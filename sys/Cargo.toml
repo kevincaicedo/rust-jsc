@@ -1,0 +1,18 @@
+[package]
+name = "rust_jsc_sys"
+description = "Low-level bindings to JavaScriptCore"
+keywords = [ "javascriptcore", "javascript" ]
+authors = [ "Kevin Caicedo <ing.sys.kevincaicedo@gmail.com>" ]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+build = "build.rs"
+
+[features]
+default = ["patches"]
+patches = []
+
+[lib]
+
+[build-dependencies]
+pkg-config = "0.3.19"

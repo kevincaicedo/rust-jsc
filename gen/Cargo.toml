@@ -1,0 +1,14 @@
+[package]
+name = "rust_jsc_gen"
+description = "Low-level bindings to JavaScriptCore"
+keywords = [ "javascriptcore", "javascript" ]
+authors = [ "Kevin Caicedo <ing.sys.kevincaicedo@gmail.com>" ]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+build = "build.rs"
+
+[lib]
+
+[build-dependencies]
+bindgen = "0.69.4"

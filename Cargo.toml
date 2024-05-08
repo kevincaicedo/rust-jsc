@@ -1,0 +1,17 @@
+[workspace]
+members = ["sys", "macros", "gen"]
+
+# exclude workspace member
+exclude = ["examples/hello_world"]
+
+[package]
+name = "rust_jsc"
+description = "Low-level bindings to JavaScriptCore"
+keywords = [ "javascriptcore", "javascript" ]
+authors = [ "Kevin Caicedo <ing.sys.kevincaicedo@gmail.com>" ]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rust_jsc_sys = { path = "./sys", features = ["patches"] }
+rust_jsc_macros = { path = "./macros" }

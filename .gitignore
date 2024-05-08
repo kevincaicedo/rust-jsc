@@ -1,0 +1,7 @@
+local/*
+tmp/*
+.tmp
+*.log
+*.pid
+target
+.cargo
