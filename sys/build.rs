@@ -32,4 +32,20 @@ fn main() {
 }
 
 #[cfg(target_os = "linux")]
-fn main() {}
+fn main() {
+    let lib_path = env::var("JSC_LIBS_PATH").unwrap();
+    println!("cargo:rustc-link-search=native={}", lib_path);
+    
+    // dylib
+    println!("cargo:rustc-link-lib=static=stdc++");
+    // println!("cargo:rustc-link-lib=static=mvec");
+    
+    println!("cargo:rustc-link-lib=static=icui18n");
+    println!("cargo:rustc-link-lib=static=icuuc");
+    println!("cargo:rustc-link-lib=static=icudata");
+    println!("cargo:rustc-link-lib=static=atomic");
+
+    println!("cargo:rustc-link-lib=static=JavaScriptCore");
+    println!("cargo:rustc-link-lib=static=WTF");
+    println!("cargo:rustc-link-lib=static=bmalloc");
+}

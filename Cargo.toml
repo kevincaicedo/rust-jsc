@@ -1,8 +1,8 @@
 [workspace]
-members = ["sys", "macros", "gen"]
+members = ["sys", "macros"]
 
 # exclude workspace member
-exclude = ["examples/hello_world"]
+exclude = ["examples/hello_world", "gen"]
 
 [package]
 name = "rust_jsc"

@@ -1,0 +1,3 @@
+[submodule "WebKit"]
+	path = WebKit
+	url = git@github.com:kevincaicedo/Kedo-WebKit.git

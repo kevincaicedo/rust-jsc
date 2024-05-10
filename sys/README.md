@@ -1,3 +1,16 @@
+# Env Variables
+
+## MacOS
+```bash
+export WEBKIT_PATH=/Users/${user}/Documents/Projects/WebKit
+```
+
+## Linux
+```bash
+export JSC_LIBS_PATH=/Users/${user}/Documents/Projects/libs
+```
+
+The default JSC LIBS path is relative to the library path. If you have a different path, you can set the `JSC_LIBS_PATH` environment variable to the correct path.
 
 # Throuble shooting
 
