@@ -2,7 +2,7 @@
 members = ["sys", "macros"]
 
 # exclude workspace member
-exclude = ["examples/hello_world", "gen"]
+exclude = ["examples/hello_world", "gen", "WebKit"]
 
 [package]
 name = "rust_jsc"

@@ -49,7 +49,9 @@ where
     pub fn get(&self, bit_offset: usize, bit_width: u8) -> u64 {
         debug_assert!(bit_width <= 64);
         debug_assert!(bit_offset / 8 < self.storage.as_ref().len());
-        debug_assert!((bit_offset + (bit_width as usize)) / 8 <= self.storage.as_ref().len());
+        debug_assert!(
+            (bit_offset + (bit_width as usize)) / 8 <= self.storage.as_ref().len()
+        );
         let mut val = 0;
         for i in 0..(bit_width as usize) {
             if self.get_bit(i + bit_offset) {
@@ -67,7 +69,9 @@ where
     pub fn set(&mut self, bit_offset: usize, bit_width: u8, val: u64) {
         debug_assert!(bit_width <= 64);
         debug_assert!(bit_offset / 8 < self.storage.as_ref().len());
-        debug_assert!((bit_offset + (bit_width as usize)) / 8 <= self.storage.as_ref().len());
+        debug_assert!(
+            (bit_offset + (bit_width as usize)) / 8 <= self.storage.as_ref().len()
+        );
         for i in 0..(bit_width as usize) {
             let mask = 1 << i;
             let val_bit_is_set = val & mask == mask;
@@ -2394,11 +2398,9 @@ pub const __COREFOUNDATION_CFSTRINGTOKENIZER__: u32 = 1;
 pub const __COREFOUNDATION_CFFILEDESCRIPTOR__: u32 = 1;
 pub const __COREFOUNDATION_CFUSERNOTIFICATION__: u32 = 1;
 pub const __COREFOUNDATION_CFXMLNODE__: u32 = 1;
-pub const __CFXMLNode_DEPRECATION_MSG: &[u8; 83] =
-    b"CFXMLNode is deprecated, use NSXMLParser, NSXMLDocument or libxml2 library instead\0";
+pub const __CFXMLNode_DEPRECATION_MSG : & [u8 ; 83] = b"CFXMLNode is deprecated, use NSXMLParser, NSXMLDocument or libxml2 library instead\0" ;
 pub const __COREFOUNDATION_CFXMLPARSER__: u32 = 1;
-pub const __CFXMLParser_DEPRECATION_MSG: &[u8; 85] =
-    b"CFXMLParser is deprecated, use NSXMLParser, NSXMLDocument or libxml2 library instead\0";
+pub const __CFXMLParser_DEPRECATION_MSG : & [u8 ; 85] = b"CFXMLParser is deprecated, use NSXMLParser, NSXMLDocument or libxml2 library instead\0" ;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct OpaqueJSContextGroup {
@@ -2511,7 +2513,8 @@ pub union __mbstate_t {
 }
 #[test]
 fn bindgen_test_layout___mbstate_t() {
-    const UNINIT: ::std::mem::MaybeUninit<__mbstate_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__mbstate_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__mbstate_t>(),
@@ -2591,7 +2594,8 @@ pub type __darwin_uuid_string_t = [::std::os::raw::c_char; 37usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct __darwin_pthread_handler_rec {
-    pub __routine: ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void)>,
+    pub __routine:
+        ::std::option::Option<unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void)>,
     pub __arg: *mut ::std::os::raw::c_void,
     pub __next: *mut __darwin_pthread_handler_rec,
 }
@@ -2986,7 +2990,8 @@ pub struct _opaque_pthread_t {
 }
 #[test]
 fn bindgen_test_layout__opaque_pthread_t() {
-    const UNINIT: ::std::mem::MaybeUninit<_opaque_pthread_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<_opaque_pthread_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<_opaque_pthread_t>(),
@@ -3064,7 +3069,8 @@ pub struct _OSUnalignedU16 {
 }
 #[test]
 fn bindgen_test_layout__OSUnalignedU16() {
-    const UNINIT: ::std::mem::MaybeUninit<_OSUnalignedU16> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<_OSUnalignedU16> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<_OSUnalignedU16>(),
@@ -3094,7 +3100,8 @@ pub struct _OSUnalignedU32 {
 }
 #[test]
 fn bindgen_test_layout__OSUnalignedU32() {
-    const UNINIT: ::std::mem::MaybeUninit<_OSUnalignedU32> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<_OSUnalignedU32> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<_OSUnalignedU32>(),
@@ -3124,7 +3131,8 @@ pub struct _OSUnalignedU64 {
 }
 #[test]
 fn bindgen_test_layout__OSUnalignedU64() {
-    const UNINIT: ::std::mem::MaybeUninit<_OSUnalignedU64> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<_OSUnalignedU64> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<_OSUnalignedU64>(),
@@ -3361,7 +3369,8 @@ pub struct _RuneCharClass {
 }
 #[test]
 fn bindgen_test_layout__RuneCharClass() {
-    const UNINIT: ::std::mem::MaybeUninit<_RuneCharClass> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<_RuneCharClass> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<_RuneCharClass>(),
@@ -3428,7 +3437,8 @@ pub struct _RuneLocale {
 }
 #[test]
 fn bindgen_test_layout__RuneLocale() {
-    const UNINIT: ::std::mem::MaybeUninit<_RuneLocale> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<_RuneLocale> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<_RuneLocale>(),
@@ -3864,7 +3874,9 @@ fn bindgen_test_layout_lconv() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).int_p_sep_by_space) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).int_p_sep_by_space) as usize - ptr as usize
+        },
         90usize,
         concat!(
             "Offset of field: ",
@@ -3874,7 +3886,9 @@ fn bindgen_test_layout_lconv() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).int_n_sep_by_space) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).int_n_sep_by_space) as usize - ptr as usize
+        },
         91usize,
         concat!(
             "Offset of field: ",
@@ -4677,7 +4691,8 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn siglongjmp(arg1: *mut ::std::os::raw::c_int, arg2: ::std::os::raw::c_int) -> !;
+    pub fn siglongjmp(arg1: *mut ::std::os::raw::c_int, arg2: ::std::os::raw::c_int)
+        -> !;
 }
 extern "C" {
     pub fn longjmperror();
@@ -5118,7 +5133,8 @@ pub struct __arm_pagein_state {
 }
 #[test]
 fn bindgen_test_layout___arm_pagein_state() {
-    const UNINIT: ::std::mem::MaybeUninit<__arm_pagein_state> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__arm_pagein_state> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__arm_pagein_state>(),
@@ -5395,7 +5411,8 @@ pub struct __darwin_mcontext32 {
 }
 #[test]
 fn bindgen_test_layout___darwin_mcontext32() {
-    const UNINIT: ::std::mem::MaybeUninit<__darwin_mcontext32> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__darwin_mcontext32> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__darwin_mcontext32>(),
@@ -5448,7 +5465,8 @@ pub struct __darwin_mcontext64 {
 }
 #[test]
 fn bindgen_test_layout___darwin_mcontext64() {
-    const UNINIT: ::std::mem::MaybeUninit<__darwin_mcontext64> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__darwin_mcontext64> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__darwin_mcontext64>(),
@@ -5501,7 +5519,8 @@ pub struct __darwin_sigaltstack {
 }
 #[test]
 fn bindgen_test_layout___darwin_sigaltstack() {
-    const UNINIT: ::std::mem::MaybeUninit<__darwin_sigaltstack> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__darwin_sigaltstack> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__darwin_sigaltstack>(),
@@ -5557,7 +5576,8 @@ pub struct __darwin_ucontext {
 }
 #[test]
 fn bindgen_test_layout___darwin_ucontext() {
-    const UNINIT: ::std::mem::MaybeUninit<__darwin_ucontext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__darwin_ucontext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__darwin_ucontext>(),
@@ -5727,7 +5747,9 @@ fn bindgen_test_layout_sigevent() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sigev_notify_function) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).sigev_notify_function) as usize - ptr as usize
+        },
         16usize,
         concat!(
             "Offset of field: ",
@@ -5737,7 +5759,9 @@ fn bindgen_test_layout_sigevent() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).sigev_notify_attributes) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).sigev_notify_attributes) as usize - ptr as usize
+        },
         24usize,
         concat!(
             "Offset of field: ",
@@ -5880,7 +5904,8 @@ pub type siginfo_t = __siginfo;
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union __sigaction_u {
-    pub __sa_handler: ::std::option::Option<unsafe extern "C" fn(arg1: ::std::os::raw::c_int)>,
+    pub __sa_handler:
+        ::std::option::Option<unsafe extern "C" fn(arg1: ::std::os::raw::c_int)>,
     pub __sa_sigaction: ::std::option::Option<
         unsafe extern "C" fn(
             arg1: ::std::os::raw::c_int,
@@ -5891,7 +5916,8 @@ pub union __sigaction_u {
 }
 #[test]
 fn bindgen_test_layout___sigaction_u() {
-    const UNINIT: ::std::mem::MaybeUninit<__sigaction_u> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__sigaction_u> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__sigaction_u>(),
@@ -5942,7 +5968,8 @@ pub struct __sigaction {
 }
 #[test]
 fn bindgen_test_layout___sigaction() {
-    const UNINIT: ::std::mem::MaybeUninit<__sigaction> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<__sigaction> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<__sigaction>(),
@@ -6051,7 +6078,8 @@ pub type sig_t = ::std::option::Option<unsafe extern "C" fn(arg1: ::std::os::raw
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct sigvec {
-    pub sv_handler: ::std::option::Option<unsafe extern "C" fn(arg1: ::std::os::raw::c_int)>,
+    pub sv_handler:
+        ::std::option::Option<unsafe extern "C" fn(arg1: ::std::os::raw::c_int)>,
     pub sv_mask: ::std::os::raw::c_int,
     pub sv_flags: ::std::os::raw::c_int,
 }
@@ -6179,7 +6207,10 @@ extern "C" {
     pub fn killpg(arg1: pid_t, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn pthread_kill(arg1: pthread_t, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+    pub fn pthread_kill(
+        arg1: pthread_t,
+        arg2: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn pthread_sigmask(
@@ -6196,13 +6227,20 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn sigaddset(arg1: *mut sigset_t, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+    pub fn sigaddset(
+        arg1: *mut sigset_t,
+        arg2: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn sigaltstack(arg1: *const stack_t, arg2: *mut stack_t) -> ::std::os::raw::c_int;
+    pub fn sigaltstack(arg1: *const stack_t, arg2: *mut stack_t)
+        -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn sigdelset(arg1: *mut sigset_t, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+    pub fn sigdelset(
+        arg1: *mut sigset_t,
+        arg2: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn sigemptyset(arg1: *mut sigset_t) -> ::std::os::raw::c_int;
@@ -6223,8 +6261,10 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn sigismember(arg1: *const sigset_t, arg2: ::std::os::raw::c_int)
-        -> ::std::os::raw::c_int;
+    pub fn sigismember(
+        arg1: *const sigset_t,
+        arg2: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn sigpause(arg1: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
@@ -6664,7 +6704,10 @@ extern "C" {
     pub fn fputc(arg1: ::std::os::raw::c_int, arg2: *mut FILE) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn fputs(arg1: *const ::std::os::raw::c_char, arg2: *mut FILE) -> ::std::os::raw::c_int;
+    pub fn fputs(
+        arg1: *const ::std::os::raw::c_char,
+        arg2: *mut FILE,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn fread(
@@ -6806,7 +6849,10 @@ extern "C" {
     pub fn ctermid(arg1: *mut ::std::os::raw::c_char) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
-    pub fn fdopen(arg1: ::std::os::raw::c_int, arg2: *const ::std::os::raw::c_char) -> *mut FILE;
+    pub fn fdopen(
+        arg1: ::std::os::raw::c_int,
+        arg2: *const ::std::os::raw::c_char,
+    ) -> *mut FILE;
 }
 extern "C" {
     pub fn fileno(arg1: *mut FILE) -> ::std::os::raw::c_int;
@@ -6831,7 +6877,8 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn __swbuf(arg1: ::std::os::raw::c_int, arg2: *mut FILE) -> ::std::os::raw::c_int;
+    pub fn __swbuf(arg1: ::std::os::raw::c_int, arg2: *mut FILE)
+        -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn flockfile(arg1: *mut FILE);
@@ -6849,7 +6896,10 @@ extern "C" {
     pub fn getchar_unlocked() -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn putc_unlocked(arg1: ::std::os::raw::c_int, arg2: *mut FILE) -> ::std::os::raw::c_int;
+    pub fn putc_unlocked(
+        arg1: ::std::os::raw::c_int,
+        arg2: *mut FILE,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn putchar_unlocked(arg1: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
@@ -7024,7 +7074,9 @@ extern "C" {
             ) -> fpos_t,
         >,
         arg5: ::std::option::Option<
-            unsafe extern "C" fn(arg1: *mut ::std::os::raw::c_void) -> ::std::os::raw::c_int,
+            unsafe extern "C" fn(
+                arg1: *mut ::std::os::raw::c_void,
+            ) -> ::std::os::raw::c_int,
         >,
     ) -> *mut FILE;
 }
@@ -7325,7 +7377,8 @@ pub struct rusage_info_v0 {
 }
 #[test]
 fn bindgen_test_layout_rusage_info_v0() {
-    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v0> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v0> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<rusage_info_v0>(),
@@ -7378,7 +7431,9 @@ fn bindgen_test_layout_rusage_info_v0() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize
+        },
         40usize,
         concat!(
             "Offset of field: ",
@@ -7428,7 +7483,9 @@ fn bindgen_test_layout_rusage_info_v0() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize
+        },
         80usize,
         concat!(
             "Offset of field: ",
@@ -7438,7 +7495,9 @@ fn bindgen_test_layout_rusage_info_v0() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize
+        },
         88usize,
         concat!(
             "Offset of field: ",
@@ -7471,7 +7530,8 @@ pub struct rusage_info_v1 {
 }
 #[test]
 fn bindgen_test_layout_rusage_info_v1() {
-    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v1> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v1> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<rusage_info_v1>(),
@@ -7524,7 +7584,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize
+        },
         40usize,
         concat!(
             "Offset of field: ",
@@ -7574,7 +7636,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize
+        },
         80usize,
         concat!(
             "Offset of field: ",
@@ -7584,7 +7648,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize
+        },
         88usize,
         concat!(
             "Offset of field: ",
@@ -7594,7 +7660,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize
+        },
         96usize,
         concat!(
             "Offset of field: ",
@@ -7604,7 +7672,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize
+        },
         104usize,
         concat!(
             "Offset of field: ",
@@ -7614,7 +7684,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize
+        },
         112usize,
         concat!(
             "Offset of field: ",
@@ -7624,7 +7696,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize
+        },
         120usize,
         concat!(
             "Offset of field: ",
@@ -7644,7 +7718,9 @@ fn bindgen_test_layout_rusage_info_v1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize
+        },
         136usize,
         concat!(
             "Offset of field: ",
@@ -7679,7 +7755,8 @@ pub struct rusage_info_v2 {
 }
 #[test]
 fn bindgen_test_layout_rusage_info_v2() {
-    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v2> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v2> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<rusage_info_v2>(),
@@ -7732,7 +7809,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize
+        },
         40usize,
         concat!(
             "Offset of field: ",
@@ -7782,7 +7861,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize
+        },
         80usize,
         concat!(
             "Offset of field: ",
@@ -7792,7 +7873,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize
+        },
         88usize,
         concat!(
             "Offset of field: ",
@@ -7802,7 +7885,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize
+        },
         96usize,
         concat!(
             "Offset of field: ",
@@ -7812,7 +7897,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize
+        },
         104usize,
         concat!(
             "Offset of field: ",
@@ -7822,7 +7909,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize
+        },
         112usize,
         concat!(
             "Offset of field: ",
@@ -7832,7 +7921,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize
+        },
         120usize,
         concat!(
             "Offset of field: ",
@@ -7852,7 +7943,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize
+        },
         136usize,
         concat!(
             "Offset of field: ",
@@ -7862,7 +7955,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize
+        },
         144usize,
         concat!(
             "Offset of field: ",
@@ -7872,7 +7967,9 @@ fn bindgen_test_layout_rusage_info_v2() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize
+        },
         152usize,
         concat!(
             "Offset of field: ",
@@ -7916,7 +8013,8 @@ pub struct rusage_info_v3 {
 }
 #[test]
 fn bindgen_test_layout_rusage_info_v3() {
-    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v3> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v3> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<rusage_info_v3>(),
@@ -7969,7 +8067,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize
+        },
         40usize,
         concat!(
             "Offset of field: ",
@@ -8019,7 +8119,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize
+        },
         80usize,
         concat!(
             "Offset of field: ",
@@ -8029,7 +8131,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize
+        },
         88usize,
         concat!(
             "Offset of field: ",
@@ -8039,7 +8143,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize
+        },
         96usize,
         concat!(
             "Offset of field: ",
@@ -8049,7 +8155,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize
+        },
         104usize,
         concat!(
             "Offset of field: ",
@@ -8059,7 +8167,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize
+        },
         112usize,
         concat!(
             "Offset of field: ",
@@ -8069,7 +8179,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize
+        },
         120usize,
         concat!(
             "Offset of field: ",
@@ -8089,7 +8201,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize
+        },
         136usize,
         concat!(
             "Offset of field: ",
@@ -8099,7 +8213,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize
+        },
         144usize,
         concat!(
             "Offset of field: ",
@@ -8109,7 +8225,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize
+        },
         152usize,
         concat!(
             "Offset of field: ",
@@ -8119,7 +8237,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize
+        },
         160usize,
         concat!(
             "Offset of field: ",
@@ -8129,7 +8249,10 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize
+                - ptr as usize
+        },
         168usize,
         concat!(
             "Offset of field: ",
@@ -8139,7 +8262,10 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize
+                - ptr as usize
+        },
         176usize,
         concat!(
             "Offset of field: ",
@@ -8149,7 +8275,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize
+        },
         184usize,
         concat!(
             "Offset of field: ",
@@ -8159,7 +8287,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize
+        },
         192usize,
         concat!(
             "Offset of field: ",
@@ -8170,7 +8300,8 @@ fn bindgen_test_layout_rusage_info_v3() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize
+                - ptr as usize
         },
         200usize,
         concat!(
@@ -8182,7 +8313,8 @@ fn bindgen_test_layout_rusage_info_v3() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize
+                - ptr as usize
         },
         208usize,
         concat!(
@@ -8193,7 +8325,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize
+        },
         216usize,
         concat!(
             "Offset of field: ",
@@ -8203,7 +8337,9 @@ fn bindgen_test_layout_rusage_info_v3() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize
+        },
         224usize,
         concat!(
             "Offset of field: ",
@@ -8255,7 +8391,8 @@ pub struct rusage_info_v4 {
 }
 #[test]
 fn bindgen_test_layout_rusage_info_v4() {
-    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v4> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v4> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<rusage_info_v4>(),
@@ -8308,7 +8445,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize
+        },
         40usize,
         concat!(
             "Offset of field: ",
@@ -8358,7 +8497,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize
+        },
         80usize,
         concat!(
             "Offset of field: ",
@@ -8368,7 +8509,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize
+        },
         88usize,
         concat!(
             "Offset of field: ",
@@ -8378,7 +8521,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize
+        },
         96usize,
         concat!(
             "Offset of field: ",
@@ -8388,7 +8533,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize
+        },
         104usize,
         concat!(
             "Offset of field: ",
@@ -8398,7 +8545,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize
+        },
         112usize,
         concat!(
             "Offset of field: ",
@@ -8408,7 +8557,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize
+        },
         120usize,
         concat!(
             "Offset of field: ",
@@ -8428,7 +8579,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize
+        },
         136usize,
         concat!(
             "Offset of field: ",
@@ -8438,7 +8591,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize
+        },
         144usize,
         concat!(
             "Offset of field: ",
@@ -8448,7 +8603,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize
+        },
         152usize,
         concat!(
             "Offset of field: ",
@@ -8458,7 +8615,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize
+        },
         160usize,
         concat!(
             "Offset of field: ",
@@ -8468,7 +8627,10 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize
+                - ptr as usize
+        },
         168usize,
         concat!(
             "Offset of field: ",
@@ -8478,7 +8640,10 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize
+                - ptr as usize
+        },
         176usize,
         concat!(
             "Offset of field: ",
@@ -8488,7 +8653,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize
+        },
         184usize,
         concat!(
             "Offset of field: ",
@@ -8498,7 +8665,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize
+        },
         192usize,
         concat!(
             "Offset of field: ",
@@ -8509,7 +8678,8 @@ fn bindgen_test_layout_rusage_info_v4() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize
+                - ptr as usize
         },
         200usize,
         concat!(
@@ -8521,7 +8691,8 @@ fn bindgen_test_layout_rusage_info_v4() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize
+                - ptr as usize
         },
         208usize,
         concat!(
@@ -8532,7 +8703,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize
+        },
         216usize,
         concat!(
             "Offset of field: ",
@@ -8542,7 +8715,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize
+        },
         224usize,
         concat!(
             "Offset of field: ",
@@ -8563,7 +8738,8 @@ fn bindgen_test_layout_rusage_info_v4() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_lifetime_max_phys_footprint) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_lifetime_max_phys_footprint) as usize
+                - ptr as usize
         },
         240usize,
         concat!(
@@ -8604,7 +8780,9 @@ fn bindgen_test_layout_rusage_info_v4() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_serviced_energy) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_serviced_energy) as usize - ptr as usize
+        },
         272usize,
         concat!(
             "Offset of field: ",
@@ -8615,7 +8793,8 @@ fn bindgen_test_layout_rusage_info_v4() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_interval_max_phys_footprint) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_interval_max_phys_footprint) as usize
+                - ptr as usize
         },
         280usize,
         concat!(
@@ -8679,7 +8858,8 @@ pub struct rusage_info_v5 {
 }
 #[test]
 fn bindgen_test_layout_rusage_info_v5() {
-    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v5> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v5> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<rusage_info_v5>(),
@@ -8732,7 +8912,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize
+        },
         40usize,
         concat!(
             "Offset of field: ",
@@ -8782,7 +8964,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize
+        },
         80usize,
         concat!(
             "Offset of field: ",
@@ -8792,7 +8976,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize
+        },
         88usize,
         concat!(
             "Offset of field: ",
@@ -8802,7 +8988,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize
+        },
         96usize,
         concat!(
             "Offset of field: ",
@@ -8812,7 +9000,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize
+        },
         104usize,
         concat!(
             "Offset of field: ",
@@ -8822,7 +9012,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize
+        },
         112usize,
         concat!(
             "Offset of field: ",
@@ -8832,7 +9024,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize
+        },
         120usize,
         concat!(
             "Offset of field: ",
@@ -8852,7 +9046,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize
+        },
         136usize,
         concat!(
             "Offset of field: ",
@@ -8862,7 +9058,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize
+        },
         144usize,
         concat!(
             "Offset of field: ",
@@ -8872,7 +9070,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize
+        },
         152usize,
         concat!(
             "Offset of field: ",
@@ -8882,7 +9082,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize
+        },
         160usize,
         concat!(
             "Offset of field: ",
@@ -8892,7 +9094,10 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize
+                - ptr as usize
+        },
         168usize,
         concat!(
             "Offset of field: ",
@@ -8902,7 +9107,10 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize
+                - ptr as usize
+        },
         176usize,
         concat!(
             "Offset of field: ",
@@ -8912,7 +9120,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize
+        },
         184usize,
         concat!(
             "Offset of field: ",
@@ -8922,7 +9132,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize
+        },
         192usize,
         concat!(
             "Offset of field: ",
@@ -8933,7 +9145,8 @@ fn bindgen_test_layout_rusage_info_v5() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize
+                - ptr as usize
         },
         200usize,
         concat!(
@@ -8945,7 +9158,8 @@ fn bindgen_test_layout_rusage_info_v5() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize
+                - ptr as usize
         },
         208usize,
         concat!(
@@ -8956,7 +9170,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize
+        },
         216usize,
         concat!(
             "Offset of field: ",
@@ -8966,7 +9182,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize
+        },
         224usize,
         concat!(
             "Offset of field: ",
@@ -8987,7 +9205,8 @@ fn bindgen_test_layout_rusage_info_v5() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_lifetime_max_phys_footprint) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_lifetime_max_phys_footprint) as usize
+                - ptr as usize
         },
         240usize,
         concat!(
@@ -9028,7 +9247,9 @@ fn bindgen_test_layout_rusage_info_v5() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_serviced_energy) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_serviced_energy) as usize - ptr as usize
+        },
         272usize,
         concat!(
             "Offset of field: ",
@@ -9039,7 +9260,8 @@ fn bindgen_test_layout_rusage_info_v5() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_interval_max_phys_footprint) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_interval_max_phys_footprint) as usize
+                - ptr as usize
         },
         280usize,
         concat!(
@@ -9122,7 +9344,8 @@ pub struct rusage_info_v6 {
 }
 #[test]
 fn bindgen_test_layout_rusage_info_v6() {
-    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v6> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<rusage_info_v6> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<rusage_info_v6>(),
@@ -9175,7 +9398,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_interrupt_wkups) as usize - ptr as usize
+        },
         40usize,
         concat!(
             "Offset of field: ",
@@ -9225,7 +9450,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_start_abstime) as usize - ptr as usize
+        },
         80usize,
         concat!(
             "Offset of field: ",
@@ -9235,7 +9462,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_proc_exit_abstime) as usize - ptr as usize
+        },
         88usize,
         concat!(
             "Offset of field: ",
@@ -9245,7 +9474,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_user_time) as usize - ptr as usize
+        },
         96usize,
         concat!(
             "Offset of field: ",
@@ -9255,7 +9486,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_system_time) as usize - ptr as usize
+        },
         104usize,
         concat!(
             "Offset of field: ",
@@ -9265,7 +9498,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_pkg_idle_wkups) as usize - ptr as usize
+        },
         112usize,
         concat!(
             "Offset of field: ",
@@ -9275,7 +9510,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_interrupt_wkups) as usize - ptr as usize
+        },
         120usize,
         concat!(
             "Offset of field: ",
@@ -9295,7 +9532,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_child_elapsed_abstime) as usize - ptr as usize
+        },
         136usize,
         concat!(
             "Offset of field: ",
@@ -9305,7 +9544,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_bytesread) as usize - ptr as usize
+        },
         144usize,
         concat!(
             "Offset of field: ",
@@ -9315,7 +9556,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_diskio_byteswritten) as usize - ptr as usize
+        },
         152usize,
         concat!(
             "Offset of field: ",
@@ -9325,7 +9568,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_default) as usize - ptr as usize
+        },
         160usize,
         concat!(
             "Offset of field: ",
@@ -9335,7 +9580,10 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_maintenance) as usize
+                - ptr as usize
+        },
         168usize,
         concat!(
             "Offset of field: ",
@@ -9345,7 +9593,10 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_background) as usize
+                - ptr as usize
+        },
         176usize,
         concat!(
             "Offset of field: ",
@@ -9355,7 +9606,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_utility) as usize - ptr as usize
+        },
         184usize,
         concat!(
             "Offset of field: ",
@@ -9365,7 +9618,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_legacy) as usize - ptr as usize
+        },
         192usize,
         concat!(
             "Offset of field: ",
@@ -9376,7 +9631,8 @@ fn bindgen_test_layout_rusage_info_v6() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_initiated) as usize
+                - ptr as usize
         },
         200usize,
         concat!(
@@ -9388,7 +9644,8 @@ fn bindgen_test_layout_rusage_info_v6() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_cpu_time_qos_user_interactive) as usize
+                - ptr as usize
         },
         208usize,
         concat!(
@@ -9399,7 +9656,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_billed_system_time) as usize - ptr as usize
+        },
         216usize,
         concat!(
             "Offset of field: ",
@@ -9409,7 +9668,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_serviced_system_time) as usize - ptr as usize
+        },
         224usize,
         concat!(
             "Offset of field: ",
@@ -9430,7 +9691,8 @@ fn bindgen_test_layout_rusage_info_v6() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_lifetime_max_phys_footprint) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_lifetime_max_phys_footprint) as usize
+                - ptr as usize
         },
         240usize,
         concat!(
@@ -9471,7 +9733,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_serviced_energy) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_serviced_energy) as usize - ptr as usize
+        },
         272usize,
         concat!(
             "Offset of field: ",
@@ -9482,7 +9746,8 @@ fn bindgen_test_layout_rusage_info_v6() {
     );
     assert_eq!(
         unsafe {
-            ::std::ptr::addr_of!((*ptr).ri_interval_max_phys_footprint) as usize - ptr as usize
+            ::std::ptr::addr_of!((*ptr).ri_interval_max_phys_footprint) as usize
+                - ptr as usize
         },
         280usize,
         concat!(
@@ -9573,7 +9838,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_secure_time_in_system) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_secure_time_in_system) as usize - ptr as usize
+        },
         352usize,
         concat!(
             "Offset of field: ",
@@ -9583,7 +9850,9 @@ fn bindgen_test_layout_rusage_info_v6() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ri_secure_ptime_in_system) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ri_secure_ptime_in_system) as usize - ptr as usize
+        },
         360usize,
         concat!(
             "Offset of field: ",
@@ -9697,10 +9966,16 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn getrlimit(arg1: ::std::os::raw::c_int, arg2: *mut rlimit) -> ::std::os::raw::c_int;
+    pub fn getrlimit(
+        arg1: ::std::os::raw::c_int,
+        arg2: *mut rlimit,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn getrusage(arg1: ::std::os::raw::c_int, arg2: *mut rusage) -> ::std::os::raw::c_int;
+    pub fn getrusage(
+        arg1: ::std::os::raw::c_int,
+        arg2: *mut rusage,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn setpriority(
@@ -9717,7 +9992,10 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn setrlimit(arg1: ::std::os::raw::c_int, arg2: *const rlimit) -> ::std::os::raw::c_int;
+    pub fn setrlimit(
+        arg1: ::std::os::raw::c_int,
+        arg2: *const rlimit,
+    ) -> ::std::os::raw::c_int;
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -9798,7 +10076,8 @@ impl wait__bindgen_ty_1 {
         w_Retcode: ::std::os::raw::c_uint,
         w_Filler: ::std::os::raw::c_uint,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 7u8, {
             let w_Termsig: u32 = unsafe { ::std::mem::transmute(w_Termsig) };
             w_Termsig as u64
@@ -9878,7 +10157,8 @@ impl wait__bindgen_ty_2 {
         w_Stopsig: ::std::os::raw::c_uint,
         w_Filler: ::std::os::raw::c_uint,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
             let w_Stopval: u32 = unsafe { ::std::mem::transmute(w_Stopval) };
             w_Stopval as u64
@@ -10234,7 +10514,9 @@ extern "C" {
     pub fn abs(arg1: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn atexit(arg1: ::std::option::Option<unsafe extern "C" fn()>) -> ::std::os::raw::c_int;
+    pub fn atexit(
+        arg1: ::std::option::Option<unsafe extern "C" fn()>,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn atof(arg1: *const ::std::os::raw::c_char) -> f64;
@@ -10281,13 +10563,21 @@ extern "C" {
     pub fn llabs(arg1: ::std::os::raw::c_longlong) -> ::std::os::raw::c_longlong;
 }
 extern "C" {
-    pub fn lldiv(arg1: ::std::os::raw::c_longlong, arg2: ::std::os::raw::c_longlong) -> lldiv_t;
+    pub fn lldiv(
+        arg1: ::std::os::raw::c_longlong,
+        arg2: ::std::os::raw::c_longlong,
+    ) -> lldiv_t;
 }
 extern "C" {
-    pub fn mblen(__s: *const ::std::os::raw::c_char, __n: usize) -> ::std::os::raw::c_int;
+    pub fn mblen(__s: *const ::std::os::raw::c_char, __n: usize)
+        -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn mbstowcs(arg1: *mut wchar_t, arg2: *const ::std::os::raw::c_char, arg3: usize) -> usize;
+    pub fn mbstowcs(
+        arg1: *mut wchar_t,
+        arg2: *const ::std::os::raw::c_char,
+        arg3: usize,
+    ) -> usize;
 }
 extern "C" {
     pub fn mbtowc(
@@ -10365,10 +10655,17 @@ extern "C" {
     pub fn system(arg1: *const ::std::os::raw::c_char) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn wcstombs(arg1: *mut ::std::os::raw::c_char, arg2: *const wchar_t, arg3: usize) -> usize;
+    pub fn wcstombs(
+        arg1: *mut ::std::os::raw::c_char,
+        arg2: *const wchar_t,
+        arg3: usize,
+    ) -> usize;
 }
 extern "C" {
-    pub fn wctomb(arg1: *mut ::std::os::raw::c_char, arg2: wchar_t) -> ::std::os::raw::c_int;
+    pub fn wctomb(
+        arg1: *mut ::std::os::raw::c_char,
+        arg2: wchar_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn _Exit(arg1: ::std::os::raw::c_int) -> !;
@@ -10507,7 +10804,10 @@ extern "C" {
     pub fn arc4random() -> u32;
 }
 extern "C" {
-    pub fn arc4random_addrandom(arg1: *mut ::std::os::raw::c_uchar, arg2: ::std::os::raw::c_int);
+    pub fn arc4random_addrandom(
+        arg1: *mut ::std::os::raw::c_uchar,
+        arg2: ::std::os::raw::c_int,
+    );
 }
 extern "C" {
     pub fn arc4random_buf(__buf: *mut ::std::os::raw::c_void, __nbytes: usize);
@@ -10613,7 +10913,10 @@ extern "C" {
     ) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
-    pub fn getloadavg(arg1: *mut f64, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+    pub fn getloadavg(
+        arg1: *mut f64,
+        arg2: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn getprogname() -> *const ::std::os::raw::c_char;
@@ -11383,7 +11686,10 @@ extern "C" {
     pub fn timegm(arg1: *mut tm) -> time_t;
 }
 extern "C" {
-    pub fn nanosleep(__rqtp: *const timespec, __rmtp: *mut timespec) -> ::std::os::raw::c_int;
+    pub fn nanosleep(
+        __rqtp: *const timespec,
+        __rmtp: *mut timespec,
+    ) -> ::std::os::raw::c_int;
 }
 pub const clockid_t__CLOCK_REALTIME: clockid_t = 0;
 pub const clockid_t__CLOCK_MONOTONIC: clockid_t = 6;
@@ -11395,19 +11701,31 @@ pub const clockid_t__CLOCK_PROCESS_CPUTIME_ID: clockid_t = 12;
 pub const clockid_t__CLOCK_THREAD_CPUTIME_ID: clockid_t = 16;
 pub type clockid_t = ::std::os::raw::c_uint;
 extern "C" {
-    pub fn clock_getres(__clock_id: clockid_t, __res: *mut timespec) -> ::std::os::raw::c_int;
+    pub fn clock_getres(
+        __clock_id: clockid_t,
+        __res: *mut timespec,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn clock_gettime(__clock_id: clockid_t, __tp: *mut timespec) -> ::std::os::raw::c_int;
+    pub fn clock_gettime(
+        __clock_id: clockid_t,
+        __tp: *mut timespec,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn clock_gettime_nsec_np(__clock_id: clockid_t) -> __uint64_t;
 }
 extern "C" {
-    pub fn clock_settime(__clock_id: clockid_t, __tp: *const timespec) -> ::std::os::raw::c_int;
+    pub fn clock_settime(
+        __clock_id: clockid_t,
+        __tp: *const timespec,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn timespec_get(ts: *mut timespec, base: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+    pub fn timespec_get(
+        ts: *mut timespec,
+        base: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn imaxabs(j: intmax_t) -> intmax_t;
@@ -11485,7 +11803,9 @@ extern "C" {
     ) -> uintmax_t;
 }
 extern "C" {
-    pub fn _Block_copy(aBlock: *const ::std::os::raw::c_void) -> *mut ::std::os::raw::c_void;
+    pub fn _Block_copy(
+        aBlock: *const ::std::os::raw::c_void,
+    ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
     pub fn _Block_release(aBlock: *const ::std::os::raw::c_void);
@@ -11498,7 +11818,10 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn _Block_object_dispose(arg1: *const ::std::os::raw::c_void, arg2: ::std::os::raw::c_int);
+    pub fn _Block_object_dispose(
+        arg1: *const ::std::os::raw::c_void,
+        arg2: ::std::os::raw::c_int,
+    );
 }
 extern "C" {
     pub static mut _NSConcreteGlobalBlock: [*mut ::std::os::raw::c_void; 32usize];
@@ -11551,7 +11874,8 @@ pub struct UnsignedWide {
 }
 #[test]
 fn bindgen_test_layout_UnsignedWide() {
-    const UNINIT: ::std::mem::MaybeUninit<UnsignedWide> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<UnsignedWide> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<UnsignedWide>(),
@@ -11686,7 +12010,8 @@ pub struct Float32Point {
 }
 #[test]
 fn bindgen_test_layout_Float32Point() {
-    const UNINIT: ::std::mem::MaybeUninit<Float32Point> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<Float32Point> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<Float32Point>(),
@@ -11744,7 +12069,8 @@ pub type ResType = FourCharCode;
 pub type OSTypePtr = *mut OSType;
 pub type ResTypePtr = *mut ResType;
 pub type Boolean = ::std::os::raw::c_uchar;
-pub type ProcPtr = ::std::option::Option<unsafe extern "C" fn() -> ::std::os::raw::c_long>;
+pub type ProcPtr =
+    ::std::option::Option<unsafe extern "C" fn() -> ::std::os::raw::c_long>;
 pub type Register68kProcPtr = ::std::option::Option<unsafe extern "C" fn()>;
 pub type UniversalProcPtr = ProcPtr;
 pub type ProcHandle = *mut ProcPtr;
@@ -11794,7 +12120,8 @@ pub struct ProcessSerialNumber {
 }
 #[test]
 fn bindgen_test_layout_ProcessSerialNumber() {
-    const UNINIT: ::std::mem::MaybeUninit<ProcessSerialNumber> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<ProcessSerialNumber> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<ProcessSerialNumber>(),
@@ -12174,7 +12501,8 @@ pub union NumVersionVariant {
 }
 #[test]
 fn bindgen_test_layout_NumVersionVariant() {
-    const UNINIT: ::std::mem::MaybeUninit<NumVersionVariant> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<NumVersionVariant> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<NumVersionVariant>(),
@@ -12406,12 +12734,15 @@ extern "C" {
     pub static kCFAllocatorUseContext: CFAllocatorRef;
 }
 pub type CFAllocatorRetainCallBack = ::std::option::Option<
-    unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+    unsafe extern "C" fn(
+        info: *const ::std::os::raw::c_void,
+    ) -> *const ::std::os::raw::c_void,
 >;
 pub type CFAllocatorReleaseCallBack =
     ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>;
-pub type CFAllocatorCopyDescriptionCallBack =
-    ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef>;
+pub type CFAllocatorCopyDescriptionCallBack = ::std::option::Option<
+    unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
+>;
 pub type CFAllocatorAllocateCallBack = ::std::option::Option<
     unsafe extern "C" fn(
         allocSize: CFIndex,
@@ -12428,7 +12759,10 @@ pub type CFAllocatorReallocateCallBack = ::std::option::Option<
     ) -> *mut ::std::os::raw::c_void,
 >;
 pub type CFAllocatorDeallocateCallBack = ::std::option::Option<
-    unsafe extern "C" fn(ptr: *mut ::std::os::raw::c_void, info: *mut ::std::os::raw::c_void),
+    unsafe extern "C" fn(
+        ptr: *mut ::std::os::raw::c_void,
+        info: *mut ::std::os::raw::c_void,
+    ),
 >;
 pub type CFAllocatorPreferredSizeCallBack = ::std::option::Option<
     unsafe extern "C" fn(
@@ -12452,7 +12786,8 @@ pub struct CFAllocatorContext {
 }
 #[test]
 fn bindgen_test_layout_CFAllocatorContext() {
-    const UNINIT: ::std::mem::MaybeUninit<CFAllocatorContext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFAllocatorContext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFAllocatorContext>(),
@@ -12586,7 +12921,10 @@ extern "C" {
     ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
-    pub fn CFAllocatorDeallocate(allocator: CFAllocatorRef, ptr: *mut ::std::os::raw::c_void);
+    pub fn CFAllocatorDeallocate(
+        allocator: CFAllocatorRef,
+        ptr: *mut ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     pub fn CFAllocatorGetPreferredSizeForSize(
@@ -12596,7 +12934,10 @@ extern "C" {
     ) -> CFIndex;
 }
 extern "C" {
-    pub fn CFAllocatorGetContext(allocator: CFAllocatorRef, context: *mut CFAllocatorContext);
+    pub fn CFAllocatorGetContext(
+        allocator: CFAllocatorRef,
+        context: *mut CFAllocatorContext,
+    );
 }
 extern "C" {
     pub fn CFGetTypeID(cf: CFTypeRef) -> CFTypeID;
@@ -12684,7 +13025,8 @@ pub struct CFArrayCallBacks {
 }
 #[test]
 fn bindgen_test_layout_CFArrayCallBacks() {
-    const UNINIT: ::std::mem::MaybeUninit<CFArrayCallBacks> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFArrayCallBacks> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFArrayCallBacks>(),
@@ -12782,7 +13124,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFArrayCreateCopy\nCreates a new immutable array with the values from the given array.\n@param allocator The CFAllocator which should be used to allocate\nmemory for the array and its storage for values. This\nparameter may be NULL in which case the current default\nCFAllocator is used. If this reference is not a valid\nCFAllocator, the behavior is undefined.\n@param theArray The array which is to be copied. The values from the\narray are copied as pointers into the new array (that is,\nthe values themselves are copied, not that which the values\npoint to, if anything). However, the values are also\nretained by the new array. The count of the new array will\nbe the same as the given array. The new array uses the same\ncallbacks as the array to be copied. If this parameter is\nnot a valid CFArray, the behavior is undefined.\n@result A reference to the new immutable CFArray."]
-    pub fn CFArrayCreateCopy(allocator: CFAllocatorRef, theArray: CFArrayRef) -> CFArrayRef;
+    pub fn CFArrayCreateCopy(
+        allocator: CFAllocatorRef,
+        theArray: CFArrayRef,
+    ) -> CFArrayRef;
 }
 extern "C" {
     #[doc = "@function CFArrayCreateMutable\nCreates a new empty mutable array.\n@param allocator The CFAllocator which should be used to allocate\nmemory for the array and its storage for values. This\nparameter may be NULL in which case the current default\nCFAllocator is used. If this reference is not a valid\nCFAllocator, the behavior is undefined.\n@param capacity A hint about the number of values that will be held\nby the CFArray. Pass 0 for no hint. The implementation may\nignore this hint, or may use it to optimize various\noperations. An array's actual capacity is only limited by\naddress space and available memory constraints). If this\nparameter is negative, the behavior is undefined.\n@param callBacks A pointer to a CFArrayCallBacks structure\ninitialized with the callbacks for the array to use on each\nvalue in the array. A copy of the contents of the\ncallbacks structure is made, so that a pointer to a\nstructure on the stack can be passed in, or can be reused\nfor multiple array creations. If the version field of this\ncallbacks structure is not one of the defined ones for\nCFArray, the behavior is undefined. The retain field may be\nNULL, in which case the CFArray will do nothing to add a\nretain to the contained values for the array. The release\nfield may be NULL, in which case the CFArray will do nothing\nto remove the array's retain (if any) on the values when the\narray is destroyed. If the copyDescription field is NULL,\nthe array will create a simple description for the value. If\nthe equal field is NULL, the array will use pointer equality\nto test for equality of values. This callbacks parameter\nitself may be NULL, which is treated as if a valid structure\nof version 0 with all fields NULL had been passed in.\nOtherwise, if any of the fields are not valid pointers to\nfunctions of the correct type, or this parameter is not a\nvalid pointer to a  CFArrayCallBacks callbacks structure,\nthe behavior is undefined. If any of the values put into the\narray is not one understood by one of the callback functions\nthe behavior when that callback function is used is\nundefined.\n@result A reference to the new mutable CFArray."]
@@ -12872,7 +13217,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFArrayAppendValue\nAdds the value to the array giving it a new largest index.\n@param theArray The array to which the value is to be added. If this\nparameter is not a valid mutable CFArray, the behavior is\nundefined.\n@param value The value to add to the array. The value is retained by\nthe array using the retain callback provided when the array\nwas created. If the value is not of the sort expected by the\nretain callback, the behavior is undefined. The value is\nassigned to the index one larger than the previous largest\nindex, and the count of the array is increased by one."]
-    pub fn CFArrayAppendValue(theArray: CFMutableArrayRef, value: *const ::std::os::raw::c_void);
+    pub fn CFArrayAppendValue(
+        theArray: CFMutableArrayRef,
+        value: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     #[doc = "@function CFArrayInsertValueAtIndex\nAdds the value to the array, giving it the given index.\n@param theArray The array to which the value is to be added. If this\nparameter is not a valid mutable CFArray, the behavior is\nundefined.\n@param idx The index to which to add the new value. If the index is\noutside the index space of the array (0 to N inclusive,\nwhere N is the count of the array before the operation), the\nbehavior is undefined. If the index is the same as N, this\nfunction has the same effect as CFArrayAppendValue().\n@param value The value to add to the array. The value is retained by\nthe array using the retain callback provided when the array\nwas created. If the value is not of the sort expected by the\nretain callback, the behavior is undefined. The value is\nassigned to the given index, and all values with equal and\nlarger indices have their indexes increased by one."]
@@ -12950,8 +13298,9 @@ pub type CFBagEqualCallBack = ::std::option::Option<
         value2: *const ::std::os::raw::c_void,
     ) -> Boolean,
 >;
-pub type CFBagHashCallBack =
-    ::std::option::Option<unsafe extern "C" fn(value: *const ::std::os::raw::c_void) -> CFHashCode>;
+pub type CFBagHashCallBack = ::std::option::Option<
+    unsafe extern "C" fn(value: *const ::std::os::raw::c_void) -> CFHashCode,
+>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct CFBagCallBacks {
@@ -12964,7 +13313,8 @@ pub struct CFBagCallBacks {
 }
 #[test]
 fn bindgen_test_layout_CFBagCallBacks() {
-    const UNINIT: ::std::mem::MaybeUninit<CFBagCallBacks> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFBagCallBacks> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFBagCallBacks>(),
@@ -13088,10 +13438,16 @@ extern "C" {
     pub fn CFBagGetCount(theBag: CFBagRef) -> CFIndex;
 }
 extern "C" {
-    pub fn CFBagGetCountOfValue(theBag: CFBagRef, value: *const ::std::os::raw::c_void) -> CFIndex;
+    pub fn CFBagGetCountOfValue(
+        theBag: CFBagRef,
+        value: *const ::std::os::raw::c_void,
+    ) -> CFIndex;
 }
 extern "C" {
-    pub fn CFBagContainsValue(theBag: CFBagRef, value: *const ::std::os::raw::c_void) -> Boolean;
+    pub fn CFBagContainsValue(
+        theBag: CFBagRef,
+        value: *const ::std::os::raw::c_void,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFBagGetValue(
@@ -13120,13 +13476,19 @@ extern "C" {
     pub fn CFBagAddValue(theBag: CFMutableBagRef, value: *const ::std::os::raw::c_void);
 }
 extern "C" {
-    pub fn CFBagReplaceValue(theBag: CFMutableBagRef, value: *const ::std::os::raw::c_void);
+    pub fn CFBagReplaceValue(
+        theBag: CFMutableBagRef,
+        value: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     pub fn CFBagSetValue(theBag: CFMutableBagRef, value: *const ::std::os::raw::c_void);
 }
 extern "C" {
-    pub fn CFBagRemoveValue(theBag: CFMutableBagRef, value: *const ::std::os::raw::c_void);
+    pub fn CFBagRemoveValue(
+        theBag: CFMutableBagRef,
+        value: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     pub fn CFBagRemoveAllValues(theBag: CFMutableBagRef);
@@ -13137,9 +13499,12 @@ pub struct CFBinaryHeapCompareContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
@@ -13222,7 +13587,10 @@ pub struct CFBinaryHeapCallBacks {
         ) -> *const ::std::os::raw::c_void,
     >,
     pub release: ::std::option::Option<
-        unsafe extern "C" fn(allocator: CFAllocatorRef, ptr: *const ::std::os::raw::c_void),
+        unsafe extern "C" fn(
+            allocator: CFAllocatorRef,
+            ptr: *const ::std::os::raw::c_void,
+        ),
     >,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(ptr: *const ::std::os::raw::c_void) -> CFStringRef,
@@ -13307,7 +13675,10 @@ extern "C" {
 }
 #[doc = "@typedef CFBinaryHeapApplierFunction\nType of the callback function used by the apply functions of\nCFBinaryHeap.\n@param val The current value from the binary heap.\n@param context The user-defined context parameter given to the apply\nfunction."]
 pub type CFBinaryHeapApplierFunction = ::std::option::Option<
-    unsafe extern "C" fn(val: *const ::std::os::raw::c_void, context: *mut ::std::os::raw::c_void),
+    unsafe extern "C" fn(
+        val: *const ::std::os::raw::c_void,
+        context: *mut ::std::os::raw::c_void,
+    ),
 >;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -13357,7 +13728,8 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFBinaryHeapGetMinimum\nReturns the minimum value is in the binary heap.  If the heap contains several equal\nminimum values, any one may be returned.\n@param heap The binary heap to be searched. If this parameter is not a\nvalid CFBinaryHeap, the behavior is undefined.\n@result A reference to the minimum value in the binary heap, or NULL if the\nbinary heap contains no values."]
-    pub fn CFBinaryHeapGetMinimum(heap: CFBinaryHeapRef) -> *const ::std::os::raw::c_void;
+    pub fn CFBinaryHeapGetMinimum(heap: CFBinaryHeapRef)
+        -> *const ::std::os::raw::c_void;
 }
 extern "C" {
     #[doc = "@function CFBinaryHeapGetMinimumIfPresent\nReturns the minimum value is in the binary heap, if present.  If the heap contains several equal\nminimum values, any one may be returned.\n@param heap The binary heap to be searched. If this parameter is not a\nvalid CFBinaryHeap, the behavior is undefined.\n@param value A C pointer to pointer-sized storage to be filled with the minimum value in\nthe binary heap.  If this value is not a valid C pointer to a pointer-sized block\nof storage, the result is undefined.  If the result of the function is false, the value\nstored at this address is undefined.\n@result true, if a minimum value was found in the specified binary heap, otherwise false."]
@@ -13368,7 +13740,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFBinaryHeapGetValues\nFills the buffer with values from the binary heap.\n@param heap The binary heap to be queried. If this parameter is not a\nvalid CFBinaryHeap, the behavior is undefined.\n@param values A C array of pointer-sized values to be filled with\nvalues from the binary heap. The values in the C array are ordered\nfrom least to greatest. If this parameter is not a valid pointer to a\nC array of at least CFBinaryHeapGetCount() pointers, the behavior is undefined."]
-    pub fn CFBinaryHeapGetValues(heap: CFBinaryHeapRef, values: *mut *const ::std::os::raw::c_void);
+    pub fn CFBinaryHeapGetValues(
+        heap: CFBinaryHeapRef,
+        values: *mut *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     #[doc = "@function CFBinaryHeapApplyFunction\nCalls a function once for each value in the binary heap.\n@param heap The binary heap to be operated upon. If this parameter is not a\nvalid CFBinaryHeap, the behavior is undefined.\n@param applier The callback function to call once for each value in\nthe given binary heap. If this parameter is not a\npointer to a function of the correct prototype, the behavior\nis undefined. If there are values in the binary heap which the\napplier function does not expect or cannot properly apply\nto, the behavior is undefined.\n@param context A pointer-sized user-defined value, which is passed\nas the second parameter to the applier function, but is\notherwise unused by this function. If the context is not\nwhat is expected by the applier function, the behavior is\nundefined."]
@@ -13380,7 +13755,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFBinaryHeapAddValue\nAdds the value to the binary heap.\n@param heap The binary heap to which the value is to be added. If this parameter is not a\nvalid mutable CFBinaryHeap, the behavior is undefined.\n@param value The value to add to the binary heap. The value is retained by\nthe binary heap using the retain callback provided when the binary heap\nwas created. If the value is not of the sort expected by the\nretain callback, the behavior is undefined."]
-    pub fn CFBinaryHeapAddValue(heap: CFBinaryHeapRef, value: *const ::std::os::raw::c_void);
+    pub fn CFBinaryHeapAddValue(
+        heap: CFBinaryHeapRef,
+        value: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     #[doc = "@function CFBinaryHeapRemoveMinimumValue\nRemoves the minimum value from the binary heap.\n@param heap The binary heap from which the minimum value is to be removed. If this\nparameter is not a valid mutable CFBinaryHeap, the behavior is undefined."]
@@ -13409,7 +13787,10 @@ extern "C" {
     ) -> CFBitVectorRef;
 }
 extern "C" {
-    pub fn CFBitVectorCreateCopy(allocator: CFAllocatorRef, bv: CFBitVectorRef) -> CFBitVectorRef;
+    pub fn CFBitVectorCreateCopy(
+        allocator: CFAllocatorRef,
+        bv: CFBitVectorRef,
+    ) -> CFBitVectorRef;
 }
 extern "C" {
     pub fn CFBitVectorCreateMutable(
@@ -13428,10 +13809,18 @@ extern "C" {
     pub fn CFBitVectorGetCount(bv: CFBitVectorRef) -> CFIndex;
 }
 extern "C" {
-    pub fn CFBitVectorGetCountOfBit(bv: CFBitVectorRef, range: CFRange, value: CFBit) -> CFIndex;
+    pub fn CFBitVectorGetCountOfBit(
+        bv: CFBitVectorRef,
+        range: CFRange,
+        value: CFBit,
+    ) -> CFIndex;
 }
 extern "C" {
-    pub fn CFBitVectorContainsBit(bv: CFBitVectorRef, range: CFRange, value: CFBit) -> Boolean;
+    pub fn CFBitVectorContainsBit(
+        bv: CFBitVectorRef,
+        range: CFRange,
+        value: CFBit,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFBitVectorGetBitAtIndex(bv: CFBitVectorRef, idx: CFIndex) -> CFBit;
@@ -13463,7 +13852,11 @@ extern "C" {
     pub fn CFBitVectorFlipBits(bv: CFMutableBitVectorRef, range: CFRange);
 }
 extern "C" {
-    pub fn CFBitVectorSetBitAtIndex(bv: CFMutableBitVectorRef, idx: CFIndex, value: CFBit);
+    pub fn CFBitVectorSetBitAtIndex(
+        bv: CFMutableBitVectorRef,
+        idx: CFIndex,
+        value: CFBit,
+    );
 }
 extern "C" {
     pub fn CFBitVectorSetBits(bv: CFMutableBitVectorRef, range: CFRange, value: CFBit);
@@ -13487,7 +13880,8 @@ pub struct CFSwappedFloat32 {
 }
 #[test]
 fn bindgen_test_layout_CFSwappedFloat32() {
-    const UNINIT: ::std::mem::MaybeUninit<CFSwappedFloat32> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFSwappedFloat32> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFSwappedFloat32>(),
@@ -13517,7 +13911,8 @@ pub struct CFSwappedFloat64 {
 }
 #[test]
 fn bindgen_test_layout_CFSwappedFloat64() {
-    const UNINIT: ::std::mem::MaybeUninit<CFSwappedFloat64> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFSwappedFloat64> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFSwappedFloat64>(),
@@ -13559,8 +13954,9 @@ pub type CFDictionaryEqualCallBack = ::std::option::Option<
         value2: *const ::std::os::raw::c_void,
     ) -> Boolean,
 >;
-pub type CFDictionaryHashCallBack =
-    ::std::option::Option<unsafe extern "C" fn(value: *const ::std::os::raw::c_void) -> CFHashCode>;
+pub type CFDictionaryHashCallBack = ::std::option::Option<
+    unsafe extern "C" fn(value: *const ::std::os::raw::c_void) -> CFHashCode,
+>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct CFDictionaryKeyCallBacks {
@@ -14046,7 +14442,9 @@ extern "C" {
     ) -> CFLocaleLanguageDirection;
 }
 extern "C" {
-    pub fn CFLocaleGetLanguageLineDirection(isoLangCode: CFStringRef) -> CFLocaleLanguageDirection;
+    pub fn CFLocaleGetLanguageLineDirection(
+        isoLangCode: CFStringRef,
+    ) -> CFLocaleLanguageDirection;
 }
 extern "C" {
     pub fn CFLocaleCreateComponentsFromLocaleIdentifier(
@@ -14067,7 +14465,10 @@ extern "C" {
     ) -> CFLocaleRef;
 }
 extern "C" {
-    pub fn CFLocaleCreateCopy(allocator: CFAllocatorRef, locale: CFLocaleRef) -> CFLocaleRef;
+    pub fn CFLocaleCreateCopy(
+        allocator: CFAllocatorRef,
+        locale: CFLocaleRef,
+    ) -> CFLocaleRef;
 }
 extern "C" {
     pub fn CFLocaleGetIdentifier(locale: CFLocaleRef) -> CFLocaleIdentifier;
@@ -14242,7 +14643,8 @@ pub struct CFGregorianDate {
 }
 #[test]
 fn bindgen_test_layout_CFGregorianDate() {
-    const UNINIT: ::std::mem::MaybeUninit<CFGregorianDate> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFGregorianDate> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFGregorianDate>(),
@@ -14327,7 +14729,8 @@ pub struct CFGregorianUnits {
 }
 #[test]
 fn bindgen_test_layout_CFGregorianUnits() {
-    const UNINIT: ::std::mem::MaybeUninit<CFGregorianUnits> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFGregorianUnits> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFGregorianUnits>(),
@@ -14410,7 +14813,10 @@ pub const kCFGregorianUnitsSeconds: _bindgen_ty_12 = 32;
 pub const kCFGregorianAllUnits: _bindgen_ty_12 = 16777215;
 pub type _bindgen_ty_12 = ::std::os::raw::c_uint;
 extern "C" {
-    pub fn CFGregorianDateIsValid(gdate: CFGregorianDate, unitFlags: CFOptionFlags) -> Boolean;
+    pub fn CFGregorianDateIsValid(
+        gdate: CFGregorianDate,
+        unitFlags: CFOptionFlags,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFGregorianDateGetAbsoluteTime(
@@ -14419,8 +14825,10 @@ extern "C" {
     ) -> CFAbsoluteTime;
 }
 extern "C" {
-    pub fn CFAbsoluteTimeGetGregorianDate(at: CFAbsoluteTime, tz: CFTimeZoneRef)
-        -> CFGregorianDate;
+    pub fn CFAbsoluteTimeGetGregorianDate(
+        at: CFAbsoluteTime,
+        tz: CFTimeZoneRef,
+    ) -> CFGregorianDate;
 }
 extern "C" {
     pub fn CFAbsoluteTimeAddGregorianUnits(
@@ -14475,7 +14883,10 @@ extern "C" {
     pub fn CFDataCreateCopy(allocator: CFAllocatorRef, theData: CFDataRef) -> CFDataRef;
 }
 extern "C" {
-    pub fn CFDataCreateMutable(allocator: CFAllocatorRef, capacity: CFIndex) -> CFMutableDataRef;
+    pub fn CFDataCreateMutable(
+        allocator: CFAllocatorRef,
+        capacity: CFIndex,
+    ) -> CFMutableDataRef;
 }
 extern "C" {
     pub fn CFDataCreateMutableCopy(
@@ -14503,7 +14914,11 @@ extern "C" {
     pub fn CFDataIncreaseLength(theData: CFMutableDataRef, extraLength: CFIndex);
 }
 extern "C" {
-    pub fn CFDataAppendBytes(theData: CFMutableDataRef, bytes: *const UInt8, length: CFIndex);
+    pub fn CFDataAppendBytes(
+        theData: CFMutableDataRef,
+        bytes: *const UInt8,
+        length: CFIndex,
+    );
 }
 extern "C" {
     pub fn CFDataReplaceBytes(
@@ -14602,11 +15017,15 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFCharacterSetHasMemberInPlane\nReports whether or not the character set contains at least one member character in the specified plane.\n@param theSet  The character set to be checked for the membership.  If this\nparameter is not a valid CFCharacterSet, the behavior is undefined.\n@param thePlane  The plane number to be checked for the membership.\nThe valid value range is from 0 to 16.  If the value is outside of the valid\nplane number range, the behavior is undefined."]
-    pub fn CFCharacterSetHasMemberInPlane(theSet: CFCharacterSetRef, thePlane: CFIndex) -> Boolean;
+    pub fn CFCharacterSetHasMemberInPlane(
+        theSet: CFCharacterSetRef,
+        thePlane: CFIndex,
+    ) -> Boolean;
 }
 extern "C" {
     #[doc = "@function CFCharacterSetCreateMutable\nCreates a new empty mutable character set.\n@param alloc The CFAllocator which should be used to allocate\nmemory for the array and its storage for values. This\nparameter may be NULL in which case the current default\nCFAllocator is used. If this reference is not a valid\nCFAllocator, the behavior is undefined.\n@result A reference to the new mutable CFCharacterSet."]
-    pub fn CFCharacterSetCreateMutable(alloc: CFAllocatorRef) -> CFMutableCharacterSetRef;
+    pub fn CFCharacterSetCreateMutable(alloc: CFAllocatorRef)
+        -> CFMutableCharacterSetRef;
 }
 extern "C" {
     #[doc = "@function CFCharacterSetCreateCopy\nCreates a new character set with the values from the given character set.  This function tries to compact the backing store where applicable.\n@param alloc The CFAllocator which should be used to allocate\nmemory for the array and its storage for values. This\nparameter may be NULL in which case the current default\nCFAllocator is used. If this reference is not a valid\nCFAllocator, the behavior is undefined.\n@param theSet The CFCharacterSet which is to be copied.  If this\nparameter is not a valid CFCharacterSet, the behavior is\nundefined.\n@result A reference to the new CFCharacterSet."]
@@ -14624,7 +15043,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFCharacterSetIsCharacterMember\nReports whether or not the Unicode character is in the character set.\n@param theSet The character set to be searched. If this parameter\nis not a valid CFCharacterSet, the behavior is undefined.\n@param theChar The Unicode character for which to test against the\ncharacter set.  Note that this function takes 16-bit Unicode\ncharacter value; hence, it does not support access to the\nnon-BMP planes.\n@result true, if the value is in the character set, otherwise false."]
-    pub fn CFCharacterSetIsCharacterMember(theSet: CFCharacterSetRef, theChar: UniChar) -> Boolean;
+    pub fn CFCharacterSetIsCharacterMember(
+        theSet: CFCharacterSetRef,
+        theChar: UniChar,
+    ) -> Boolean;
 }
 extern "C" {
     #[doc = "@function CFCharacterSetIsLongCharacterMember\nReports whether or not the UTF-32 character is in the character set.\n@param theSet The character set to be searched. If this parameter\nis not a valid CFCharacterSet, the behavior is undefined.\n@param theChar The UTF-32 character for which to test against the\ncharacter set.\n@result true, if the value is in the character set, otherwise false."]
@@ -14642,7 +15064,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFCharacterSetAddCharactersInRange\nAdds the given range to the charaacter set.\n@param theSet The character set to which the range is to be added.\nIf this parameter is not a valid mutable CFCharacterSet,\nthe behavior is undefined.\n@param theRange The range to add to the character set.  It accepts\nthe range in 32-bit in the UTF-32 format.  The valid\ncharacter point range is from 0x00000 to 0x10FFFF.  If the\nrange is outside of the valid Unicode character point,\nthe behavior is undefined."]
-    pub fn CFCharacterSetAddCharactersInRange(theSet: CFMutableCharacterSetRef, theRange: CFRange);
+    pub fn CFCharacterSetAddCharactersInRange(
+        theSet: CFMutableCharacterSetRef,
+        theRange: CFRange,
+    );
 }
 extern "C" {
     #[doc = "@function CFCharacterSetRemoveCharactersInRange\nRemoves the given range from the charaacter set.\n@param theSet The character set from which the range is to be\nremoved.  If this parameter is not a valid mutable\nCFCharacterSet, the behavior is undefined.\n@param theRange The range to remove from the character set.\nIt accepts the range in 32-bit in the UTF-32 format.\nThe valid character point range is from 0x00000 to 0x10FFFF.\nIf the range is outside of the valid Unicode character point,\nthe behavior is undefined."]
@@ -14667,7 +15092,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFCharacterSetUnion\nForms the union with the given character set.\n@param theSet The destination character set into which the\nunion of the two character sets is stored.  If this\nparameter is not a valid mutable CFCharacterSet, the\nbehavior is undefined.\n@param theOtherSet The character set with which the union is\nformed.  If this parameter is not a valid CFCharacterSet,\nthe behavior is undefined."]
-    pub fn CFCharacterSetUnion(theSet: CFMutableCharacterSetRef, theOtherSet: CFCharacterSetRef);
+    pub fn CFCharacterSetUnion(
+        theSet: CFMutableCharacterSetRef,
+        theOtherSet: CFCharacterSetRef,
+    );
 }
 extern "C" {
     #[doc = "@function CFCharacterSetIntersect\nForms the intersection with the given character set.\n@param theSet The destination character set into which the\nintersection of the two character sets is stored.\nIf this parameter is not a valid mutable CFCharacterSet,\nthe behavior is undefined.\n@param theOtherSet The character set with which the intersection\nis formed.  If this parameter is not a valid CFCharacterSet,\nthe behavior is undefined."]
@@ -14865,7 +15293,10 @@ extern "C" {
     ) -> CFStringRef;
 }
 extern "C" {
-    pub fn CFStringCreateCopy(alloc: CFAllocatorRef, theString: CFStringRef) -> CFStringRef;
+    pub fn CFStringCreateCopy(
+        alloc: CFAllocatorRef,
+        theString: CFStringRef,
+    ) -> CFStringRef;
 }
 extern "C" {
     pub fn CFStringCreateWithFormat(
@@ -14904,7 +15335,10 @@ extern "C" {
     ) -> CFStringRef;
 }
 extern "C" {
-    pub fn CFStringCreateMutable(alloc: CFAllocatorRef, maxLength: CFIndex) -> CFMutableStringRef;
+    pub fn CFStringCreateMutable(
+        alloc: CFAllocatorRef,
+        maxLength: CFIndex,
+    ) -> CFMutableStringRef;
 }
 extern "C" {
     pub fn CFStringCreateMutableCopy(
@@ -14930,7 +15364,11 @@ extern "C" {
     pub fn CFStringGetCharacterAtIndex(theString: CFStringRef, idx: CFIndex) -> UniChar;
 }
 extern "C" {
-    pub fn CFStringGetCharacters(theString: CFStringRef, range: CFRange, buffer: *mut UniChar);
+    pub fn CFStringGetCharacters(
+        theString: CFStringRef,
+        range: CFRange,
+        buffer: *mut UniChar,
+    );
 }
 extern "C" {
     pub fn CFStringGetPascalString(
@@ -15014,7 +15452,9 @@ extern "C" {
     ) -> Boolean;
 }
 extern "C" {
-    pub fn CFStringGetMaximumSizeOfFileSystemRepresentation(string: CFStringRef) -> CFIndex;
+    pub fn CFStringGetMaximumSizeOfFileSystemRepresentation(
+        string: CFStringRef,
+    ) -> CFIndex;
 }
 extern "C" {
     pub fn CFStringCreateWithFileSystemRepresentation(
@@ -15211,13 +15651,21 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn CFStringInsert(str_: CFMutableStringRef, idx: CFIndex, insertedStr: CFStringRef);
+    pub fn CFStringInsert(
+        str_: CFMutableStringRef,
+        idx: CFIndex,
+        insertedStr: CFStringRef,
+    );
 }
 extern "C" {
     pub fn CFStringDelete(theString: CFMutableStringRef, range: CFRange);
 }
 extern "C" {
-    pub fn CFStringReplace(theString: CFMutableStringRef, range: CFRange, replacement: CFStringRef);
+    pub fn CFStringReplace(
+        theString: CFMutableStringRef,
+        range: CFRange,
+        replacement: CFStringRef,
+    );
 }
 extern "C" {
     pub fn CFStringReplaceAll(theString: CFMutableStringRef, replacement: CFStringRef);
@@ -15271,7 +15719,10 @@ pub const kCFStringNormalizationFormKC: _bindgen_ty_17 = 3;
 pub type _bindgen_ty_17 = ::std::os::raw::c_uint;
 extern "C" {
     #[doc = "@function CFStringNormalize\nNormalizes the string into the specified form as described in\nUnicode Technical Report #15.\n@param theString  The string which is to be normalized.  If this\nparameter is not a valid mutable CFString, the behavior is\nundefined.\n@param theForm  The form into which the string is to be normalized.\nIf this parameter is not a valid CFStringNormalizationForm value,\nthe behavior is undefined."]
-    pub fn CFStringNormalize(theString: CFMutableStringRef, theForm: CFStringNormalizationForm);
+    pub fn CFStringNormalize(
+        theString: CFMutableStringRef,
+        theForm: CFStringNormalizationForm,
+    );
 }
 extern "C" {
     #[doc = "@function CFStringFold\nFolds the string into the form specified by the flags.\nCharacter foldings are operations that convert any of a set of characters\nsharing similar semantics into a single representative from that set.\nThis function can be used to preprocess strings that are to be compared,\nsearched, or indexed.\nNote that folding does not include normalization, so it is necessary\nto use CFStringNormalize in addition to CFStringFold in order to obtain\nthe effect of kCFCompareNonliteral.\n@param theString  The string which is to be folded.  If this parameter is not\na valid mutable CFString, the behavior is undefined.\n@param theFlags  The equivalency flags which describes the character folding form.\nOnly those flags containing the word \"insensitive\" are recognized here; other flags are ignored.\nFolding with kCFCompareCaseInsensitive removes case distinctions in accordance with the mapping\nspecified by ftp://ftp.unicode.org/Public/UNIDATA/CaseFolding.txt.  Folding with\nkCFCompareDiacriticInsensitive removes distinctions of accents and other diacritics.  Folding\nwith kCFCompareWidthInsensitive removes character width distinctions by mapping characters in\nthe range U+FF00-U+FFEF to their ordinary equivalents.\n@param theLocale The locale tailoring the character folding behavior. If NULL,\nit's considered to be the system locale returned from CFLocaleGetSystem().\nIf non-NULL and not a valid CFLocale object, the behavior is undefined."]
@@ -15358,16 +15809,22 @@ extern "C" {
     ) -> CFStringEncoding;
 }
 extern "C" {
-    pub fn CFStringConvertEncodingToWindowsCodepage(encoding: CFStringEncoding) -> UInt32;
+    pub fn CFStringConvertEncodingToWindowsCodepage(encoding: CFStringEncoding)
+        -> UInt32;
 }
 extern "C" {
-    pub fn CFStringConvertWindowsCodepageToEncoding(codepage: UInt32) -> CFStringEncoding;
+    pub fn CFStringConvertWindowsCodepageToEncoding(codepage: UInt32)
+        -> CFStringEncoding;
 }
 extern "C" {
-    pub fn CFStringConvertIANACharSetNameToEncoding(theString: CFStringRef) -> CFStringEncoding;
+    pub fn CFStringConvertIANACharSetNameToEncoding(
+        theString: CFStringRef,
+    ) -> CFStringEncoding;
 }
 extern "C" {
-    pub fn CFStringConvertEncodingToIANACharSetName(encoding: CFStringEncoding) -> CFStringRef;
+    pub fn CFStringConvertEncodingToIANACharSetName(
+        encoding: CFStringEncoding,
+    ) -> CFStringRef;
 }
 extern "C" {
     pub fn CFStringGetMostCompatibleMacStringEncoding(
@@ -15387,7 +15844,8 @@ pub struct CFStringInlineBuffer {
 }
 #[test]
 fn bindgen_test_layout_CFStringInlineBuffer() {
-    const UNINIT: ::std::mem::MaybeUninit<CFStringInlineBuffer> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFStringInlineBuffer> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFStringInlineBuffer>(),
@@ -15420,7 +15878,9 @@ fn bindgen_test_layout_CFStringInlineBuffer() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).directUniCharBuffer) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).directUniCharBuffer) as usize - ptr as usize
+        },
         136usize,
         concat!(
             "Offset of field: ",
@@ -15430,7 +15890,9 @@ fn bindgen_test_layout_CFStringInlineBuffer() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).directCStringBuffer) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).directCStringBuffer) as usize - ptr as usize
+        },
         144usize,
         concat!(
             "Offset of field: ",
@@ -15450,7 +15912,9 @@ fn bindgen_test_layout_CFStringInlineBuffer() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).bufferedRangeStart) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).bufferedRangeStart) as usize - ptr as usize
+        },
         168usize,
         concat!(
             "Offset of field: ",
@@ -15477,7 +15941,9 @@ extern "C" {
     pub fn CFShowStr(str_: CFStringRef);
 }
 extern "C" {
-    pub fn __CFStringMakeConstantString(cStr: *const ::std::os::raw::c_char) -> CFStringRef;
+    pub fn __CFStringMakeConstantString(
+        cStr: *const ::std::os::raw::c_char,
+    ) -> CFStringRef;
 }
 extern "C" {
     pub fn CFTimeZoneGetTypeID() -> CFTypeID;
@@ -15530,13 +15996,22 @@ extern "C" {
     pub fn CFTimeZoneGetData(tz: CFTimeZoneRef) -> CFDataRef;
 }
 extern "C" {
-    pub fn CFTimeZoneGetSecondsFromGMT(tz: CFTimeZoneRef, at: CFAbsoluteTime) -> CFTimeInterval;
+    pub fn CFTimeZoneGetSecondsFromGMT(
+        tz: CFTimeZoneRef,
+        at: CFAbsoluteTime,
+    ) -> CFTimeInterval;
 }
 extern "C" {
-    pub fn CFTimeZoneCopyAbbreviation(tz: CFTimeZoneRef, at: CFAbsoluteTime) -> CFStringRef;
+    pub fn CFTimeZoneCopyAbbreviation(
+        tz: CFTimeZoneRef,
+        at: CFAbsoluteTime,
+    ) -> CFStringRef;
 }
 extern "C" {
-    pub fn CFTimeZoneIsDaylightSavingTime(tz: CFTimeZoneRef, at: CFAbsoluteTime) -> Boolean;
+    pub fn CFTimeZoneIsDaylightSavingTime(
+        tz: CFTimeZoneRef,
+        at: CFAbsoluteTime,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFTimeZoneGetDaylightSavingTimeOffset(
@@ -15886,7 +16361,8 @@ pub struct CGAffineTransform {
 }
 #[test]
 fn bindgen_test_layout_CGAffineTransform() {
-    const UNINIT: ::std::mem::MaybeUninit<CGAffineTransform> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CGAffineTransform> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CGAffineTransform>(),
@@ -16082,16 +16558,23 @@ extern "C" {
     pub fn CFDateFormatterGetLocale(formatter: CFDateFormatterRef) -> CFLocaleRef;
 }
 extern "C" {
-    pub fn CFDateFormatterGetDateStyle(formatter: CFDateFormatterRef) -> CFDateFormatterStyle;
+    pub fn CFDateFormatterGetDateStyle(
+        formatter: CFDateFormatterRef,
+    ) -> CFDateFormatterStyle;
 }
 extern "C" {
-    pub fn CFDateFormatterGetTimeStyle(formatter: CFDateFormatterRef) -> CFDateFormatterStyle;
+    pub fn CFDateFormatterGetTimeStyle(
+        formatter: CFDateFormatterRef,
+    ) -> CFDateFormatterStyle;
 }
 extern "C" {
     pub fn CFDateFormatterGetFormat(formatter: CFDateFormatterRef) -> CFStringRef;
 }
 extern "C" {
-    pub fn CFDateFormatterSetFormat(formatter: CFDateFormatterRef, formatString: CFStringRef);
+    pub fn CFDateFormatterSetFormat(
+        formatter: CFDateFormatterRef,
+        formatString: CFStringRef,
+    );
 }
 extern "C" {
     pub fn CFDateFormatterCreateStringWithDate(
@@ -16341,13 +16824,18 @@ extern "C" {
     pub fn CFNumberFormatterGetLocale(formatter: CFNumberFormatterRef) -> CFLocaleRef;
 }
 extern "C" {
-    pub fn CFNumberFormatterGetStyle(formatter: CFNumberFormatterRef) -> CFNumberFormatterStyle;
+    pub fn CFNumberFormatterGetStyle(
+        formatter: CFNumberFormatterRef,
+    ) -> CFNumberFormatterStyle;
 }
 extern "C" {
     pub fn CFNumberFormatterGetFormat(formatter: CFNumberFormatterRef) -> CFStringRef;
 }
 extern "C" {
-    pub fn CFNumberFormatterSetFormat(formatter: CFNumberFormatterRef, formatString: CFStringRef);
+    pub fn CFNumberFormatterSetFormat(
+        formatter: CFNumberFormatterRef,
+        formatString: CFStringRef,
+    );
 }
 extern "C" {
     pub fn CFNumberFormatterCreateStringWithNumber(
@@ -16580,7 +17068,10 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn CFPreferencesAddSuitePreferencesToApp(applicationID: CFStringRef, suiteID: CFStringRef);
+    pub fn CFPreferencesAddSuitePreferencesToApp(
+        applicationID: CFStringRef,
+        suiteID: CFStringRef,
+    );
 }
 extern "C" {
     pub fn CFPreferencesRemoveSuitePreferencesFromApp(
@@ -16646,7 +17137,10 @@ extern "C" {
     ) -> CFArrayRef;
 }
 extern "C" {
-    pub fn CFPreferencesAppValueIsForced(key: CFStringRef, applicationID: CFStringRef) -> Boolean;
+    pub fn CFPreferencesAppValueIsForced(
+        key: CFStringRef,
+        applicationID: CFStringRef,
+    ) -> Boolean;
 }
 pub type CFURLPathStyle = CFIndex;
 pub const kCFURLPOSIXPathStyle: _bindgen_ty_29 = 0;
@@ -16763,7 +17257,10 @@ extern "C" {
     pub fn CFURLCopyStrictPath(anURL: CFURLRef, isAbsolute: *mut Boolean) -> CFStringRef;
 }
 extern "C" {
-    pub fn CFURLCopyFileSystemPath(anURL: CFURLRef, pathStyle: CFURLPathStyle) -> CFStringRef;
+    pub fn CFURLCopyFileSystemPath(
+        anURL: CFURLRef,
+        pathStyle: CFURLPathStyle,
+    ) -> CFStringRef;
 }
 extern "C" {
     pub fn CFURLHasDirectoryPath(anURL: CFURLRef) -> Boolean;
@@ -16796,8 +17293,10 @@ extern "C" {
     ) -> CFStringRef;
 }
 extern "C" {
-    pub fn CFURLCopyFragment(anURL: CFURLRef, charactersToLeaveEscaped: CFStringRef)
-        -> CFStringRef;
+    pub fn CFURLCopyFragment(
+        anURL: CFURLRef,
+        charactersToLeaveEscaped: CFStringRef,
+    ) -> CFStringRef;
 }
 extern "C" {
     pub fn CFURLCopyLastPathComponent(url: CFURLRef) -> CFStringRef;
@@ -16833,7 +17332,11 @@ extern "C" {
     ) -> CFURLRef;
 }
 extern "C" {
-    pub fn CFURLGetBytes(url: CFURLRef, buffer: *mut UInt8, bufferLength: CFIndex) -> CFIndex;
+    pub fn CFURLGetBytes(
+        url: CFURLRef,
+        buffer: *mut UInt8,
+        bufferLength: CFIndex,
+    ) -> CFIndex;
 }
 pub type CFURLComponentType = CFIndex;
 pub const kCFURLComponentScheme: _bindgen_ty_30 = 1;
@@ -16903,7 +17406,10 @@ pub struct FSRef {
     _unused: [u8; 0],
 }
 extern "C" {
-    pub fn CFURLCreateFromFSRef(allocator: CFAllocatorRef, fsRef: *const FSRef) -> CFURLRef;
+    pub fn CFURLCreateFromFSRef(
+        allocator: CFAllocatorRef,
+        fsRef: *const FSRef,
+    ) -> CFURLRef;
 }
 extern "C" {
     pub fn CFURLGetFSRef(url: CFURLRef, fsRef: *mut FSRef) -> Boolean;
@@ -17471,7 +17977,8 @@ pub struct mach_port_status {
 }
 #[test]
 fn bindgen_test_layout_mach_port_status() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_port_status> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_port_status> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_port_status>(),
@@ -17592,7 +18099,8 @@ pub struct mach_port_limits {
 }
 #[test]
 fn bindgen_test_layout_mach_port_limits() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_port_limits> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_port_limits> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_port_limits>(),
@@ -17625,7 +18133,8 @@ pub struct mach_port_info_ext {
 }
 #[test]
 fn bindgen_test_layout_mach_port_info_ext() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_port_info_ext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_port_info_ext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_port_info_ext>(),
@@ -17676,7 +18185,8 @@ pub struct mach_port_guard_info {
 }
 #[test]
 fn bindgen_test_layout_mach_port_guard_info() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_port_guard_info> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_port_guard_info> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_port_guard_info>(),
@@ -17711,7 +18221,8 @@ pub struct mach_port_qos {
 }
 #[test]
 fn bindgen_test_layout_mach_port_qos() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_port_qos> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_port_qos> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_port_qos>(),
@@ -17774,7 +18285,8 @@ impl mach_port_qos {
         prealloc: ::std::os::raw::c_uint,
         pad1: boolean_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 1u8, {
             let name: u32 = unsafe { ::std::mem::transmute(name) };
             name as u64
@@ -17876,7 +18388,9 @@ fn bindgen_test_layout_mach_port_options__bindgen_ty_1() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).work_interval_port) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).work_interval_port) as usize - ptr as usize
+        },
         0usize,
         concat!(
             "Offset of field: ",
@@ -17908,7 +18422,8 @@ fn bindgen_test_layout_mach_port_options__bindgen_ty_1() {
 }
 #[test]
 fn bindgen_test_layout_mach_port_options() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_port_options> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_port_options> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_port_options>(),
@@ -17943,39 +18458,42 @@ fn bindgen_test_layout_mach_port_options() {
 }
 pub type mach_port_options_t = mach_port_options;
 pub type mach_port_options_ptr_t = *mut mach_port_options_t;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_DESTROY: mach_port_guard_exception_codes = 1;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_MOD_REFS: mach_port_guard_exception_codes = 2;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_DESTROY:
+    mach_port_guard_exception_codes = 1;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_MOD_REFS:
+    mach_port_guard_exception_codes = 2;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_INVALID_OPTIONS:
     mach_port_guard_exception_codes = 3;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_SET_CONTEXT: mach_port_guard_exception_codes =
-    4;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_SET_CONTEXT:
+    mach_port_guard_exception_codes = 4;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_THREAD_SET_STATE:
     mach_port_guard_exception_codes = 5;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_EXCEPTION_BEHAVIOR_ENFORCE:
     mach_port_guard_exception_codes = 6;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_UNGUARDED: mach_port_guard_exception_codes = 8;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_UNGUARDED:
+    mach_port_guard_exception_codes = 8;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_INCORRECT_GUARD:
     mach_port_guard_exception_codes = 16;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_IMMOVABLE: mach_port_guard_exception_codes =
-    32;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_STRICT_REPLY: mach_port_guard_exception_codes =
-    64;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_MSG_FILTERED: mach_port_guard_exception_codes =
-    128;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_IMMOVABLE:
+    mach_port_guard_exception_codes = 32;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_STRICT_REPLY:
+    mach_port_guard_exception_codes = 64;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_MSG_FILTERED:
+    mach_port_guard_exception_codes = 128;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_INVALID_RIGHT:
     mach_port_guard_exception_codes = 256;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_INVALID_NAME: mach_port_guard_exception_codes =
-    512;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_INVALID_NAME:
+    mach_port_guard_exception_codes = 512;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_INVALID_VALUE:
     mach_port_guard_exception_codes = 1024;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_INVALID_ARGUMENT:
     mach_port_guard_exception_codes = 2048;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_RIGHT_EXISTS: mach_port_guard_exception_codes =
-    4096;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_RIGHT_EXISTS:
+    mach_port_guard_exception_codes = 4096;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_KERN_NO_SPACE:
     mach_port_guard_exception_codes = 8192;
-pub const mach_port_guard_exception_codes_kGUARD_EXC_KERN_FAILURE: mach_port_guard_exception_codes =
-    16384;
+pub const mach_port_guard_exception_codes_kGUARD_EXC_KERN_FAILURE:
+    mach_port_guard_exception_codes = 16384;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_KERN_RESOURCE:
     mach_port_guard_exception_codes = 32768;
 pub const mach_port_guard_exception_codes_kGUARD_EXC_SEND_INVALID_REPLY:
@@ -18060,7 +18578,10 @@ extern "C" {
     pub fn CFRunLoopAddCommonMode(rl: CFRunLoopRef, mode: CFRunLoopMode);
 }
 extern "C" {
-    pub fn CFRunLoopGetNextTimerFireDate(rl: CFRunLoopRef, mode: CFRunLoopMode) -> CFAbsoluteTime;
+    pub fn CFRunLoopGetNextTimerFireDate(
+        rl: CFRunLoopRef,
+        mode: CFRunLoopMode,
+    ) -> CFAbsoluteTime;
 }
 extern "C" {
     pub fn CFRunLoopRun();
@@ -18096,10 +18617,18 @@ extern "C" {
     ) -> Boolean;
 }
 extern "C" {
-    pub fn CFRunLoopAddSource(rl: CFRunLoopRef, source: CFRunLoopSourceRef, mode: CFRunLoopMode);
+    pub fn CFRunLoopAddSource(
+        rl: CFRunLoopRef,
+        source: CFRunLoopSourceRef,
+        mode: CFRunLoopMode,
+    );
 }
 extern "C" {
-    pub fn CFRunLoopRemoveSource(rl: CFRunLoopRef, source: CFRunLoopSourceRef, mode: CFRunLoopMode);
+    pub fn CFRunLoopRemoveSource(
+        rl: CFRunLoopRef,
+        source: CFRunLoopSourceRef,
+        mode: CFRunLoopMode,
+    );
 }
 extern "C" {
     pub fn CFRunLoopContainsObserver(
@@ -18130,10 +18659,18 @@ extern "C" {
     ) -> Boolean;
 }
 extern "C" {
-    pub fn CFRunLoopAddTimer(rl: CFRunLoopRef, timer: CFRunLoopTimerRef, mode: CFRunLoopMode);
+    pub fn CFRunLoopAddTimer(
+        rl: CFRunLoopRef,
+        timer: CFRunLoopTimerRef,
+        mode: CFRunLoopMode,
+    );
 }
 extern "C" {
-    pub fn CFRunLoopRemoveTimer(rl: CFRunLoopRef, timer: CFRunLoopTimerRef, mode: CFRunLoopMode);
+    pub fn CFRunLoopRemoveTimer(
+        rl: CFRunLoopRef,
+        timer: CFRunLoopTimerRef,
+        mode: CFRunLoopMode,
+    );
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -18141,9 +18678,12 @@ pub struct CFRunLoopSourceContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
@@ -18170,7 +18710,8 @@ pub struct CFRunLoopSourceContext {
             mode: CFRunLoopMode,
         ),
     >,
-    pub perform: ::std::option::Option<unsafe extern "C" fn(info: *mut ::std::os::raw::c_void)>,
+    pub perform:
+        ::std::option::Option<unsafe extern "C" fn(info: *mut ::std::os::raw::c_void)>,
 }
 #[test]
 fn bindgen_test_layout_CFRunLoopSourceContext() {
@@ -18294,9 +18835,12 @@ pub struct CFRunLoopSourceContext1 {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
@@ -18461,9 +19005,12 @@ pub struct CFRunLoopObserverContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
@@ -18564,7 +19111,9 @@ extern "C" {
     ) -> CFRunLoopObserverRef;
 }
 extern "C" {
-    pub fn CFRunLoopObserverGetActivities(observer: CFRunLoopObserverRef) -> CFOptionFlags;
+    pub fn CFRunLoopObserverGetActivities(
+        observer: CFRunLoopObserverRef,
+    ) -> CFOptionFlags;
 }
 extern "C" {
     pub fn CFRunLoopObserverDoesRepeat(observer: CFRunLoopObserverRef) -> Boolean;
@@ -18590,9 +19139,12 @@ pub struct CFRunLoopTimerContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
@@ -18694,7 +19246,10 @@ extern "C" {
     pub fn CFRunLoopTimerGetNextFireDate(timer: CFRunLoopTimerRef) -> CFAbsoluteTime;
 }
 extern "C" {
-    pub fn CFRunLoopTimerSetNextFireDate(timer: CFRunLoopTimerRef, fireDate: CFAbsoluteTime);
+    pub fn CFRunLoopTimerSetNextFireDate(
+        timer: CFRunLoopTimerRef,
+        fireDate: CFAbsoluteTime,
+    );
 }
 extern "C" {
     pub fn CFRunLoopTimerGetInterval(timer: CFRunLoopTimerRef) -> CFTimeInterval;
@@ -18712,13 +19267,19 @@ extern "C" {
     pub fn CFRunLoopTimerIsValid(timer: CFRunLoopTimerRef) -> Boolean;
 }
 extern "C" {
-    pub fn CFRunLoopTimerGetContext(timer: CFRunLoopTimerRef, context: *mut CFRunLoopTimerContext);
+    pub fn CFRunLoopTimerGetContext(
+        timer: CFRunLoopTimerRef,
+        context: *mut CFRunLoopTimerContext,
+    );
 }
 extern "C" {
     pub fn CFRunLoopTimerGetTolerance(timer: CFRunLoopTimerRef) -> CFTimeInterval;
 }
 extern "C" {
-    pub fn CFRunLoopTimerSetTolerance(timer: CFRunLoopTimerRef, tolerance: CFTimeInterval);
+    pub fn CFRunLoopTimerSetTolerance(
+        timer: CFRunLoopTimerRef,
+        tolerance: CFTimeInterval,
+    );
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -18741,7 +19302,8 @@ pub struct CFSocketSignature {
 }
 #[test]
 fn bindgen_test_layout_CFSocketSignature() {
-    const UNINIT: ::std::mem::MaybeUninit<CFSocketSignature> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFSocketSignature> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFSocketSignature>(),
@@ -18824,16 +19386,20 @@ pub struct CFSocketContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
 }
 #[test]
 fn bindgen_test_layout_CFSocketContext() {
-    const UNINIT: ::std::mem::MaybeUninit<CFSocketContext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFSocketContext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFSocketContext>(),
@@ -19074,7 +19640,8 @@ pub struct accessx_descriptor {
 }
 #[test]
 fn bindgen_test_layout_accessx_descriptor() {
-    const UNINIT: ::std::mem::MaybeUninit<accessx_descriptor> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<accessx_descriptor> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<accessx_descriptor>(),
@@ -19230,7 +19797,10 @@ extern "C" {
     pub fn dup(arg1: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn dup2(arg1: ::std::os::raw::c_int, arg2: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
+    pub fn dup2(
+        arg1: ::std::os::raw::c_int,
+        arg2: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn execl(
@@ -19282,7 +19852,10 @@ extern "C" {
     ) -> ::std::os::raw::c_long;
 }
 extern "C" {
-    pub fn getcwd(arg1: *mut ::std::os::raw::c_char, arg2: usize) -> *mut ::std::os::raw::c_char;
+    pub fn getcwd(
+        arg1: *mut ::std::os::raw::c_char,
+        arg2: usize,
+    ) -> *mut ::std::os::raw::c_char;
 }
 extern "C" {
     pub fn getegid() -> gid_t;
@@ -19294,7 +19867,10 @@ extern "C" {
     pub fn getgid() -> gid_t;
 }
 extern "C" {
-    pub fn getgroups(arg1: ::std::os::raw::c_int, arg2: *mut gid_t) -> ::std::os::raw::c_int;
+    pub fn getgroups(
+        arg1: ::std::os::raw::c_int,
+        arg2: *mut gid_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn getlogin() -> *mut ::std::os::raw::c_char;
@@ -19321,7 +19897,11 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn lseek(arg1: ::std::os::raw::c_int, arg2: off_t, arg3: ::std::os::raw::c_int) -> off_t;
+    pub fn lseek(
+        arg1: ::std::os::raw::c_int,
+        arg2: off_t,
+        arg3: ::std::os::raw::c_int,
+    ) -> off_t;
 }
 extern "C" {
     pub fn pathconf(
@@ -19503,7 +20083,10 @@ extern "C" {
     pub fn sync();
 }
 extern "C" {
-    pub fn truncate(arg1: *const ::std::os::raw::c_char, arg2: off_t) -> ::std::os::raw::c_int;
+    pub fn truncate(
+        arg1: *const ::std::os::raw::c_char,
+        arg2: off_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn ualarm(arg1: useconds_t, arg2: useconds_t) -> useconds_t;
@@ -19521,13 +20104,23 @@ extern "C" {
     pub fn ftruncate(arg1: ::std::os::raw::c_int, arg2: off_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn getlogin_r(arg1: *mut ::std::os::raw::c_char, arg2: usize) -> ::std::os::raw::c_int;
+    pub fn getlogin_r(
+        arg1: *mut ::std::os::raw::c_char,
+        arg2: usize,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn fchown(arg1: ::std::os::raw::c_int, arg2: uid_t, arg3: gid_t) -> ::std::os::raw::c_int;
+    pub fn fchown(
+        arg1: ::std::os::raw::c_int,
+        arg2: uid_t,
+        arg3: gid_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn gethostname(arg1: *mut ::std::os::raw::c_char, arg2: usize) -> ::std::os::raw::c_int;
+    pub fn gethostname(
+        arg1: *mut ::std::os::raw::c_char,
+        arg2: usize,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn readlink(
@@ -19665,7 +20258,10 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn mkpath_np(path: *const ::std::os::raw::c_char, omode: mode_t) -> ::std::os::raw::c_int;
+    pub fn mkpath_np(
+        path: *const ::std::os::raw::c_char,
+        omode: mode_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn mkpathat_np(
@@ -19739,7 +20335,10 @@ extern "C" {
     pub fn pthread_setugid_np(arg1: uid_t, arg2: gid_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn pthread_getugid_np(arg1: *mut uid_t, arg2: *mut gid_t) -> ::std::os::raw::c_int;
+    pub fn pthread_getugid_np(
+        arg1: *mut uid_t,
+        arg2: *mut gid_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn reboot(arg1: ::std::os::raw::c_int) -> ::std::os::raw::c_int;
@@ -19809,7 +20408,10 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn setgroups(arg1: ::std::os::raw::c_int, arg2: *const gid_t) -> ::std::os::raw::c_int;
+    pub fn setgroups(
+        arg1: ::std::os::raw::c_int,
+        arg2: *const gid_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn sethostid(arg1: ::std::os::raw::c_long);
@@ -20057,7 +20659,8 @@ pub struct flocktimeout {
 }
 #[test]
 fn bindgen_test_layout_flocktimeout() {
-    const UNINIT: ::std::mem::MaybeUninit<flocktimeout> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<flocktimeout> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<flocktimeout>(),
@@ -20143,7 +20746,8 @@ pub struct fsignatures {
 }
 #[test]
 fn bindgen_test_layout_fsignatures() {
-    const UNINIT: ::std::mem::MaybeUninit<fsignatures> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<fsignatures> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<fsignatures>(),
@@ -20186,7 +20790,9 @@ fn bindgen_test_layout_fsignatures() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fs_fsignatures_size) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).fs_fsignatures_size) as usize - ptr as usize
+        },
         24usize,
         concat!(
             "Offset of field: ",
@@ -20227,7 +20833,8 @@ pub struct fsupplement {
 }
 #[test]
 fn bindgen_test_layout_fsupplement() {
-    const UNINIT: ::std::mem::MaybeUninit<fsupplement> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<fsupplement> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<fsupplement>(),
@@ -20313,7 +20920,9 @@ fn bindgen_test_layout_fchecklv() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).lv_error_message_size) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).lv_error_message_size) as usize - ptr as usize
+        },
         8usize,
         concat!(
             "Offset of field: ",
@@ -20343,7 +20952,8 @@ pub struct fgetsigsinfo {
 }
 #[test]
 fn bindgen_test_layout_fgetsigsinfo() {
-    const UNINIT: ::std::mem::MaybeUninit<fgetsigsinfo> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<fgetsigsinfo> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<fgetsigsinfo>(),
@@ -20376,7 +20986,9 @@ fn bindgen_test_layout_fgetsigsinfo() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).fg_sig_is_platform) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).fg_sig_is_platform) as usize - ptr as usize
+        },
         12usize,
         concat!(
             "Offset of field: ",
@@ -20534,7 +21146,8 @@ pub struct ftrimactivefile {
 }
 #[test]
 fn bindgen_test_layout_ftrimactivefile() {
-    const UNINIT: ::std::mem::MaybeUninit<ftrimactivefile> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<ftrimactivefile> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<ftrimactivefile>(),
@@ -20641,7 +21254,8 @@ pub struct fattributiontag {
 }
 #[test]
 fn bindgen_test_layout_fattributiontag() {
-    const UNINIT: ::std::mem::MaybeUninit<fattributiontag> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<fattributiontag> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<fattributiontag>(),
@@ -20674,7 +21288,9 @@ fn bindgen_test_layout_fattributiontag() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).ft_attribution_name) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).ft_attribution_name) as usize - ptr as usize
+        },
         16usize,
         concat!(
             "Offset of field: ",
@@ -20768,7 +21384,10 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn creat(arg1: *const ::std::os::raw::c_char, arg2: mode_t) -> ::std::os::raw::c_int;
+    pub fn creat(
+        arg1: *const ::std::os::raw::c_char,
+        arg2: mode_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn fcntl(
@@ -20812,8 +21431,10 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn flock(arg1: ::std::os::raw::c_int, arg2: ::std::os::raw::c_int)
-        -> ::std::os::raw::c_int;
+    pub fn flock(
+        arg1: ::std::os::raw::c_int,
+        arg2: ::std::os::raw::c_int,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn filesec_init() -> filesec_t;
@@ -21153,7 +21774,8 @@ pub struct mach_timespec {
 }
 #[test]
 fn bindgen_test_layout_mach_timespec() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_timespec> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_timespec> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_timespec>(),
@@ -21228,7 +21850,8 @@ pub union dispatch_object_t {
 }
 #[test]
 fn bindgen_test_layout_dispatch_object_t() {
-    const UNINIT: ::std::mem::MaybeUninit<dispatch_object_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<dispatch_object_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<dispatch_object_t>(),
@@ -21370,13 +21993,20 @@ extern "C" {
     pub fn dispatch_release(object: dispatch_object_t);
 }
 extern "C" {
-    pub fn dispatch_get_context(object: dispatch_object_t) -> *mut ::std::os::raw::c_void;
+    pub fn dispatch_get_context(object: dispatch_object_t)
+        -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
-    pub fn dispatch_set_context(object: dispatch_object_t, context: *mut ::std::os::raw::c_void);
+    pub fn dispatch_set_context(
+        object: dispatch_object_t,
+        context: *mut ::std::os::raw::c_void,
+    );
 }
 extern "C" {
-    pub fn dispatch_set_finalizer_f(object: dispatch_object_t, finalizer: dispatch_function_t);
+    pub fn dispatch_set_finalizer_f(
+        object: dispatch_object_t,
+        finalizer: dispatch_function_t,
+    );
 }
 extern "C" {
     pub fn dispatch_activate(object: dispatch_object_t);
@@ -21395,7 +22025,10 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn dispatch_wait(object: *mut ::std::os::raw::c_void, timeout: dispatch_time_t) -> isize;
+    pub fn dispatch_wait(
+        object: *mut ::std::os::raw::c_void,
+        timeout: dispatch_time_t,
+    ) -> isize;
 }
 extern "C" {
     pub fn dispatch_notify(
@@ -21411,7 +22044,11 @@ extern "C" {
     pub fn dispatch_testcancel(object: *mut ::std::os::raw::c_void) -> isize;
 }
 extern "C" {
-    pub fn dispatch_debug(object: dispatch_object_t, message: *const ::std::os::raw::c_char, ...);
+    pub fn dispatch_debug(
+        object: dispatch_object_t,
+        message: *const ::std::os::raw::c_char,
+        ...
+    );
 }
 extern "C" {
     pub fn dispatch_debugv(
@@ -21486,7 +22123,10 @@ extern "C" {
 }
 pub type dispatch_queue_priority_t = ::std::os::raw::c_long;
 extern "C" {
-    pub fn dispatch_get_global_queue(identifier: isize, flags: usize) -> dispatch_queue_global_t;
+    pub fn dispatch_get_global_queue(
+        identifier: isize,
+        flags: usize,
+    ) -> dispatch_queue_global_t;
 }
 pub type dispatch_queue_attr_t = *mut dispatch_queue_attr_s;
 #[repr(C)]
@@ -21537,7 +22177,9 @@ extern "C" {
     ) -> dispatch_queue_t;
 }
 extern "C" {
-    pub fn dispatch_queue_get_label(queue: dispatch_queue_t) -> *const ::std::os::raw::c_char;
+    pub fn dispatch_queue_get_label(
+        queue: dispatch_queue_t,
+    ) -> *const ::std::os::raw::c_char;
 }
 extern "C" {
     pub fn dispatch_queue_get_qos_class(
@@ -21552,7 +22194,11 @@ extern "C" {
     pub fn dispatch_main() -> !;
 }
 extern "C" {
-    pub fn dispatch_after(when: dispatch_time_t, queue: dispatch_queue_t, block: dispatch_block_t);
+    pub fn dispatch_after(
+        when: dispatch_time_t,
+        queue: dispatch_queue_t,
+        block: dispatch_block_t,
+    );
 }
 extern "C" {
     pub fn dispatch_after_f(
@@ -21583,7 +22229,10 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn dispatch_barrier_async_and_wait(queue: dispatch_queue_t, block: dispatch_block_t);
+    pub fn dispatch_barrier_async_and_wait(
+        queue: dispatch_queue_t,
+        block: dispatch_block_t,
+    );
 }
 extern "C" {
     pub fn dispatch_barrier_async_and_wait_f(
@@ -21607,8 +22256,9 @@ extern "C" {
     ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
-    pub fn dispatch_get_specific(key: *const ::std::os::raw::c_void)
-        -> *mut ::std::os::raw::c_void;
+    pub fn dispatch_get_specific(
+        key: *const ::std::os::raw::c_void,
+    ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
     #[link_name = "\u{1}_dispatch_assert_queue$V2"]
@@ -21628,10 +22278,13 @@ extern "C" {
 }
 pub const dispatch_block_flags_t_DISPATCH_BLOCK_BARRIER: dispatch_block_flags_t = 1;
 pub const dispatch_block_flags_t_DISPATCH_BLOCK_DETACHED: dispatch_block_flags_t = 2;
-pub const dispatch_block_flags_t_DISPATCH_BLOCK_ASSIGN_CURRENT: dispatch_block_flags_t = 4;
+pub const dispatch_block_flags_t_DISPATCH_BLOCK_ASSIGN_CURRENT: dispatch_block_flags_t =
+    4;
 pub const dispatch_block_flags_t_DISPATCH_BLOCK_NO_QOS_CLASS: dispatch_block_flags_t = 8;
-pub const dispatch_block_flags_t_DISPATCH_BLOCK_INHERIT_QOS_CLASS: dispatch_block_flags_t = 16;
-pub const dispatch_block_flags_t_DISPATCH_BLOCK_ENFORCE_QOS_CLASS: dispatch_block_flags_t = 32;
+pub const dispatch_block_flags_t_DISPATCH_BLOCK_INHERIT_QOS_CLASS:
+    dispatch_block_flags_t = 16;
+pub const dispatch_block_flags_t_DISPATCH_BLOCK_ENFORCE_QOS_CLASS:
+    dispatch_block_flags_t = 32;
 pub type dispatch_block_flags_t = ::std::os::raw::c_ulong;
 extern "C" {
     pub fn dispatch_block_create(
@@ -21651,7 +22304,10 @@ extern "C" {
     pub fn dispatch_block_perform(flags: dispatch_block_flags_t, block: dispatch_block_t);
 }
 extern "C" {
-    pub fn dispatch_block_wait(block: dispatch_block_t, timeout: dispatch_time_t) -> isize;
+    pub fn dispatch_block_wait(
+        block: dispatch_block_t,
+        timeout: dispatch_time_t,
+    ) -> isize;
 }
 extern "C" {
     pub fn dispatch_block_notify(
@@ -21748,7 +22404,8 @@ impl mach_msg_type_descriptor_t {
         pad3: ::std::os::raw::c_uint,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 24u8, {
             let pad3: u32 = unsafe { ::std::mem::transmute(pad3) };
             pad3 as u64
@@ -21844,7 +22501,8 @@ impl mach_msg_port_descriptor_t {
         disposition: mach_msg_type_name_t,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 16u8, {
             let pad2: u32 = unsafe { ::std::mem::transmute(pad2) };
             pad2 as u64
@@ -21956,7 +22614,8 @@ impl mach_msg_ool_descriptor32_t {
         pad1: ::std::os::raw::c_uint,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
             let deallocate: u32 = unsafe { ::std::mem::transmute(deallocate) };
             deallocate as u64
@@ -22072,7 +22731,8 @@ impl mach_msg_ool_descriptor64_t {
         pad1: ::std::os::raw::c_uint,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
             let deallocate: u32 = unsafe { ::std::mem::transmute(deallocate) };
             deallocate as u64
@@ -22188,7 +22848,8 @@ impl mach_msg_ool_descriptor_t {
         pad1: ::std::os::raw::c_uint,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
             let deallocate: u32 = unsafe { ::std::mem::transmute(deallocate) };
             deallocate as u64
@@ -22307,7 +22968,8 @@ impl mach_msg_ool_ports_descriptor32_t {
         disposition: mach_msg_type_name_t,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
             let deallocate: u32 = unsafe { ::std::mem::transmute(deallocate) };
             deallocate as u64
@@ -22426,7 +23088,8 @@ impl mach_msg_ool_ports_descriptor64_t {
         disposition: mach_msg_type_name_t,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
             let deallocate: u32 = unsafe { ::std::mem::transmute(deallocate) };
             deallocate as u64
@@ -22542,7 +23205,8 @@ impl mach_msg_ool_ports_descriptor_t {
         disposition: mach_msg_type_name_t,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 8u8, {
             let deallocate: u32 = unsafe { ::std::mem::transmute(deallocate) };
             deallocate as u64
@@ -22652,7 +23316,8 @@ impl mach_msg_guarded_port_descriptor32_t {
         disposition: mach_msg_type_name_t,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 16u8, {
             let flags: u32 = unsafe { ::std::mem::transmute(flags) };
             flags as u64
@@ -22758,7 +23423,8 @@ impl mach_msg_guarded_port_descriptor64_t {
         disposition: mach_msg_type_name_t,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 16u8, {
             let flags: u32 = unsafe { ::std::mem::transmute(flags) };
             flags as u64
@@ -22861,7 +23527,8 @@ impl mach_msg_guarded_port_descriptor_t {
         disposition: mach_msg_type_name_t,
         type_: mach_msg_descriptor_type_t,
     ) -> __BindgenBitfieldUnit<[u8; 4usize]> {
-        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> = Default::default();
+        let mut __bindgen_bitfield_unit: __BindgenBitfieldUnit<[u8; 4usize]> =
+            Default::default();
         __bindgen_bitfield_unit.set(0usize, 16u8, {
             let flags: u32 = unsafe { ::std::mem::transmute(flags) };
             flags as u64
@@ -22959,7 +23626,8 @@ pub struct mach_msg_body_t {
 }
 #[test]
 fn bindgen_test_layout_mach_msg_body_t() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_msg_body_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_msg_body_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_msg_body_t>(),
@@ -22972,7 +23640,9 @@ fn bindgen_test_layout_mach_msg_body_t() {
         concat!("Alignment of ", stringify!(mach_msg_body_t))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).msgh_descriptor_count) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).msgh_descriptor_count) as usize - ptr as usize
+        },
         0usize,
         concat!(
             "Offset of field: ",
@@ -22994,7 +23664,8 @@ pub struct mach_msg_header_t {
 }
 #[test]
 fn bindgen_test_layout_mach_msg_header_t() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_msg_header_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_msg_header_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_msg_header_t>(),
@@ -23075,7 +23746,8 @@ pub struct mach_msg_base_t {
 }
 #[test]
 fn bindgen_test_layout_mach_msg_base_t() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_msg_base_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_msg_base_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_msg_base_t>(),
@@ -23119,7 +23791,8 @@ pub struct mach_msg_trailer_t {
 }
 #[test]
 fn bindgen_test_layout_mach_msg_trailer_t() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_msg_trailer_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_msg_trailer_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_msg_trailer_t>(),
@@ -23212,7 +23885,8 @@ pub struct security_token_t {
 }
 #[test]
 fn bindgen_test_layout_security_token_t() {
-    const UNINIT: ::std::mem::MaybeUninit<security_token_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<security_token_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<security_token_t>(),
@@ -23306,7 +23980,8 @@ pub struct audit_token_t {
 }
 #[test]
 fn bindgen_test_layout_audit_token_t() {
-    const UNINIT: ::std::mem::MaybeUninit<audit_token_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<audit_token_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<audit_token_t>(),
@@ -23497,7 +24172,8 @@ pub struct msg_labels_t {
 }
 #[test]
 fn bindgen_test_layout_msg_labels_t() {
-    const UNINIT: ::std::mem::MaybeUninit<msg_labels_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<msg_labels_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<msg_labels_t>(),
@@ -23677,7 +24353,8 @@ pub struct mach_msg_empty_rcv_t {
 }
 #[test]
 fn bindgen_test_layout_mach_msg_empty_rcv_t() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_msg_empty_rcv_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_msg_empty_rcv_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_msg_empty_rcv_t>(),
@@ -23718,7 +24395,8 @@ pub union mach_msg_empty_t {
 }
 #[test]
 fn bindgen_test_layout_mach_msg_empty_t() {
-    const UNINIT: ::std::mem::MaybeUninit<mach_msg_empty_t> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<mach_msg_empty_t> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<mach_msg_empty_t>(),
@@ -23840,7 +24518,10 @@ extern "C" {
     ) -> dispatch_source_t;
 }
 extern "C" {
-    pub fn dispatch_source_set_event_handler(source: dispatch_source_t, handler: dispatch_block_t);
+    pub fn dispatch_source_set_event_handler(
+        source: dispatch_source_t,
+        handler: dispatch_block_t,
+    );
 }
 extern "C" {
     pub fn dispatch_source_set_event_handler_f(
@@ -23849,7 +24530,10 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn dispatch_source_set_cancel_handler(source: dispatch_source_t, handler: dispatch_block_t);
+    pub fn dispatch_source_set_cancel_handler(
+        source: dispatch_source_t,
+        handler: dispatch_block_t,
+    );
 }
 extern "C" {
     pub fn dispatch_source_set_cancel_handler_f(
@@ -23915,7 +24599,10 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn dispatch_group_wait(group: dispatch_group_t, timeout: dispatch_time_t) -> isize;
+    pub fn dispatch_group_wait(
+        group: dispatch_group_t,
+        timeout: dispatch_time_t,
+    ) -> isize;
 }
 extern "C" {
     pub fn dispatch_group_notify(
@@ -23943,7 +24630,10 @@ extern "C" {
     pub fn dispatch_semaphore_create(value: isize) -> dispatch_semaphore_t;
 }
 extern "C" {
-    pub fn dispatch_semaphore_wait(dsema: dispatch_semaphore_t, timeout: dispatch_time_t) -> isize;
+    pub fn dispatch_semaphore_wait(
+        dsema: dispatch_semaphore_t,
+        timeout: dispatch_time_t,
+    ) -> isize;
 }
 extern "C" {
     pub fn dispatch_semaphore_signal(dsema: dispatch_semaphore_t) -> isize;
@@ -24007,7 +24697,10 @@ extern "C" {
 }
 pub type dispatch_data_applier_t = *mut ::std::os::raw::c_void;
 extern "C" {
-    pub fn dispatch_data_apply(data: dispatch_data_t, applier: dispatch_data_applier_t) -> bool;
+    pub fn dispatch_data_apply(
+        data: dispatch_data_t,
+        applier: dispatch_data_applier_t,
+    ) -> bool;
 }
 extern "C" {
     pub fn dispatch_data_copy_region(
@@ -24106,7 +24799,9 @@ extern "C" {
 }
 pub type dispatch_workloop_t = dispatch_queue_t;
 extern "C" {
-    pub fn dispatch_workloop_create(label: *const ::std::os::raw::c_char) -> dispatch_workloop_t;
+    pub fn dispatch_workloop_create(
+        label: *const ::std::os::raw::c_char,
+    ) -> dispatch_workloop_t;
 }
 extern "C" {
     pub fn dispatch_workloop_create_inactive(
@@ -24133,7 +24828,8 @@ pub struct CFStreamError {
 }
 #[test]
 fn bindgen_test_layout_CFStreamError() {
-    const UNINIT: ::std::mem::MaybeUninit<CFStreamError> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFStreamError> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFStreamError>(),
@@ -24191,9 +24887,12 @@ pub struct CFStreamClientContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *mut ::std::os::raw::c_void) -> *mut ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *mut ::std::os::raw::c_void,
+        ) -> *mut ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *mut ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *mut ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *mut ::std::os::raw::c_void) -> CFStringRef,
     >,
@@ -24321,7 +25020,10 @@ extern "C" {
     ) -> CFWriteStreamRef;
 }
 extern "C" {
-    pub fn CFReadStreamCreateWithFile(alloc: CFAllocatorRef, fileURL: CFURLRef) -> CFReadStreamRef;
+    pub fn CFReadStreamCreateWithFile(
+        alloc: CFAllocatorRef,
+        fileURL: CFURLRef,
+    ) -> CFReadStreamRef;
 }
 extern "C" {
     pub fn CFWriteStreamCreateWithFile(
@@ -24604,8 +25306,10 @@ pub const kCFPropertyListXMLFormat_v1_0: _bindgen_ty_44 = 100;
 pub const kCFPropertyListBinaryFormat_v1_0: _bindgen_ty_44 = 200;
 pub type _bindgen_ty_44 = ::std::os::raw::c_uint;
 extern "C" {
-    pub fn CFPropertyListIsValid(plist: CFPropertyListRef, format: CFPropertyListFormat)
-        -> Boolean;
+    pub fn CFPropertyListIsValid(
+        plist: CFPropertyListRef,
+        format: CFPropertyListFormat,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFPropertyListWriteToStream(
@@ -24690,8 +25394,9 @@ pub type CFSetEqualCallBack = ::std::option::Option<
     ) -> Boolean,
 >;
 #[doc = "@typedef CFSetHashCallBack\nType of the callback function used by CFSets for hashing values.\n@param value The value to hash.\n@result The hash of the value."]
-pub type CFSetHashCallBack =
-    ::std::option::Option<unsafe extern "C" fn(value: *const ::std::os::raw::c_void) -> CFHashCode>;
+pub type CFSetHashCallBack = ::std::option::Option<
+    unsafe extern "C" fn(value: *const ::std::os::raw::c_void) -> CFHashCode,
+>;
 #[doc = "@typedef CFSetCallBacks\nStructure containing the callbacks of a CFSet.\n@field version The version number of the structure type being passed\nin as a parameter to the CFSet creation functions. This\nstructure is version 0.\n@field retain The callback used to add a retain for the set on\nvalues as they are put into the set. This callback returns\nthe value to store in the set, which is usually the value\nparameter passed to this callback, but may be a different\nvalue if a different value should be stored in the set.\nThe set's allocator is passed as the first argument.\n@field release The callback used to remove a retain previously added\nfor the set from values as they are removed from the\nset. The set's allocator is passed as the first\nargument.\n@field copyDescription The callback used to create a descriptive\nstring representation of each value in the set. This is\nused by the CFCopyDescription() function.\n@field equal The callback used to compare values in the set for\nequality for some operations.\n@field hash The callback used to compare values in the set for\nuniqueness for some operations."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -24705,7 +25410,8 @@ pub struct CFSetCallBacks {
 }
 #[test]
 fn bindgen_test_layout_CFSetCallBacks() {
-    const UNINIT: ::std::mem::MaybeUninit<CFSetCallBacks> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFSetCallBacks> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFSetCallBacks>(),
@@ -24841,11 +25547,17 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFSetGetCountOfValue\nCounts the number of times the given value occurs in the set. Since\nsets by definition contain only one instance of a value, this function\nis synonymous to CFSetContainsValue.\n@param theSet The set to be searched. If this parameter is not a\nvalid CFSet, the behavior is undefined.\n@param value The value for which to find matches in the set. The\nequal() callback provided when the set was created is\nused to compare. If the equal() callback was NULL, pointer\nequality (in C, ==) is used. If value, or any of the values\nin the set, are not understood by the equal() callback,\nthe behavior is undefined.\n@result The number of times the given value occurs in the set."]
-    pub fn CFSetGetCountOfValue(theSet: CFSetRef, value: *const ::std::os::raw::c_void) -> CFIndex;
+    pub fn CFSetGetCountOfValue(
+        theSet: CFSetRef,
+        value: *const ::std::os::raw::c_void,
+    ) -> CFIndex;
 }
 extern "C" {
     #[doc = "@function CFSetContainsValue\nReports whether or not the value is in the set.\n@param theSet The set to be searched. If this parameter is not a\nvalid CFSet, the behavior is undefined.\n@param value The value for which to find matches in the set. The\nequal() callback provided when the set was created is\nused to compare. If the equal() callback was NULL, pointer\nequality (in C, ==) is used. If value, or any of the values\nin the set, are not understood by the equal() callback,\nthe behavior is undefined.\n@result true, if the value is in the set, otherwise false."]
-    pub fn CFSetContainsValue(theSet: CFSetRef, value: *const ::std::os::raw::c_void) -> Boolean;
+    pub fn CFSetContainsValue(
+        theSet: CFSetRef,
+        value: *const ::std::os::raw::c_void,
+    ) -> Boolean;
 }
 extern "C" {
     #[doc = "@function CFSetGetValue\nRetrieves a value in the set which hashes the same as the specified value.\n@param theSet The set to be queried. If this parameter is not a\nvalid CFSet, the behavior is undefined.\n@param value The value to retrieve. The equal() callback provided when\nthe set was created is used to compare. If the equal() callback\nwas NULL, pointer equality (in C, ==) is used. If a value, or\nany of the values in the set, are not understood by the equal()\ncallback, the behavior is undefined.\n@result The value in the set with the given hash."]
@@ -24880,7 +25592,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFSetReplaceValue\nReplaces the value in the set if it is present.\n@param theSet The set to which the value is to be replaced. If this\nparameter is not a valid mutable CFSet, the behavior is\nundefined.\n@param value The value to replace in the set. The equal() callback provided when\nthe set was created is used to compare. If the equal() callback\nwas NULL, pointer equality (in C, ==) is used. If a value, or\nany of the values in the set, are not understood by the equal()\ncallback, the behavior is undefined. The value is retained by\nthe set using the retain callback provided when the set\nwas created. If the value is not of the sort expected by the\nretain callback, the behavior is undefined. The count of the\nset is increased by one."]
-    pub fn CFSetReplaceValue(theSet: CFMutableSetRef, value: *const ::std::os::raw::c_void);
+    pub fn CFSetReplaceValue(
+        theSet: CFMutableSetRef,
+        value: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     #[doc = "@function CFSetSetValue\nReplaces the value in the set if it is present, or adds the value to\nthe set if it is absent.\n@param theSet The set to which the value is to be replaced. If this\nparameter is not a valid mutable CFSet, the behavior is\nundefined.\n@param value The value to set in the CFSet. The equal() callback provided when\nthe set was created is used to compare. If the equal() callback\nwas NULL, pointer equality (in C, ==) is used. If a value, or\nany of the values in the set, are not understood by the equal()\ncallback, the behavior is undefined. The value is retained by\nthe set using the retain callback provided when the set\nwas created. If the value is not of the sort expected by the\nretain callback, the behavior is undefined. The count of the\nset is increased by one."]
@@ -24888,7 +25603,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFSetRemoveValue\nRemoves the specified value from the set.\n@param theSet The set from which the value is to be removed.\nIf this parameter is not a valid mutable CFSet,\nthe behavior is undefined.\n@param value The value to remove. The equal() callback provided when\nthe set was created is used to compare. If the equal() callback\nwas NULL, pointer equality (in C, ==) is used. If a value, or\nany of the values in the set, are not understood by the equal()\ncallback, the behavior is undefined."]
-    pub fn CFSetRemoveValue(theSet: CFMutableSetRef, value: *const ::std::os::raw::c_void);
+    pub fn CFSetRemoveValue(
+        theSet: CFMutableSetRef,
+        value: *const ::std::os::raw::c_void,
+    );
 }
 extern "C" {
     #[doc = "@function CFSetRemoveAllValues\nRemoves all the values from the set, making it empty.\n@param theSet The set from which all of the values are to be\nremoved. If this parameter is not a valid mutable CFSet,\nthe behavior is undefined."]
@@ -25027,14 +25745,17 @@ pub const kCFStringEncodingShiftJIS_X0213_00: _bindgen_ty_46 = 1576;
 pub type _bindgen_ty_46 = ::std::os::raw::c_uint;
 #[doc = "@typedef CFTreeRetainCallBack\nType of the callback function used to add a retain to the user-specified\ninfo parameter.  This callback may returns the value to use whenever the\ninfo parameter is retained, which is usually the value parameter passed\nto this callback, but may be a different value if a different value\nshould be used.\n@param info A user-supplied info parameter provided in a CFTreeContext.\n@result The retained info parameter."]
 pub type CFTreeRetainCallBack = ::std::option::Option<
-    unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+    unsafe extern "C" fn(
+        info: *const ::std::os::raw::c_void,
+    ) -> *const ::std::os::raw::c_void,
 >;
 #[doc = "@typedef CFTreeReleaseCallBack\nType of the callback function used to remove a retain previously\nadded to the user-specified info parameter.\n@param info A user-supplied info parameter provided in a CFTreeContext."]
 pub type CFTreeReleaseCallBack =
     ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>;
 #[doc = "@typedef CFTreeCopyDescriptionCallBack\nType of the callback function used to provide a description of the\nuser-specified info parameter.\n@param info A user-supplied info parameter provided in a CFTreeContext.\n@result A description of the info parameter."]
-pub type CFTreeCopyDescriptionCallBack =
-    ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef>;
+pub type CFTreeCopyDescriptionCallBack = ::std::option::Option<
+    unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
+>;
 #[doc = "@typedef CFTreeContext\nStructure containing user-specified data and callbacks for a CFTree.\n@field version The version number of the structure type being passed\nin as a parameter to the CFTree creation function.\nThis structure is version 0.\n@field info A C pointer to a user-specified block of data.\n@field retain The callback used to add a retain for the info field.\nIf this parameter is not a pointer to a function of the correct\nprototype, the behavior is undefined.  The value may be NULL.\n@field release The calllback used to remove a retain previously added\nfor the info field.  If this parameter is not a pointer to a\nfunction of the correct prototype, the behavior is undefined.\nThe value may be NULL.\n@field copyDescription The callback used to provide a description of\nthe info field."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -25047,7 +25768,8 @@ pub struct CFTreeContext {
 }
 #[test]
 fn bindgen_test_layout_CFTreeContext() {
-    const UNINIT: ::std::mem::MaybeUninit<CFTreeContext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFTreeContext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFTreeContext>(),
@@ -25130,7 +25852,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFTreeCreate\nCreates a new mutable tree.\n@param allocator The CFAllocator which should be used to allocate\nmemory for the tree and storage for its children.  This\nparameter may be NULL in which case the current default\nCFAllocator is used.  If this reference is not a valid\nCFAllocator, the behavior is undefined.\n@param context A C pointer to a CFTreeContext structure to be copied\nand used as the context of the new tree.  The info parameter\nwill be retained by the tree if a retain function is provided.\nIf this value is not a valid C pointer to a CFTreeContext\nstructure-sized block of storage, the result is undefined.\nIf the version number of the storage is not a valid CFTreeContext\nversion number, the result is undefined.\n@result A reference to the new CFTree."]
-    pub fn CFTreeCreate(allocator: CFAllocatorRef, context: *const CFTreeContext) -> CFTreeRef;
+    pub fn CFTreeCreate(
+        allocator: CFAllocatorRef,
+        context: *const CFTreeContext,
+    ) -> CFTreeRef;
 }
 extern "C" {
     #[doc = "@function CFTreeGetParent\nReturns the parent of the specified tree.\n@param tree The tree to be queried.  If this parameter is not a valid\nCFTree, the behavior is undefined.\n@result The parent of the tree."]
@@ -25296,7 +26021,8 @@ pub struct CFUUIDBytes {
 }
 #[test]
 fn bindgen_test_layout_CFUUIDBytes() {
-    const UNINIT: ::std::mem::MaybeUninit<CFUUIDBytes> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFUUIDBytes> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFUUIDBytes>(),
@@ -25497,7 +26223,10 @@ extern "C" {
     ) -> CFUUIDRef;
 }
 extern "C" {
-    pub fn CFUUIDCreateFromString(alloc: CFAllocatorRef, uuidStr: CFStringRef) -> CFUUIDRef;
+    pub fn CFUUIDCreateFromString(
+        alloc: CFAllocatorRef,
+        uuidStr: CFStringRef,
+    ) -> CFUUIDRef;
 }
 extern "C" {
     pub fn CFUUIDCreateString(alloc: CFAllocatorRef, uuid: CFUUIDRef) -> CFStringRef;
@@ -25527,7 +26256,10 @@ extern "C" {
     pub fn CFUUIDGetUUIDBytes(uuid: CFUUIDRef) -> CFUUIDBytes;
 }
 extern "C" {
-    pub fn CFUUIDCreateFromUUIDBytes(alloc: CFAllocatorRef, bytes: CFUUIDBytes) -> CFUUIDRef;
+    pub fn CFUUIDCreateFromUUIDBytes(
+        alloc: CFAllocatorRef,
+        bytes: CFUUIDBytes,
+    ) -> CFUUIDRef;
 }
 extern "C" {
     pub fn CFCopyHomeDirectoryURL() -> CFURLRef;
@@ -25589,8 +26321,10 @@ extern "C" {
     pub fn CFBundleCopyBundleURL(bundle: CFBundleRef) -> CFURLRef;
 }
 extern "C" {
-    pub fn CFBundleGetValueForInfoDictionaryKey(bundle: CFBundleRef, key: CFStringRef)
-        -> CFTypeRef;
+    pub fn CFBundleGetValueForInfoDictionaryKey(
+        bundle: CFBundleRef,
+        key: CFStringRef,
+    ) -> CFTypeRef;
 }
 extern "C" {
     pub fn CFBundleGetInfoDictionary(bundle: CFBundleRef) -> CFDictionaryRef;
@@ -25684,7 +26418,9 @@ extern "C" {
     pub fn CFBundleCopyBundleLocalizations(bundle: CFBundleRef) -> CFArrayRef;
 }
 extern "C" {
-    pub fn CFBundleCopyPreferredLocalizationsFromArray(locArray: CFArrayRef) -> CFArrayRef;
+    pub fn CFBundleCopyPreferredLocalizationsFromArray(
+        locArray: CFArrayRef,
+    ) -> CFArrayRef;
 }
 extern "C" {
     pub fn CFBundleCopyLocalizationsForPreferences(
@@ -25731,7 +26467,10 @@ extern "C" {
     pub fn CFBundleCopyExecutableArchitectures(bundle: CFBundleRef) -> CFArrayRef;
 }
 extern "C" {
-    pub fn CFBundlePreflightExecutable(bundle: CFBundleRef, error: *mut CFErrorRef) -> Boolean;
+    pub fn CFBundlePreflightExecutable(
+        bundle: CFBundleRef,
+        error: *mut CFErrorRef,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFBundleLoadExecutableAndReturnError(
@@ -25825,16 +26564,20 @@ pub struct CFMessagePortContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
 }
 #[test]
 fn bindgen_test_layout_CFMessagePortContext() {
-    const UNINIT: ::std::mem::MaybeUninit<CFMessagePortContext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFMessagePortContext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFMessagePortContext>(),
@@ -25936,7 +26679,10 @@ extern "C" {
     pub fn CFMessagePortSetName(ms: CFMessagePortRef, newName: CFStringRef) -> Boolean;
 }
 extern "C" {
-    pub fn CFMessagePortGetContext(ms: CFMessagePortRef, context: *mut CFMessagePortContext);
+    pub fn CFMessagePortGetContext(
+        ms: CFMessagePortRef,
+        context: *mut CFMessagePortContext,
+    );
 }
 extern "C" {
     pub fn CFMessagePortInvalidate(ms: CFMessagePortRef);
@@ -25993,7 +26739,8 @@ extern "C" {
 }
 pub type CFPlugInDynamicRegisterFunction =
     ::std::option::Option<unsafe extern "C" fn(plugIn: CFPlugInRef)>;
-pub type CFPlugInUnloadFunction = ::std::option::Option<unsafe extern "C" fn(plugIn: CFPlugInRef)>;
+pub type CFPlugInUnloadFunction =
+    ::std::option::Option<unsafe extern "C" fn(plugIn: CFPlugInRef)>;
 pub type CFPlugInFactoryFunction = ::std::option::Option<
     unsafe extern "C" fn(
         allocator: CFAllocatorRef,
@@ -26048,10 +26795,16 @@ extern "C" {
     pub fn CFPlugInUnregisterFactory(factoryUUID: CFUUIDRef) -> Boolean;
 }
 extern "C" {
-    pub fn CFPlugInRegisterPlugInType(factoryUUID: CFUUIDRef, typeUUID: CFUUIDRef) -> Boolean;
+    pub fn CFPlugInRegisterPlugInType(
+        factoryUUID: CFUUIDRef,
+        typeUUID: CFUUIDRef,
+    ) -> Boolean;
 }
 extern "C" {
-    pub fn CFPlugInUnregisterPlugInType(factoryUUID: CFUUIDRef, typeUUID: CFUUIDRef) -> Boolean;
+    pub fn CFPlugInUnregisterPlugInType(
+        factoryUUID: CFUUIDRef,
+        typeUUID: CFUUIDRef,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFPlugInAddInstanceForFactory(factoryID: CFUUIDRef);
@@ -26072,8 +26825,9 @@ pub type CFPlugInInstanceGetInterfaceFunction = ::std::option::Option<
         ftbl: *mut *mut ::std::os::raw::c_void,
     ) -> Boolean,
 >;
-pub type CFPlugInInstanceDeallocateInstanceDataFunction =
-    ::std::option::Option<unsafe extern "C" fn(instanceData: *mut ::std::os::raw::c_void)>;
+pub type CFPlugInInstanceDeallocateInstanceDataFunction = ::std::option::Option<
+    unsafe extern "C" fn(instanceData: *mut ::std::os::raw::c_void),
+>;
 extern "C" {
     pub fn CFPlugInInstanceGetInterfaceFunctionTable(
         instance: CFPlugInInstanceRef,
@@ -26113,16 +26867,20 @@ pub struct CFMachPortContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *const ::std::os::raw::c_void,
+        ) -> *const ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
     >,
 }
 #[test]
 fn bindgen_test_layout_CFMachPortContext() {
-    const UNINIT: ::std::mem::MaybeUninit<CFMachPortContext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFMachPortContext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFMachPortContext>(),
@@ -26229,8 +26987,9 @@ extern "C" {
     pub fn CFMachPortIsValid(port: CFMachPortRef) -> Boolean;
 }
 extern "C" {
-    pub fn CFMachPortGetInvalidationCallBack(port: CFMachPortRef)
-        -> CFMachPortInvalidationCallBack;
+    pub fn CFMachPortGetInvalidationCallBack(
+        port: CFMachPortRef,
+    ) -> CFMachPortInvalidationCallBack;
 }
 extern "C" {
     pub fn CFMachPortSetInvalidationCallBack(
@@ -26643,7 +27402,9 @@ fn bindgen_test_layout_kauth_identity_extlookup() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).el_info_reserved_1) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).el_info_reserved_1) as usize - ptr as usize
+        },
         24usize,
         concat!(
             "Offset of field: ",
@@ -26791,7 +27552,8 @@ pub struct kauth_cache_sizes {
 }
 #[test]
 fn bindgen_test_layout_kauth_cache_sizes() {
-    const UNINIT: ::std::mem::MaybeUninit<kauth_cache_sizes> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<kauth_cache_sizes> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<kauth_cache_sizes>(),
@@ -26941,7 +27703,8 @@ pub struct kauth_filesec {
 }
 #[test]
 fn bindgen_test_layout_kauth_filesec() {
-    const UNINIT: ::std::mem::MaybeUninit<kauth_filesec> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<kauth_filesec> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<kauth_filesec>(),
@@ -27073,10 +27836,16 @@ extern "C" {
     pub fn acl_init(count: ::std::os::raw::c_int) -> acl_t;
 }
 extern "C" {
-    pub fn acl_copy_entry(dest_d: acl_entry_t, src_d: acl_entry_t) -> ::std::os::raw::c_int;
+    pub fn acl_copy_entry(
+        dest_d: acl_entry_t,
+        src_d: acl_entry_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_create_entry(acl_p: *mut acl_t, entry_p: *mut acl_entry_t) -> ::std::os::raw::c_int;
+    pub fn acl_create_entry(
+        acl_p: *mut acl_t,
+        entry_p: *mut acl_entry_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn acl_create_entry_np(
@@ -27120,7 +27889,10 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_add_perm(permset_d: acl_permset_t, perm: acl_perm_t) -> ::std::os::raw::c_int;
+    pub fn acl_add_perm(
+        permset_d: acl_permset_t,
+        perm: acl_perm_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn acl_calc_mask(acl_p: *mut acl_t) -> ::std::os::raw::c_int;
@@ -27129,10 +27901,16 @@ extern "C" {
     pub fn acl_clear_perms(permset_d: acl_permset_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_delete_perm(permset_d: acl_permset_t, perm: acl_perm_t) -> ::std::os::raw::c_int;
+    pub fn acl_delete_perm(
+        permset_d: acl_permset_t,
+        perm: acl_perm_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_get_perm_np(permset_d: acl_permset_t, perm: acl_perm_t) -> ::std::os::raw::c_int;
+    pub fn acl_get_perm_np(
+        permset_d: acl_permset_t,
+        perm: acl_perm_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn acl_get_permset(
@@ -27141,11 +27919,15 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_set_permset(entry_d: acl_entry_t, permset_d: acl_permset_t)
-        -> ::std::os::raw::c_int;
+    pub fn acl_set_permset(
+        entry_d: acl_entry_t,
+        permset_d: acl_permset_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_maximal_permset_mask_np(mask_p: *mut acl_permset_mask_t) -> ::std::os::raw::c_int;
+    pub fn acl_maximal_permset_mask_np(
+        mask_p: *mut acl_permset_mask_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn acl_get_permset_mask_np(
@@ -27160,16 +27942,25 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_add_flag_np(flagset_d: acl_flagset_t, flag: acl_flag_t) -> ::std::os::raw::c_int;
+    pub fn acl_add_flag_np(
+        flagset_d: acl_flagset_t,
+        flag: acl_flag_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn acl_clear_flags_np(flagset_d: acl_flagset_t) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_delete_flag_np(flagset_d: acl_flagset_t, flag: acl_flag_t) -> ::std::os::raw::c_int;
+    pub fn acl_delete_flag_np(
+        flagset_d: acl_flagset_t,
+        flag: acl_flag_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_get_flag_np(flagset_d: acl_flagset_t, flag: acl_flag_t) -> ::std::os::raw::c_int;
+    pub fn acl_get_flag_np(
+        flagset_d: acl_flagset_t,
+        flag: acl_flag_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn acl_get_flagset_np(
@@ -27199,10 +27990,15 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_set_tag_type(entry_d: acl_entry_t, tag_type: acl_tag_t) -> ::std::os::raw::c_int;
+    pub fn acl_set_tag_type(
+        entry_d: acl_entry_t,
+        tag_type: acl_tag_t,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_delete_def_file(path_p: *const ::std::os::raw::c_char) -> ::std::os::raw::c_int;
+    pub fn acl_delete_def_file(
+        path_p: *const ::std::os::raw::c_char,
+    ) -> ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn acl_get_fd(fd: ::std::os::raw::c_int) -> acl_t;
@@ -27211,10 +28007,16 @@ extern "C" {
     pub fn acl_get_fd_np(fd: ::std::os::raw::c_int, type_: acl_type_t) -> acl_t;
 }
 extern "C" {
-    pub fn acl_get_file(path_p: *const ::std::os::raw::c_char, type_: acl_type_t) -> acl_t;
+    pub fn acl_get_file(
+        path_p: *const ::std::os::raw::c_char,
+        type_: acl_type_t,
+    ) -> acl_t;
 }
 extern "C" {
-    pub fn acl_get_link_np(path_p: *const ::std::os::raw::c_char, type_: acl_type_t) -> acl_t;
+    pub fn acl_get_link_np(
+        path_p: *const ::std::os::raw::c_char,
+        type_: acl_type_t,
+    ) -> acl_t;
 }
 extern "C" {
     pub fn acl_set_fd(fd: ::std::os::raw::c_int, acl: acl_t) -> ::std::os::raw::c_int;
@@ -27241,7 +28043,11 @@ extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 extern "C" {
-    pub fn acl_copy_ext(buf_p: *mut ::std::os::raw::c_void, acl: acl_t, size: isize) -> isize;
+    pub fn acl_copy_ext(
+        buf_p: *mut ::std::os::raw::c_void,
+        acl: acl_t,
+        size: isize,
+    ) -> isize;
 }
 extern "C" {
     pub fn acl_copy_ext_native(
@@ -27290,7 +28096,10 @@ extern "C" {
     ) -> Boolean;
 }
 extern "C" {
-    pub fn CFFileSecuritySetOwnerUUID(fileSec: CFFileSecurityRef, ownerUUID: CFUUIDRef) -> Boolean;
+    pub fn CFFileSecuritySetOwnerUUID(
+        fileSec: CFFileSecurityRef,
+        ownerUUID: CFUUIDRef,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFFileSecurityCopyGroupUUID(
@@ -27299,7 +28108,10 @@ extern "C" {
     ) -> Boolean;
 }
 extern "C" {
-    pub fn CFFileSecuritySetGroupUUID(fileSec: CFFileSecurityRef, groupUUID: CFUUIDRef) -> Boolean;
+    pub fn CFFileSecuritySetGroupUUID(
+        fileSec: CFFileSecurityRef,
+        groupUUID: CFUUIDRef,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFFileSecurityCopyAccessControlList(
@@ -27314,19 +28126,28 @@ extern "C" {
     ) -> Boolean;
 }
 extern "C" {
-    pub fn CFFileSecurityGetOwner(fileSec: CFFileSecurityRef, owner: *mut uid_t) -> Boolean;
+    pub fn CFFileSecurityGetOwner(
+        fileSec: CFFileSecurityRef,
+        owner: *mut uid_t,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFFileSecuritySetOwner(fileSec: CFFileSecurityRef, owner: uid_t) -> Boolean;
 }
 extern "C" {
-    pub fn CFFileSecurityGetGroup(fileSec: CFFileSecurityRef, group: *mut gid_t) -> Boolean;
+    pub fn CFFileSecurityGetGroup(
+        fileSec: CFFileSecurityRef,
+        group: *mut gid_t,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFFileSecuritySetGroup(fileSec: CFFileSecurityRef, group: gid_t) -> Boolean;
 }
 extern "C" {
-    pub fn CFFileSecurityGetMode(fileSec: CFFileSecurityRef, mode: *mut mode_t) -> Boolean;
+    pub fn CFFileSecurityGetMode(
+        fileSec: CFFileSecurityRef,
+        mode: *mut mode_t,
+    ) -> Boolean;
 }
 extern "C" {
     pub fn CFFileSecuritySetMode(fileSec: CFFileSecurityRef, mode: mode_t) -> Boolean;
@@ -27425,7 +28246,9 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function CFStringTokenizerGetCurrentTokenRange\n@abstract Returns the range of current token.\n@param tokenizer The reference to CFStringTokenizer returned by\nCFStringTokenizerCreate.\n@result Range of current token, or {kCFNotFound,0} if there is no current token."]
-    pub fn CFStringTokenizerGetCurrentTokenRange(tokenizer: CFStringTokenizerRef) -> CFRange;
+    pub fn CFStringTokenizerGetCurrentTokenRange(
+        tokenizer: CFStringTokenizerRef,
+    ) -> CFRange;
 }
 extern "C" {
     #[doc = "@function CFStringTokenizerCopyCurrentTokenAttribute\n@abstract Copies the specified attribute of current token.\n@param tokenizer The reference to CFStringTokenizer returned by\nCFStringTokenizerCreate.\n@param attribute Specify a token attribute you want to obtain. The value is\none of kCFStringTokenizerAttributeLatinTranscription or\nkCFStringTokenizerAttributeLanguage.\n@result Token attribute, or NULL if current token does not have the specified\nattribute or if there is no current token."]
@@ -27466,9 +28289,12 @@ pub struct CFFileDescriptorContext {
     pub version: CFIndex,
     pub info: *mut ::std::os::raw::c_void,
     pub retain: ::std::option::Option<
-        unsafe extern "C" fn(info: *mut ::std::os::raw::c_void) -> *mut ::std::os::raw::c_void,
+        unsafe extern "C" fn(
+            info: *mut ::std::os::raw::c_void,
+        ) -> *mut ::std::os::raw::c_void,
     >,
-    pub release: ::std::option::Option<unsafe extern "C" fn(info: *mut ::std::os::raw::c_void)>,
+    pub release:
+        ::std::option::Option<unsafe extern "C" fn(info: *mut ::std::os::raw::c_void)>,
     pub copyDescription: ::std::option::Option<
         unsafe extern "C" fn(info: *mut ::std::os::raw::c_void) -> CFStringRef,
     >,
@@ -27563,10 +28389,16 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn CFFileDescriptorEnableCallBacks(f: CFFileDescriptorRef, callBackTypes: CFOptionFlags);
+    pub fn CFFileDescriptorEnableCallBacks(
+        f: CFFileDescriptorRef,
+        callBackTypes: CFOptionFlags,
+    );
 }
 extern "C" {
-    pub fn CFFileDescriptorDisableCallBacks(f: CFFileDescriptorRef, callBackTypes: CFOptionFlags);
+    pub fn CFFileDescriptorDisableCallBacks(
+        f: CFFileDescriptorRef,
+        callBackTypes: CFOptionFlags,
+    );
 }
 extern "C" {
     pub fn CFFileDescriptorInvalidate(f: CFFileDescriptorRef);
@@ -27588,7 +28420,10 @@ pub struct __CFUserNotification {
 }
 pub type CFUserNotificationRef = *mut __CFUserNotification;
 pub type CFUserNotificationCallBack = ::std::option::Option<
-    unsafe extern "C" fn(userNotification: CFUserNotificationRef, responseFlags: CFOptionFlags),
+    unsafe extern "C" fn(
+        userNotification: CFUserNotificationRef,
+        responseFlags: CFOptionFlags,
+    ),
 >;
 extern "C" {
     pub fn CFUserNotificationGetTypeID() -> CFTypeID;
@@ -27764,7 +28599,8 @@ pub struct CFXMLElementInfo {
 }
 #[test]
 fn bindgen_test_layout_CFXMLElementInfo() {
-    const UNINIT: ::std::mem::MaybeUninit<CFXMLElementInfo> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFXMLElementInfo> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFXMLElementInfo>(),
@@ -27856,7 +28692,8 @@ pub struct CFXMLDocumentInfo {
 }
 #[test]
 fn bindgen_test_layout_CFXMLDocumentInfo() {
-    const UNINIT: ::std::mem::MaybeUninit<CFXMLDocumentInfo> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFXMLDocumentInfo> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFXMLDocumentInfo>(),
@@ -27897,7 +28734,8 @@ pub struct CFXMLExternalID {
 }
 #[test]
 fn bindgen_test_layout_CFXMLExternalID() {
-    const UNINIT: ::std::mem::MaybeUninit<CFXMLExternalID> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFXMLExternalID> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFXMLExternalID>(),
@@ -27968,7 +28806,8 @@ pub struct CFXMLNotationInfo {
 }
 #[test]
 fn bindgen_test_layout_CFXMLNotationInfo() {
-    const UNINIT: ::std::mem::MaybeUninit<CFXMLNotationInfo> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFXMLNotationInfo> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFXMLNotationInfo>(),
@@ -28012,7 +28851,9 @@ fn bindgen_test_layout_CFXMLElementTypeDeclarationInfo() {
         concat!("Alignment of ", stringify!(CFXMLElementTypeDeclarationInfo))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).contentDescription) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).contentDescription) as usize - ptr as usize
+        },
         0usize,
         concat!(
             "Offset of field: ",
@@ -28100,7 +28941,9 @@ fn bindgen_test_layout_CFXMLAttributeListDeclarationInfo() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).numberOfAttributes) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).numberOfAttributes) as usize - ptr as usize
+        },
         0usize,
         concat!(
             "Offset of field: ",
@@ -28137,7 +28980,8 @@ pub struct CFXMLEntityInfo {
 }
 #[test]
 fn bindgen_test_layout_CFXMLEntityInfo() {
-    const UNINIT: ::std::mem::MaybeUninit<CFXMLEntityInfo> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFXMLEntityInfo> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFXMLEntityInfo>(),
@@ -28234,7 +29078,10 @@ extern "C" {
     ) -> CFXMLNodeRef;
 }
 extern "C" {
-    pub fn CFXMLNodeCreateCopy(alloc: CFAllocatorRef, origNode: CFXMLNodeRef) -> CFXMLNodeRef;
+    pub fn CFXMLNodeCreateCopy(
+        alloc: CFAllocatorRef,
+        origNode: CFXMLNodeRef,
+    ) -> CFXMLNodeRef;
 }
 extern "C" {
     pub fn CFXMLNodeGetTypeCode(node: CFXMLNodeRef) -> CFXMLNodeTypeCode;
@@ -28249,7 +29096,10 @@ extern "C" {
     pub fn CFXMLNodeGetVersion(node: CFXMLNodeRef) -> CFIndex;
 }
 extern "C" {
-    pub fn CFXMLTreeCreateWithNode(allocator: CFAllocatorRef, node: CFXMLNodeRef) -> CFXMLTreeRef;
+    pub fn CFXMLTreeCreateWithNode(
+        allocator: CFAllocatorRef,
+        node: CFXMLNodeRef,
+    ) -> CFXMLTreeRef;
 }
 extern "C" {
     pub fn CFXMLTreeGetNode(xmlTree: CFXMLTreeRef) -> CFXMLNodeRef;
@@ -28338,7 +29188,8 @@ pub struct CFXMLParserCallBacks {
 }
 #[test]
 fn bindgen_test_layout_CFXMLParserCallBacks() {
-    const UNINIT: ::std::mem::MaybeUninit<CFXMLParserCallBacks> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFXMLParserCallBacks> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFXMLParserCallBacks>(),
@@ -28361,7 +29212,9 @@ fn bindgen_test_layout_CFXMLParserCallBacks() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).createXMLStructure) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).createXMLStructure) as usize - ptr as usize
+        },
         8usize,
         concat!(
             "Offset of field: ",
@@ -28391,7 +29244,9 @@ fn bindgen_test_layout_CFXMLParserCallBacks() {
         )
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).resolveExternalEntity) as usize - ptr as usize },
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).resolveExternalEntity) as usize - ptr as usize
+        },
         32usize,
         concat!(
             "Offset of field: ",
@@ -28412,12 +29267,15 @@ fn bindgen_test_layout_CFXMLParserCallBacks() {
     );
 }
 pub type CFXMLParserRetainCallBack = ::std::option::Option<
-    unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> *const ::std::os::raw::c_void,
+    unsafe extern "C" fn(
+        info: *const ::std::os::raw::c_void,
+    ) -> *const ::std::os::raw::c_void,
 >;
 pub type CFXMLParserReleaseCallBack =
     ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void)>;
-pub type CFXMLParserCopyDescriptionCallBack =
-    ::std::option::Option<unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef>;
+pub type CFXMLParserCopyDescriptionCallBack = ::std::option::Option<
+    unsafe extern "C" fn(info: *const ::std::os::raw::c_void) -> CFStringRef,
+>;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct CFXMLParserContext {
@@ -28429,7 +29287,8 @@ pub struct CFXMLParserContext {
 }
 #[test]
 fn bindgen_test_layout_CFXMLParserContext() {
-    const UNINIT: ::std::mem::MaybeUninit<CFXMLParserContext> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<CFXMLParserContext> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<CFXMLParserContext>(),
@@ -28517,10 +29376,16 @@ extern "C" {
     ) -> CFXMLParserRef;
 }
 extern "C" {
-    pub fn CFXMLParserGetContext(parser: CFXMLParserRef, context: *mut CFXMLParserContext);
+    pub fn CFXMLParserGetContext(
+        parser: CFXMLParserRef,
+        context: *mut CFXMLParserContext,
+    );
 }
 extern "C" {
-    pub fn CFXMLParserGetCallBacks(parser: CFXMLParserRef, callBacks: *mut CFXMLParserCallBacks);
+    pub fn CFXMLParserGetCallBacks(
+        parser: CFXMLParserRef,
+        callBacks: *mut CFXMLParserCallBacks,
+    );
 }
 extern "C" {
     pub fn CFXMLParserGetSourceURL(parser: CFXMLParserRef) -> CFURLRef;
@@ -28578,7 +29443,10 @@ extern "C" {
     ) -> CFXMLTreeRef;
 }
 extern "C" {
-    pub fn CFXMLTreeCreateXMLData(allocator: CFAllocatorRef, xmlTree: CFXMLTreeRef) -> CFDataRef;
+    pub fn CFXMLTreeCreateXMLData(
+        allocator: CFAllocatorRef,
+        xmlTree: CFXMLTreeRef,
+    ) -> CFDataRef;
 }
 extern "C" {
     pub fn CFXMLCreateStringByEscapingEntities(
@@ -28734,7 +29602,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function\n@abstract       Creates a JavaScript value from a JSON formatted string.\n@param ctx      The execution context to use.\n@param string   The JSString containing the JSON string to be parsed.\n@result         A JSValue containing the parsed value, or NULL if the input is invalid."]
-    pub fn JSValueMakeFromJSONString(ctx: JSContextRef, string: JSStringRef) -> JSValueRef;
+    pub fn JSValueMakeFromJSONString(
+        ctx: JSContextRef,
+        string: JSStringRef,
+    ) -> JSValueRef;
 }
 extern "C" {
     #[doc = "@function\n@abstract       Creates a JavaScript string containing the JSON serialized representation of a JS value.\n@param ctx      The execution context to use.\n@param value    The value to serialize.\n@param indent   The number of spaces to indent when nesting.  If 0, the resulting JSON will not contains newlines.  The size of the indent is clamped to 10 spaces.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result         A JSString with the result of serialization, or NULL if an exception is thrown."]
@@ -28751,8 +29622,11 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function\n@abstract       Converts a JavaScript value to number and returns the resulting number.\n@param ctx  The execution context to use.\n@param value    The JSValue to convert.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result         The numeric result of conversion, or NaN if an exception is thrown."]
-    pub fn JSValueToNumber(ctx: JSContextRef, value: JSValueRef, exception: *mut JSValueRef)
-        -> f64;
+    pub fn JSValueToNumber(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> f64;
 }
 extern "C" {
     #[doc = "@function\n@abstract       Converts a JavaScript value to string and copies the result into a JavaScript string.\n@param ctx  The execution context to use.\n@param value    The JSValue to convert.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result         A JSString with the result of conversion, or NULL if an exception is thrown. Ownership follows the Create Rule."]
@@ -28800,7 +29674,11 @@ pub type JSObjectFinalizeCallback =
     ::std::option::Option<unsafe extern "C" fn(object: JSObjectRef)>;
 #[doc = "@typedef JSObjectHasPropertyCallback\n@abstract The callback invoked when determining whether an object has a property.\n@param ctx The execution context to use.\n@param object The JSObject to search for the property.\n@param propertyName A JSString containing the name of the property look up.\n@result true if object has the property, otherwise false.\n@discussion If you named your function HasProperty, you would declare it like this:\n\nbool HasProperty(JSContextRef ctx, JSObjectRef object, JSStringRef propertyName);\n\nIf this function returns false, the hasProperty request forwards to object's statically declared properties, then its parent class chain (which includes the default object class), then its prototype chain.\n\nThis callback enables optimization in cases where only a property's existence needs to be known, not its value, and computing its value would be expensive.\n\nIf this callback is NULL, the getProperty callback will be used to service hasProperty requests."]
 pub type JSObjectHasPropertyCallback = ::std::option::Option<
-    unsafe extern "C" fn(ctx: JSContextRef, object: JSObjectRef, propertyName: JSStringRef) -> bool,
+    unsafe extern "C" fn(
+        ctx: JSContextRef,
+        object: JSObjectRef,
+        propertyName: JSStringRef,
+    ) -> bool,
 >;
 #[doc = "@typedef JSObjectGetPropertyCallback\n@abstract The callback invoked when getting a property's value.\n@param ctx The execution context to use.\n@param object The JSObject to search for the property.\n@param propertyName A JSString containing the name of the property to get.\n@param exception A pointer to a JSValueRef in which to return an exception, if any.\n@result The property's value if object has the property, otherwise NULL.\n@discussion If you named your function GetProperty, you would declare it like this:\n\nJSValueRef GetProperty(JSContextRef ctx, JSObjectRef object, JSStringRef propertyName, JSValueRef* exception);\n\nIf this function returns NULL, the get request forwards to object's statically declared properties, then its parent class chain (which includes the default object class), then its prototype chain."]
 pub type JSObjectGetPropertyCallback = ::std::option::Option<
@@ -28888,7 +29766,8 @@ pub struct JSStaticValue {
 }
 #[test]
 fn bindgen_test_layout_JSStaticValue() {
-    const UNINIT: ::std::mem::MaybeUninit<JSStaticValue> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<JSStaticValue> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<JSStaticValue>(),
@@ -28951,7 +29830,8 @@ pub struct JSStaticFunction {
 }
 #[test]
 fn bindgen_test_layout_JSStaticFunction() {
-    const UNINIT: ::std::mem::MaybeUninit<JSStaticFunction> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<JSStaticFunction> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<JSStaticFunction>(),
@@ -29018,7 +29898,8 @@ pub struct JSClassDefinition {
 }
 #[test]
 fn bindgen_test_layout_JSClassDefinition() {
-    const UNINIT: ::std::mem::MaybeUninit<JSClassDefinition> = ::std::mem::MaybeUninit::uninit();
+    const UNINIT: ::std::mem::MaybeUninit<JSClassDefinition> =
+        ::std::mem::MaybeUninit::uninit();
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<JSClassDefinition>(),
@@ -29305,7 +30186,11 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function\n@abstract Sets an object's prototype.\n@param ctx  The execution context to use.\n@param object The JSObject whose prototype you want to set.\n@param value A JSValue to set as the object's prototype."]
-    pub fn JSObjectSetPrototype(ctx: JSContextRef, object: JSObjectRef, value: JSValueRef);
+    pub fn JSObjectSetPrototype(
+        ctx: JSContextRef,
+        object: JSObjectRef,
+        value: JSValueRef,
+    );
 }
 extern "C" {
     #[doc = "@function\n@abstract Tests whether an object has a given property.\n@param object The JSObject to test.\n@param propertyName A JSString containing the property's name.\n@result true if the object has a property whose name matches propertyName, otherwise false."]
@@ -29407,7 +30292,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function\n@abstract Sets a pointer to private data on an object.\n@param object The JSObject whose private data you want to set.\n@param data A void* to set as the object's private data.\n@result true if object can store private data, otherwise false.\n@discussion The default object class does not allocate storage for private data. Only objects created with a non-NULL JSClass can store private data."]
-    pub fn JSObjectSetPrivate(object: JSObjectRef, data: *mut ::std::os::raw::c_void) -> bool;
+    pub fn JSObjectSetPrivate(
+        object: JSObjectRef,
+        data: *mut ::std::os::raw::c_void,
+    ) -> bool;
 }
 extern "C" {
     #[doc = "@function\n@abstract Tests whether an object can be called as a function.\n@param ctx  The execution context to use.\n@param object The JSObject to test.\n@result true if the object can be called as a function, otherwise false."]
@@ -29447,7 +30335,9 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function\n@abstract Retains a JavaScript property name array.\n@param array The JSPropertyNameArray to retain.\n@result A JSPropertyNameArray that is the same as array."]
-    pub fn JSPropertyNameArrayRetain(array: JSPropertyNameArrayRef) -> JSPropertyNameArrayRef;
+    pub fn JSPropertyNameArrayRetain(
+        array: JSPropertyNameArrayRef,
+    ) -> JSPropertyNameArrayRef;
 }
 extern "C" {
     #[doc = "@function\n@abstract Releases a JavaScript property name array.\n@param array The JSPropetyNameArray to release."]
@@ -29507,6 +30397,14 @@ extern "C" {
     pub fn JSContextGetGlobalObject(ctx: JSContextRef) -> JSObjectRef;
 }
 extern "C" {
+    #[doc = "@function\n@abstract Gets the shared data pointer\n@param ctx The JSContext whose global object you want to get.\n@param data A void* to set as the context's shared data. Pass NULL to specify no shared data."]
+    pub fn JSContextSetSharedData(ctx: JSContextRef, data: *mut ::std::os::raw::c_void);
+}
+extern "C" {
+    #[doc = "@function\n@abstract Gets the shared data pointer\n@param ctx The JSContext whose global object you want to get.\n@result A void* that is the context's shared data, if the context has shared data, otherwise NULL."]
+    pub fn JSContextGetSharedData(ctx: JSContextRef) -> *mut ::std::os::raw::c_void;
+}
+extern "C" {
     #[doc = "@function\n@abstract Gets the context group to which a JavaScript execution context belongs.\n@param ctx The JSContext whose group you want to get.\n@result ctx's group."]
     pub fn JSContextGetGroup(ctx: JSContextRef) -> JSContextGroupRef;
 }
@@ -29534,11 +30432,16 @@ extern "C" {
 pub type JSChar = ::std::os::raw::c_ushort;
 extern "C" {
     #[doc = "@function\n@abstract         Creates a JavaScript string from a buffer of Unicode characters.\n@param chars      The buffer of Unicode characters to copy into the new JSString.\n@param numChars   The number of characters to copy from the buffer pointed to by chars.\n@result           A JSString containing chars. Ownership follows the Create Rule."]
-    pub fn JSStringCreateWithCharacters(chars: *const JSChar, numChars: usize) -> JSStringRef;
+    pub fn JSStringCreateWithCharacters(
+        chars: *const JSChar,
+        numChars: usize,
+    ) -> JSStringRef;
 }
 extern "C" {
     #[doc = "@function\n@abstract         Creates a JavaScript string from a null-terminated UTF8 string.\n@param string     The null-terminated UTF8 string to copy into the new JSString.\n@result           A JSString containing string. Ownership follows the Create Rule."]
-    pub fn JSStringCreateWithUTF8CString(string: *const ::std::os::raw::c_char) -> JSStringRef;
+    pub fn JSStringCreateWithUTF8CString(
+        string: *const ::std::os::raw::c_char,
+    ) -> JSStringRef;
 }
 extern "C" {
     #[doc = "@function\n@abstract         Retains a JavaScript string.\n@param string     The JSString to retain.\n@result           A JSString that is the same as string."]
@@ -29574,7 +30477,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function\n@abstract     Tests whether a JavaScript string matches a null-terminated UTF8 string.\n@param a      The JSString to test.\n@param b      The null-terminated UTF8 string to test.\n@result       true if the two strings match, otherwise false."]
-    pub fn JSStringIsEqualToUTF8CString(a: JSStringRef, b: *const ::std::os::raw::c_char) -> bool;
+    pub fn JSStringIsEqualToUTF8CString(
+        a: JSStringRef,
+        b: *const ::std::os::raw::c_char,
+    ) -> bool;
 }
 extern "C" {
     #[doc = "@function\n@abstract           Creates a JavaScript Typed Array object with the given number of elements.\n@param ctx          The execution context to use.\n@param arrayType    A value identifying the type of array to create. If arrayType is kJSTypedArrayTypeNone or kJSTypedArrayTypeArrayBuffer then NULL will be returned.\n@param length       The number of elements to be in the new Typed Array.\n@param exception    A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result             A JSObjectRef that is a Typed Array with all elements set to zero or NULL if there was an error."]
@@ -29690,7 +30596,10 @@ extern "C" {
 }
 extern "C" {
     #[doc = "@function\n@abstract         Creates a CFString from a JavaScript string.\n@param alloc      The alloc parameter to pass to CFStringCreate.\n@param string     The JSString to copy into the new CFString.\n@result           A CFString containing string. Ownership follows the Create Rule."]
-    pub fn JSStringCopyCFString(alloc: CFAllocatorRef, string: JSStringRef) -> CFStringRef;
+    pub fn JSStringCopyCFString(
+        alloc: CFAllocatorRef,
+        string: JSStringRef,
+    ) -> CFStringRef;
 }
 pub type __builtin_va_list = *mut ::std::os::raw::c_char;
 pub type __uint128_t = u128;

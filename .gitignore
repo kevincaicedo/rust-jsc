@@ -6,3 +6,4 @@ tmp/*
 target
 .cargo
 .libs
+*.swp
