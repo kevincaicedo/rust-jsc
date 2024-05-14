@@ -9,6 +9,12 @@ help:
 	@echo "  build-lib: Build the Rust library"
 	@echo "  gen-bindings: Generate the Rust bindings"
 
+test:
+	RUST_BACKTRACE=1 cargo test --lib
+
+all-tests:
+	cargo test
+
 # Build the Docker image
 build-docker-jsc:
 # Check if WebKit submodule is initialized otherwise initialize it
@@ -42,4 +48,4 @@ build-lib:
 gen-bindings:
 	(cd gen && cargo build --release)
 
-.PHONY: build-docker-jsc build-jsc build-lib gen-bindings
+.PHONY: build-docker-jsc build-jsc build-lib gen-bindings test

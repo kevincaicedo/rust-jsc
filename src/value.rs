@@ -142,7 +142,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::from_json(&ctx, r#"{"key": "value"}"#).unwrap();
+    /// let value = JSValue::from_json(&ctx, r#"{"key": "value"}"#);
     /// assert!(value.is_object());
     /// ```
     ///
@@ -164,7 +164,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = ctx.evaluate_script("({ key: 'value' })").unwrap();
+    /// let value = ctx.evaluate_script("({ key: 'value' })", None).unwrap();
     /// assert!(value.as_json_string(2).is_ok());
     /// ```
     ///
@@ -191,7 +191,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::string(ctx, "Hello, World!");
+    /// let value = JSValue::string(&ctx, "Hello, World!");
     /// assert!(value.as_string().is_ok());
     /// ```
     ///
@@ -216,7 +216,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::object(ctx);
+    /// let value = ctx.evaluate_script("({ key: 'value' })", None).unwrap();
     /// assert!(value.as_object().is_ok());
     /// ```
     ///
@@ -241,7 +241,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::boolean(ctx, true);
+    /// let value = JSValue::boolean(&ctx, true);
     /// assert_eq!(value.as_boolean(), true);
     /// ```
     ///
@@ -258,7 +258,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::number(ctx, 42.0);
+    /// let value = JSValue::number(&ctx, 42.0);
     /// assert_eq!(value.as_number().unwrap(), 42.0);
     /// ```
     ///
@@ -300,7 +300,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::null(ctx);
+    /// let value = JSValue::null(&ctx);
     /// assert!(value.is_null());
     /// ```
     ///
@@ -317,7 +317,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::boolean(ctx, true);
+    /// let value = JSValue::boolean(&ctx, true);
     /// assert!(value.is_boolean());
     /// ```
     ///
@@ -334,7 +334,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::number(ctx, 42.0);
+    /// let value = JSValue::number(&ctx, 42.0);
     /// assert!(value.is_number());
     /// ```
     ///
@@ -351,7 +351,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::string(ctx, "Hello, World!");
+    /// let value = JSValue::string(&ctx, "Hello, World!");
     /// assert!(value.is_string());
     /// ```
     ///
@@ -368,7 +368,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::object(ctx);
+    /// let value = ctx.evaluate_script("({ key: 'value' })", None).unwrap();
     /// assert!(value.is_object());
     /// ```
     ///
@@ -385,7 +385,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::symbol(ctx, "symbol");
+    /// let value = JSValue::symbol(&ctx, "symbol");
     /// assert!(value.is_symbol());
     /// ```
     ///
@@ -402,7 +402,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::array(ctx);
+    /// let value = ctx.evaluate_script("[1, 2, 3]", None).unwrap();
     /// assert!(value.is_array());
     /// ```
     ///
@@ -419,7 +419,7 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let value = JSValue::date(ctx, 0.0);
+    /// let value = ctx.evaluate_script("new Date()", None).unwrap();
     /// assert!(value.is_date());
     /// ```
     ///
@@ -467,8 +467,8 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let class = JSClass::builder("Test").build();
-    /// let value = class.object::<i32>(&ctx, Some(Box::new(42))).unwrap();
+    /// let class = JSClass::builder("Test").build().unwrap();
+    /// let value = class.object::<i32>(&ctx, Some(Box::new(42)));
     /// assert!(value.is_object_of_class(&class).unwrap());
     /// ```
     ///

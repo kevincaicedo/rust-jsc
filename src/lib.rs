@@ -1,8 +1,8 @@
 use rust_jsc_sys::{
     kJSClassAttributeNoAutomaticPrototype, kJSClassAttributeNone,
     kJSPropertyAttributeDontDelete, kJSPropertyAttributeDontEnum,
-    kJSPropertyAttributeNone, kJSPropertyAttributeReadOnly, JSClassRef,
-    JSContextGroupRef, JSContextRef, JSGlobalContextRef, JSObjectRef,
+    kJSPropertyAttributeNone, kJSPropertyAttributeReadOnly, JSClassAttributes,
+    JSClassRef, JSContextGroupRef, JSContextRef, JSGlobalContextRef, JSObjectRef,
     JSPropertyAttributes, JSStringRef, JSType, JSType_kJSTypeBoolean, JSType_kJSTypeNull,
     JSType_kJSTypeNumber, JSType_kJSTypeObject, JSType_kJSTypeString,
     JSType_kJSTypeSymbol, JSType_kJSTypeUndefined, JSTypedArrayType as MJSTypedArrayType,
@@ -20,6 +20,7 @@ use rust_jsc_sys::{
     JSTypedArrayType_kJSTypedArrayTypeUint8ClampedArray, JSValueRef,
 };
 
+pub mod array;
 pub mod class;
 pub mod context;
 pub mod date;
@@ -50,11 +51,13 @@ pub struct JSClass {
     pub(crate) name: String,
 }
 
+#[derive(Clone)]
 pub struct JSObject {
     inner: JSObjectRef,
     value: JSValue,
 }
 
+#[derive(Clone)]
 pub struct JSFunction {
     pub(crate) object: JSObject,
 }
@@ -67,7 +70,13 @@ pub struct JSRegExp {
     pub(crate) object: JSObject,
 }
 
+#[derive(Debug, Clone)]
 pub struct JSTypedArray {
+    pub(crate) object: JSObject,
+}
+
+#[derive(Debug, Clone)]
+pub struct JSArrayBuffer {
     pub(crate) object: JSObject,
 }
 
@@ -81,7 +90,7 @@ pub struct JSPromise {
     reject: JSObject,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JSValue {
     pub(crate) inner: JSValueRef,
     pub(crate) ctx: JSContextRef,
@@ -95,6 +104,18 @@ pub enum JSClassAttribute {
     NoAutomaticPrototype = kJSClassAttributeNoAutomaticPrototype as isize,
 }
 
+impl Default for JSClassAttribute {
+    fn default() -> Self {
+        JSClassAttribute::None
+    }
+}
+
+impl Into<JSClassAttributes> for JSClassAttribute {
+    fn into(self) -> JSClassAttributes {
+        self as JSClassAttributes
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum JSValueType {
     Undefined = JSType_kJSTypeUndefined as isize,
@@ -105,8 +126,6 @@ pub enum JSValueType {
     Object = JSType_kJSTypeObject as isize,
     Symbol = JSType_kJSTypeSymbol as isize,
 }
-
-
 
 // lazy_static! {
 //     static ref JS_VALUE_TYPE_LOOKUP: Vec<Option<JSTypedArrayType>> = {
@@ -223,7 +242,6 @@ pub struct JSError {
 pub struct JSString {
     pub(crate) inner: JSStringRef,
 }
-
 
 pub type JSResult<T> = Result<T, JSError>;
 

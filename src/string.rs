@@ -83,11 +83,14 @@ impl From<JSStringRef> for JSString {
 
 impl Debug for JSString {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let len = self.len();
-        let mut buffer = vec![0u8; len + 1];
+        let max_len = self.len() + 1;
+        let mut buffer = vec![0u8; max_len];
+        let new_size = unsafe {
+            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
+        };
         unsafe {
-            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, len + 1);
-        }
+            buffer.set_len(new_size - 1);
+        };
         let s = String::from_utf8(buffer).unwrap();
         write!(fmt, "{:?}", s)
     }
@@ -95,11 +98,14 @@ impl Debug for JSString {
 
 impl std::fmt::Display for JSString {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let len = self.len();
-        let mut buffer = vec![0u8; len + 1];
+        let max_len = self.len() + 1;
+        let mut buffer = vec![0u8; max_len];
+        let new_size = unsafe {
+            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
+        };
         unsafe {
-            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, len + 1);
-        }
+            buffer.set_len(new_size - 1);
+        };
         let s = String::from_utf8(buffer).unwrap();
         write!(fmt, "{}", s)
     }
@@ -110,5 +116,40 @@ impl Drop for JSString {
         unsafe {
             JSStringRelease(self.inner);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::JSString;
+
+    #[test]
+    fn test_js_string() {
+        let s = JSString::from("Hello, World!");
+        assert_eq!(s.len(), 13);
+        assert_eq!(s.to_string(), "Hello, World!");
+    }
+
+    #[test]
+    fn test_js_string_eq() {
+        let s1 = JSString::from("Hello, World!");
+        let s2 = JSString::from("Hello, World!");
+        assert_eq!(s1, s2);
+        assert_eq!(s1, "Hello, World!");
+        assert_eq!(s2, "Hello, World!");
+        assert_eq!("Hello, World!", s1);
+        assert_eq!("Hello, World!", s2);
+    }
+
+    #[test]
+    fn test_js_string_len() {
+        let s = JSString::from("Hello, World!");
+        assert_eq!(s.len(), 13);
+    }
+
+    #[test]
+    fn test_js_string_is_empty() {
+        let s = JSString::from("");
+        assert_eq!(s.is_empty(), true);
     }
 }

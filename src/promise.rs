@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use rust_jsc_sys::{JSObjectMakeDeferredPromise, JSValueRef};
 
 use crate::{JSContext, JSError, JSObject, JSPromise, JSResult, JSValue};
@@ -42,6 +44,14 @@ impl JSPromise {
     }
 }
 
+impl Deref for JSPromise {
+    type Target = JSValue;
+
+    fn deref(&self) -> &JSValue {
+        self.this.deref()
+    }
+}
+
 impl From<JSPromise> for JSObject {
     fn from(promise: JSPromise) -> Self {
         promise.this
@@ -55,3 +65,35 @@ impl From<JSPromise> for JSValue {
 }
 
 unsafe impl Send for JSPromise {}
+
+#[cfg(test)]
+mod tests {
+    use crate::{JSContext, JSValue};
+
+    use super::*;
+
+    #[test]
+    fn test_new_promise() {
+        let ctx = JSContext::new();
+        let promise = JSPromise::new_promise(&ctx).unwrap();
+        assert_eq!(promise.is_object(), true);
+    }
+
+    #[test]
+    fn test_resolve() {
+        let ctx = JSContext::new();
+        let promise = JSPromise::new_promise(&ctx).unwrap();
+        let value = JSValue::number(&ctx, 42.0);
+        let result = promise.resolve(&[value]).unwrap();
+        assert_eq!(result.is_undefined(), true);
+    }
+
+    #[test]
+    fn test_reject() {
+        let ctx = JSContext::new();
+        let promise = JSPromise::new_promise(&ctx).unwrap();
+        let value = JSValue::number(&ctx, 42.0);
+        let result = promise.reject(&[value]).unwrap();
+        assert_eq!(result.is_undefined(), true);
+    }
+}

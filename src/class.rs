@@ -10,7 +10,7 @@ use rust_jsc_sys::{
     JSObjectSetPropertyCallback,
 };
 
-use crate::{JSClass, JSContext, JSObject};
+use crate::{JSClass, JSContext, JSObject, JSResult};
 
 #[derive(Debug)]
 pub enum ClassError {
@@ -142,6 +142,66 @@ impl JSClassBuilder {
 }
 
 impl JSClass {
+    /// Creates a new class builder.
+    ///
+    /// # Arguments
+    /// - `name`: The name of the class.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// use rust_jsc::{JSClass, JSClassBuilder};
+    ///
+    /// let builder = JSClass::builder("Test");
+    ///
+    /// let class = builder
+    ///     .set_version(1)
+    ///     .set_attributes(JSClassAttribute::None.into())
+    ///     .set_initialize(None)
+    ///     .build()
+    ///     .expect("Failed to create class");
+    /// ```
+    ///
+    /// With constructor:
+    ///
+    /// ```rust,ignore
+    /// use rust_jsc_macros::constructor;
+    /// use rust_jsc::{JSClass, JSClassBuilder, JSClassAttribute, JSResult, JSValue, JSObject, JSContext};
+    ///
+    /// #[constructor]
+    /// fn constructor(
+    ///    _ctx: JSContext,
+    ///   this: JSObject,
+    ///  _arguments: &[JSValue],
+    /// ) -> JSResult<JSValue> {
+    ///    let value = JSValue::string(&_ctx, "John");
+    ///   this.set_property(&"name".into(), &value, Default::default())
+    ///      .unwrap();
+    ///
+    ///   Ok(this.into())
+    /// }
+    ///
+    /// let builder = JSClass::builder("Test");
+    ///
+    /// let class = builder
+    ///    .set_version(1)
+    ///    .set_attributes(JSClassAttribute::None.into())
+    ///    .set_initialize(None)
+    ///    .set_finalize(None)
+    ///    .has_property(None)
+    ///    .get_property(None)
+    ///    .set_property(None)
+    ///    .delete_property(None)
+    ///    .get_property_names(None)
+    ///    .call_as_function(None)
+    ///    .call_as_constructor(Some(constructor))
+    ///    .has_instance(None)
+    ///    .convert_to_type(None)
+    ///    .build()
+    ///    .expect("Failed to create class");
+    /// ```
+    ///
+    /// # Returns
+    /// A new class builder.
     pub fn builder(name: &str) -> JSClassBuilder {
         JSClassBuilder::new(name)
     }
@@ -150,6 +210,30 @@ impl JSClass {
         &self.name
     }
 
+    /// Creates a new object of the class.
+    /// The object will be created in the given context.
+    /// The object will have the given data associated with it.
+    /// The data will be passed to the initialize callback.
+    ///
+    /// # Arguments
+    /// - `ctx`: The JavaScript context to create the object in.
+    /// - `data`: The data to associate with the object.
+    ///
+    /// # Example
+    /// ```
+    /// use rust_jsc::{JSClass, JSContext};
+    ///
+    /// let ctx = JSContext::default();
+    /// let class = JSClass::builder("Test")
+    ///    .set_version(1)
+    ///     .build()
+    ///    .unwrap();
+    ///
+    /// let object = class.object::<i32>(&ctx, Some(Box::new(42)));
+    /// ```
+    ///
+    /// # Returns
+    /// A new object of the class.
     pub fn object<T>(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
         let data_ptr = if let Some(data) = data {
             Box::into_raw(data) as *mut std::ffi::c_void
@@ -159,6 +243,49 @@ impl JSClass {
 
         let inner = unsafe { JSObjectMake(ctx.inner, self.inner, data_ptr) };
         JSObject::from_ref(inner, ctx.inner)
+    }
+
+    /// Registers the class in the global object.
+    /// This will make the class available in JavaScript.
+    /// The class will be available as a constructor function.
+    /// The class name will be the same as the class name in Rust.
+    ///
+    /// # Arguments
+    /// - `ctx`: The JavaScript context to register the class in.
+    ///
+    /// # Example
+    /// ```
+    /// use rust_jsc::{JSClass, JSContext, JSClassAttribute};
+    ///
+    /// let ctx = JSContext::default();
+    /// let class = JSClass::builder("Test")
+    ///     .set_version(1)
+    ///     .set_attributes(JSClassAttribute::None.into())
+    ///     .set_initialize(None)
+    ///     .set_finalize(None)
+    ///     .has_property(None)
+    ///     .get_property(None)
+    ///     .set_property(None)
+    ///     .delete_property(None)
+    ///     .get_property_names(None)
+    ///     .call_as_function(None)
+    ///     .call_as_constructor(None)
+    ///     .has_instance(None)
+    ///     .convert_to_type(None)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// class.register(&ctx).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    /// If an error occurs while registering the class.
+    pub fn register(&self, ctx: &JSContext) -> JSResult<()> {
+        ctx.global_object().set_property(
+            &self.name().into(),
+            &self.object::<()>(ctx, None),
+            Default::default(),
+        )
     }
 }
 
@@ -191,7 +318,7 @@ mod tests {
         let ctx = JSContext::default();
         let class = JSClass::builder("Test")
             .set_version(1)
-            .set_attributes(JSClassAttribute::None as _)
+            .set_attributes(JSClassAttribute::None.into())
             .set_initialize(None)
             .set_finalize(None)
             .has_property(None)
@@ -223,5 +350,74 @@ mod tests {
             object.get_property(&"name".into()).unwrap(),
             JSValue::string(&ctx, "John")
         );
+    }
+
+    #[test]
+    fn test_class_register() {
+        #[constructor]
+        fn constructor(
+            _ctx: JSContext,
+            this: JSObject,
+            _arguments: &[JSValue],
+        ) -> JSResult<JSValue> {
+            let value = JSValue::string(&_ctx, "John");
+            this.set_property(&"name".into(), &value, Default::default())
+                .unwrap();
+            Ok(this.into())
+        }
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("Test")
+            .set_version(1)
+            .set_attributes(JSClassAttribute::None.into())
+            .set_initialize(None)
+            .set_finalize(None)
+            .has_property(None)
+            .get_property(None)
+            .set_property(None)
+            .delete_property(None)
+            .get_property_names(None)
+            .call_as_function(None)
+            .call_as_constructor(Some(constructor))
+            .has_instance(None)
+            .convert_to_type(None)
+            .build()
+            .unwrap();
+
+        class.register(&ctx).unwrap();
+        let result_object = ctx
+            .evaluate_script("const obj = new Test(); obj", None)
+            .unwrap();
+
+        assert!(result_object.is_object_of_class(&class).unwrap());
+    }
+
+    #[test]
+    fn test_class_without_constructor() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("Test")
+            .set_version(1)
+            .set_attributes(JSClassAttribute::None.into())
+            .set_initialize(None)
+            .set_finalize(None)
+            .has_property(None)
+            .get_property(None)
+            .set_property(None)
+            .delete_property(None)
+            .get_property_names(None)
+            .call_as_function(None)
+            .call_as_constructor(None)
+            .has_instance(None)
+            .convert_to_type(None)
+            .build()
+            .unwrap();
+
+        class.register(&ctx).unwrap();
+        let result = ctx.evaluate_script("const obj = new Test(); obj", None);
+
+        assert!(result.is_err());
+
+        let error = result.unwrap_err();
+        assert_eq!(error.name().unwrap(), "TypeError");
     }
 }

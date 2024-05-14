@@ -82,8 +82,8 @@ impl JSObject {
     /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(name, value, PropertyDescriptor::default());
-    /// assert_eq!(object.has_property(name), Ok(true));
+    /// object.set_property(&name, &value, PropertyDescriptor::default());
+    /// assert_eq!(object.has_property(&name), true);
     /// ```
     ///
     /// # Returns
@@ -108,8 +108,8 @@ impl JSObject {
     /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(name, value, PropertyDescriptor::default());
-    /// assert_eq!(object.get_property(name), Ok(value));
+    /// object.set_property(&name, &value, PropertyDescriptor::default());
+    /// assert_eq!(object.get_property(&name).unwrap(), value);
     /// ```
     ///
     /// # Returns
@@ -140,11 +140,12 @@ impl JSObject {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let array = JSObject::new(&ctx); // assuming object is an array
+    /// let array = ctx.evaluate_script("[1, 2, 3]", None).unwrap();
     /// let value = JSValue::string(&ctx, "value");
+    /// let array = array.as_object().unwrap();
     ///
-    /// array.set_property_at_index(0, value);
-    /// assert_eq!(object.get_property_at_index(0), Ok(value));
+    /// array.set_property_at_index(0, &value);
+    /// assert_eq!(array.get_property_at_index(0).unwrap(), value);
     /// ```
     ///
     /// # Returns
@@ -180,8 +181,8 @@ impl JSObject {
     /// let key = JSValue::string(&ctx, "key");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set(&key, &value, PropertyDescriptor::default());
-    /// assert_eq!(object.get(&key), Ok(value));
+    /// object.set(&key, &value, PropertyDescriptor::default()).unwrap();
+    /// assert_eq!(object.get(&key).unwrap(), value);
     /// ```
     ///
     /// # Errors
@@ -232,7 +233,7 @@ impl JSObject {
     /// let value = JSValue::string(&ctx, "value");
     ///
     /// object.set(&key, &value, PropertyDescriptor::default());
-    /// assert_eq!(object.get(&key), Ok(value));
+    /// assert_eq!(object.get(&key).unwrap(), value);
     /// ```
     ///
     pub fn get(&self, key: &JSValue) -> JSResult<JSValue> {
@@ -269,7 +270,7 @@ impl JSObject {
     /// let value = JSValue::string(&ctx, "value");
     ///
     /// object.set(&key, &value, PropertyDescriptor::default());
-    /// assert_eq!(object.has(&key), Ok(true));
+    /// assert_eq!(object.has(&key).unwrap(), true);
     /// ```
     ///
     /// # Errors
@@ -309,9 +310,9 @@ impl JSObject {
     /// let value = JSValue::string(&ctx, "value");
     ///
     /// object.set(&key, &value, PropertyDescriptor::default());
-    /// assert_eq!(object.has(&key), Ok(true));
-    /// assert_eq!(object.delete(&key), Ok(true));
-    /// assert_eq!(object.has(&key), Ok(false));
+    /// assert_eq!(object.has(&key).unwrap(), true);
+    /// assert_eq!(object.delete(&key).unwrap(), true);
+    /// assert_eq!(object.has(&key).unwrap(), false);
     /// ```
     ///
     /// # Errors
@@ -339,7 +340,7 @@ impl JSObject {
     /// * `descriptor` - The property descriptor to set on the object.
     ///
     /// # Example
-    /// ```no_run
+    /// ```
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
@@ -347,8 +348,8 @@ impl JSObject {
     /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(name, value, PropertyDescriptor::default());
-    /// assert_eq!(object.get_property(name), Ok(value));
+    /// object.set_property(&name, &value, PropertyDescriptor::default()).unwrap();
+    /// assert_eq!(object.get_property(&name).unwrap(), value);
     /// ```
     pub fn set_property(
         &self,
@@ -379,15 +380,16 @@ impl JSObject {
     /// * `value` - The value to set on the object.
     ///
     /// # Example
-    /// ```no_run
+    /// ```
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let array = JSObject::new(&ctx); // assuming object is an array
+    /// let array = ctx.evaluate_script("[1, 2, 3]", None).unwrap();
     /// let value = JSValue::string(&ctx, "value");
+    /// let array = array.as_object().unwrap();
     ///
-    /// array.set_property_at_index(0, value);
-    /// assert_eq!(object.get_property_at_index(0), Ok(value));
+    /// array.set_property_at_index(0, &value);
+    /// assert_eq!(array.get_property_at_index(0).unwrap(), value);
     /// ```
     ///
     /// # Errors
@@ -429,10 +431,10 @@ impl JSObject {
     /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(name, value, PropertyDescriptor::default());
-    /// assert_eq!(object.has_property(name), Ok(true));
-    /// assert_eq!(object.delete_property(name), Ok(true));
-    /// assert_eq!(object.has_property(name), Ok(false));
+    /// object.set_property(&name, &value, PropertyDescriptor::default());
+    /// assert_eq!(object.has_property(&name), true);
+    /// assert_eq!(object.delete_property(&name).unwrap(), true);
+    /// assert_eq!(object.has_property(&name), false);
     /// ```
     ///
     /// # Returns
@@ -518,7 +520,7 @@ impl JSObject {
     /// let ctx = JSContext::new();
     /// let object = JSObject::new(&ctx);
     /// let prototype = JSObject::new(&ctx);
-    /// object.set_prototype(prototype);
+    /// object.set_prototype(&prototype);
     /// ```
     pub fn set_prototype(&self, prototype: &JSObject) {
         unsafe {
@@ -676,7 +678,7 @@ impl JSObject {
     ///
     /// # Errors
     /// Returns a `JSError` if the operation fails.
-    pub fn call(&self, this: Option<JSObject>, args: &[JSValue]) -> JSResult<JSValue> {
+    pub fn call(&self, this: Option<&JSObject>, args: &[JSValue]) -> JSResult<JSValue> {
         let mut exception: JSValueRef = std::ptr::null_mut();
         let args: Vec<JSValueRef> = args.iter().map(|arg| arg.inner).collect();
         let this_object = this.map_or(std::ptr::null_mut(), |this| this.inner);
