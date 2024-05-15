@@ -2,12 +2,15 @@
 IMAGE_NAME := javascriptcore
 
 help:
-	@echo "Usage: make [target]"
+	@echo "Usage: make [target] [platform=<platform>]"
 	@echo "Targets:"
 	@echo "  build-docker-jsc: Build the Docker image with JavaScriptCore"
 	@echo "  build-jsc: Build JavaScriptCore"
 	@echo "  build-lib: Build the Rust library"
 	@echo "  gen-bindings: Generate the Rust bindings"
+	@echo "  test: Run the tests"
+	@echo "  all-tests: Run all the tests"
+	@echo "  archive: Archive the build artifacts with the platform parameter"
 
 test:
 	RUST_BACKTRACE=1 cargo test --lib
@@ -41,6 +44,18 @@ build-jsc:
 	WebKit/Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF"
 
 # (cd examples/hello_world && cargo build --release &> output.txt)
+# archive all *.a files from JSOnly build receive the name libjsc-<platform>.a.gz, platforn is a parameter
+archive:
+	@echo "Archiving the build artifacts..."
+
+	@if [ -z "$(platform)" ]; then \
+		echo "Please provide the platform parameter"; \
+		exit 1; \
+	fi
+
+	@cd WebKit/WebKitBuild/JSCOnly/Release/lib/ && \
+	tar -czf libjsc-$(platform).a.gz *.a && \
+	mv libjsc-$(platform).a.gz ../../../../../
 
 build-lib:
 	cargo build --release
@@ -48,4 +63,4 @@ build-lib:
 gen-bindings:
 	(cd gen && cargo build --release)
 
-.PHONY: build-docker-jsc build-jsc build-lib gen-bindings test
+.PHONY: build-docker-jsc build-jsc build-lib gen-bindings test archive

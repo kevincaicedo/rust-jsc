@@ -1,24 +1,115 @@
 use std::env;
 extern crate pkg_config;
 
+fn check_supported_platform() {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+
+    if target_os != "linux" && target_os != "macos" {
+        panic!("Unsupported target OS: {}", target_os);
+    }
+
+    if target_arch != "x86_64" && target_arch != "aarch64" {
+        panic!("Unsupported target architecture: {}", target_arch);
+    }
+}
+
+fn static_lib_file() -> String {
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let platform = format!("{}-{}", target_os, target_arch);
+
+    format!("libjsc-{}.a.gz", platform)
+}
+
+fn static_lib_url() -> String {
+    if let Ok(custom_archive) = env::var("RUST_JSC_CUSTOM_ARCHIVE") {
+        return custom_archive;
+    }
+
+    check_supported_platform();
+
+    let default_base = "https://github.com/kevincaicedo/rust-jsc/releases/download";
+    let base = env::var("RUST_JSC_MIRROR").unwrap_or_else(|_| default_base.into());
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+
+    let platform_file = static_lib_file();
+    format!("{}/v{}/{}", base, version, platform_file)
+}
+
+// use a python script that receives the URL and downloads the file also passing the output path
+fn fetch_static_lib() {
+    let url = static_lib_url();
+    let output_path = env::var("OUT_DIR").unwrap();
+    let filename = static_lib_file();
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+
+    let output_path = format!("{}/{}", output_path, version);
+
+    let output = std::process::Command::new("python3")
+        .arg("../scripts/download_file.py")
+        .arg(url)
+        .arg(output_path)
+        .arg(filename)
+        .output()
+        .expect("Failed to download static library");
+
+    if !output.status.success() {
+        panic!("Failed to download static library: {:?}", output);
+    }
+}
+
+fn extract_static_lib() {
+    let output_path = env::var("OUT_DIR").unwrap();
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+    let output_path = format!("{}/{}", output_path, version);
+    let filename = static_lib_file();
+
+    let output = std::process::Command::new("tar")
+        .arg("-xvf")
+        .arg(format!("{}/{}", output_path, filename))
+        .arg("-C")
+        .arg(output_path)
+        .output()
+        .expect("Failed to extract static library");
+
+    if !output.status.success() {
+        panic!("Failed to extract static library: {:?}", output);
+    }
+}
+
 #[cfg(target_os = "macos")]
 #[cfg(feature = "patches")]
 fn main() {
-    let webkit_path = env::var("WEBKIT_PATH").unwrap();
-    let lib_dir = format!("{}/WebKitBuild/JSCOnly/Release/lib", webkit_path);
+    // if custom path for the static lib is set use it, otherwise download the static lib
+    if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
+        println!("cargo:rustc-link-search=native={}", custom_build_path);
+    } else {
+        let output_path = env::var("OUT_DIR").unwrap();
+        let version = env::var("CARGO_PKG_VERSION").unwrap();
+        let output_path = format!("{}/{}", output_path, version);
+        let static_lib_file = static_lib_file();
 
+        // if archive file is not found in outdir, download it
+        if !std::path::Path::new(&format!("{}/{}", output_path, static_lib_file)).exists() {
+            fetch_static_lib();
+            extract_static_lib();
+        }
+
+        // set search native path to the output directory
+        println!("cargo:rustc-link-search=native={}", output_path);
+    }
+
+    let lib_dir = env::var("SYSTEM_LIBS_PATH").unwrap_or_else(|_| "/usr/lib".into());
+    println!("cargo:rustc-link-search={}", lib_dir);
+
+    // dylib
     println!("cargo:rustc-link-lib=dylib=c++");
     println!("cargo:rustc-link-lib=dylib=m");
     println!("cargo:rustc-link-lib=dylib=dl");
+    println!("cargo:rustc-link-lib=dylib=icucore");
 
-    println!("cargo:rustc-link-lib=dylib=icucore.A");
-    println!("cargo:rustc-link-search=/usr/lib");
-    // println!("cargo:rustc-link-lib=dylib=icui18n");
-    // println!("cargo:rustc-link-lib=dylib=icuuc");
-    // println!("cargo:rustc-link-lib=dylib=icudata");
-    // println!("cargo:rustc-link-lib=dylib=atomic");
-
-    println!("cargo:rustc-link-search=native={}", lib_dir);
+    // static libs
     println!("cargo:rustc-link-lib=static=JavaScriptCore");
     println!("cargo:rustc-link-lib=static=WTF");
     println!("cargo:rustc-link-lib=static=bmalloc");
@@ -33,13 +124,13 @@ fn main() {
 
 #[cfg(target_os = "linux")]
 fn main() {
-    let lib_path = env::var("JSC_LIBS_PATH").unwrap();
+    let lib_path = env::var("RUST_JSC_CUSTOM_BUILD_PATH").unwrap();
     println!("cargo:rustc-link-search=native={}", lib_path);
-    
+
     // dylib
     println!("cargo:rustc-link-lib=static=stdc++");
     // println!("cargo:rustc-link-lib=static=mvec");
-    
+
     println!("cargo:rustc-link-lib=static=icui18n");
     println!("cargo:rustc-link-lib=static=icuuc");
     println!("cargo:rustc-link-lib=static=icudata");

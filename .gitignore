@@ -7,3 +7,4 @@ target
 .cargo
 .libs
 *.swp
+public
