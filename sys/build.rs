@@ -47,7 +47,7 @@ fn fetch_static_lib() {
     let output_path = format!("{}/{}", output_path, version);
 
     let output = std::process::Command::new("python3")
-        .arg("../scripts/download_file.py")
+        .arg("scripts/download_file.py")
         .arg(url)
         .arg(output_path)
         .arg(filename)
