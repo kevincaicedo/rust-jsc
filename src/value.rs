@@ -8,7 +8,7 @@ use crate::{
 
 impl JSValue {
     /// Creates a new `JSValue` object.
-    pub(crate) fn new(inner: JSValueRef, ctx: JSContextRef) -> Self {
+    pub fn new(inner: JSValueRef, ctx: JSContextRef) -> Self {
         Self { inner, ctx }
     }
 

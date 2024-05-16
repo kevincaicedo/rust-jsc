@@ -201,6 +201,7 @@ impl From<JSObject> for JSFunction {
 
 #[cfg(test)]
 mod tests {
+    use crate as rust_jsc;
     use rust_jsc_macros::{callback, constructor};
     use rust_jsc_sys::{JSContextRef, JSObjectRef, JSValueRef};
 

@@ -28,25 +28,15 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
- "rust_jsc_macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rust_jsc_sys 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust_jsc_macros",
+ "rust_jsc_sys",
 ]
 
 [[package]]
 name = "rust_jsc_macros"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn",
-]
-
-[[package]]
-name = "rust_jsc_macros"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10ec7587366452b8c4b6612bc819e7e47d178ed7a6d370e36635de7042fda9ee"
+version = "0.1.2"
 dependencies = [
  "quote",
  "syn",
@@ -54,16 +44,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc_sys"
-version = "0.1.0"
-dependencies = [
- "pkg-config",
-]
-
-[[package]]
-name = "rust_jsc_sys"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dd30e88d84bb127b4f8ac11142bd755cdb22944754aed9bf5fe994266bd9b06"
+version = "0.1.2"
 dependencies = [
  "pkg-config",
 ]

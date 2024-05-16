@@ -297,6 +297,7 @@ impl Drop for JSClass {
 
 #[cfg(test)]
 mod tests {
+    use crate as rust_jsc;
     use rust_jsc_macros::constructor;
 
     use crate::{JSClass, JSClassAttribute, JSContext, JSObject, JSResult, JSValue};

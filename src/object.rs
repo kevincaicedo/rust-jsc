@@ -61,7 +61,7 @@ impl JSObject {
         Self { inner, value }
     }
 
-    pub(crate) fn from_ref(inner: JSObjectRef, ctx: JSContextRef) -> Self {
+    pub fn from_ref(inner: JSObjectRef, ctx: JSContextRef) -> Self {
         let value = JSValue::new(inner, ctx);
         Self { inner, value }
     }

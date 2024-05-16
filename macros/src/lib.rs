@@ -13,13 +13,13 @@ pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #visibility unsafe extern "C" fn #fn_name <#generic_params> (
-            __ctx_ref: rust_jsc_sys::JSContextRef,
-            __function: rust_jsc_sys::JSObjectRef,
-            __this_object: rust_jsc_sys::JSObjectRef,
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __function: rust_jsc::internal::JSObjectRef,
+            __this_object: rust_jsc::internal::JSObjectRef,
             __argument_count: usize,
-            __arguments: *const rust_jsc_sys::JSValueRef,
-            __exception: *mut rust_jsc_sys::JSValueRef,
-        ) -> *const rust_jsc_sys::OpaqueJSValue
+            __arguments: *const rust_jsc::internal::JSValueRef,
+            __exception: *mut rust_jsc::internal::JSValueRef,
+        ) -> *const rust_jsc::internal::OpaqueJSValue
         #where_clause {
             let ctx = crate::JSContext::from(__ctx_ref);
             let function = crate::JSObject::from_ref(__function, __ctx_ref);
@@ -52,7 +52,7 @@ pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     value.into()
                 }
                 Err(exception) => {
-                    *__exception = rust_jsc_sys::JSValueRef::from(exception) as *mut _;
+                    *__exception = rust_jsc::internal::JSValueRef::from(exception) as *mut _;
                     std::ptr::null_mut()
                 }
             }
@@ -73,12 +73,12 @@ pub fn constructor(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #visibility unsafe extern "C" fn #fn_name <#generic_params> (
-            __ctx_ref: rust_jsc_sys::JSContextRef,
-            __constructor: rust_jsc_sys::JSObjectRef,
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __constructor: rust_jsc::internal::JSObjectRef,
             __argument_count: usize,
-            __arguments: *const rust_jsc_sys::JSValueRef,
-            __exception: *mut rust_jsc_sys::JSValueRef,
-        ) -> *mut rust_jsc_sys::OpaqueJSValue
+            __arguments: *const rust_jsc::internal::JSValueRef,
+            __exception: *mut rust_jsc::internal::JSValueRef,
+        ) -> *mut rust_jsc::internal::OpaqueJSValue
         #where_clause {
             let ctx = crate::JSContext::from(__ctx_ref);
             let constructor = crate::JSObject::from_ref(__constructor, __ctx_ref);
@@ -109,7 +109,7 @@ pub fn constructor(_attr: TokenStream, item: TokenStream) -> TokenStream {
                     value.into()
                 }
                 Err(exception) => {
-                    *__exception = rust_jsc_sys::JSValueRef::from(exception) as *mut _;
+                    *__exception = rust_jsc::internal::JSValueRef::from(exception) as *mut _;
                     std::ptr::null_mut()
                 }
             }
