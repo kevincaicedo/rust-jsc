@@ -14,13 +14,14 @@ exclude = [
     "examples",
     "tests",
     ".gitmodules",
-    "gen", 
+    "gen",
+    "Dockerfile",
     "WebKit"
 ]
 description = "Low-level bindings to JavaScriptCore"
 keywords = [ "javascriptcore", "javascript" ]
 authors = [ "Kevin Caicedo <ing.sys.kevincaicedo@gmail.com>" ]
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/kevincaicedo/rust-jsc"
