@@ -57,6 +57,18 @@ archive:
 	tar -czf libjsc-$(platform).a.gz *.a && \
 	mv libjsc-$(platform).a.gz ../../../../../
 
+archive-linux:
+	@echo "Archiving the build artifacts..."
+
+	@if [ -z "$(platform)" ]; then \
+		echo "Please provide the platform parameter"; \
+		exit 1; \
+	fi
+
+	@cd .libs && \
+	tar -czf libjsc-$(platform).a.gz *.a && \
+	mv libjsc-$(platform).a.gz ../
+
 build-lib:
 	cargo build --release
 

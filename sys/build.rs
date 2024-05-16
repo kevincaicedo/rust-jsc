@@ -123,14 +123,30 @@ fn main() {
 }
 
 #[cfg(target_os = "linux")]
+#[cfg(feature = "patches")]
 fn main() {
-    let lib_path = env::var("RUST_JSC_CUSTOM_BUILD_PATH").unwrap();
-    println!("cargo:rustc-link-search=native={}", lib_path);
+    // if custom path for the static lib is set use it, otherwise download the static lib
+    if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
+        println!("cargo:rustc-link-search=native={}", custom_build_path);
+    } else {
+        let output_path = env::var("OUT_DIR").unwrap();
+        let version = env::var("CARGO_PKG_VERSION").unwrap();
+        let output_path = format!("{}/{}", output_path, version);
+        let static_lib_file = static_lib_file();
 
-    // dylib
+        // if archive file is not found in outdir, download it
+        if !std::path::Path::new(&format!("{}/{}", output_path, static_lib_file)).exists()
+        {
+            fetch_static_lib();
+            extract_static_lib();
+        }
+
+        // set search native path to the output directory
+        println!("cargo:rustc-link-search=native={}", output_path);
+    }
+
+    // static libs
     println!("cargo:rustc-link-lib=static=stdc++");
-    // println!("cargo:rustc-link-lib=static=mvec");
-
     println!("cargo:rustc-link-lib=static=icui18n");
     println!("cargo:rustc-link-lib=static=icuuc");
     println!("cargo:rustc-link-lib=static=icudata");
@@ -139,4 +155,10 @@ fn main() {
     println!("cargo:rustc-link-lib=static=JavaScriptCore");
     println!("cargo:rustc-link-lib=static=WTF");
     println!("cargo:rustc-link-lib=static=bmalloc");
+}
+
+#[cfg(target_os = "linux")]
+#[cfg(not(feature = "patches"))]
+fn main() {
+    pkg_config::probe_library("javascriptcoregtk-6.0").unwrap();
 }

@@ -33,6 +33,8 @@ pub mod string;
 pub mod typed_array;
 pub mod value;
 
+pub use rust_jsc_macros::*;
+
 pub struct JSContext {
     pub(crate) inner: JSContextRef,
     #[allow(dead_code)]

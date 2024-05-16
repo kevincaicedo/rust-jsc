@@ -13,15 +13,12 @@ exclude = [
 description = "Low-level bindings to JavaScriptCore"
 keywords = [ "javascriptcore", "javascript" ]
 authors = [ "Kevin Caicedo <ing.sys.kevincaicedo@gmail.com>" ]
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/kevincaicedo/rust-jsc"
 readme = "README.md"
 
-# path = "./sys"
-# path = "./macros"
-
 [dependencies]
-rust_jsc_sys = { features = ["patches"], version = "0.1.0" }
-rust_jsc_macros = { version = "0.1.0" }
+rust_jsc_sys = { path = "sys", features = ["patches"], version = "0.1.2" }
+rust_jsc_macros = { path = "macros", version = "0.1.0" }
