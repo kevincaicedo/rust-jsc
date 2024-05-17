@@ -21,24 +21,24 @@ pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> *const rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = crate::JSContext::from(__ctx_ref);
-            let function = crate::JSObject::from_ref(__function, __ctx_ref);
-            let this_object = crate::JSObject::from_ref(__this_object, __ctx_ref);
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let function = rust_jsc::JSObject::from_ref(__function, __ctx_ref);
+            let this_object = rust_jsc::JSObject::from_ref(__this_object, __ctx_ref);
             let arguments = if __arguments.is_null() || __argument_count == 0 {
                 vec![]
             } else {
                 unsafe { std::slice::from_raw_parts(__arguments, __argument_count) }
                     .iter()
-                    .map(|__inner_value| JSValue::new(*__inner_value, __ctx_ref))
+                    .map(|__inner_value| rust_jsc::JSValue::new(*__inner_value, __ctx_ref))
                     .collect::<Vec<_>>()
             };
 
             let func: fn(
-                JSContext,
-                JSObject,
-                JSObject,
-                &[JSValue],
-            ) -> crate::JSResult<JSValue> = {
+                rust_jsc::JSContext,
+                rust_jsc::JSObject,
+                rust_jsc::JSObject,
+                &[rust_jsc::JSValue],
+            ) -> rust_jsc::JSResult<rust_jsc::JSValue> = {
                 #input
 
                 #fn_name ::<#generic_params>
@@ -80,22 +80,22 @@ pub fn constructor(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = crate::JSContext::from(__ctx_ref);
-            let constructor = crate::JSObject::from_ref(__constructor, __ctx_ref);
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let constructor = rust_jsc::JSObject::from_ref(__constructor, __ctx_ref);
             let arguments = if __arguments.is_null() || __argument_count == 0 {
                 vec![]
             } else {
                 unsafe { std::slice::from_raw_parts(__arguments, __argument_count) }
                     .iter()
-                    .map(|__inner_value| JSValue::new(*__inner_value, __ctx_ref))
+                    .map(|__inner_value| rust_jsc::JSValue::new(*__inner_value, __ctx_ref))
                     .collect::<Vec<_>>()
             };
 
             let func: fn(
-                JSContext,
-                JSObject,
-                &[JSValue],
-            ) -> crate::JSResult<JSValue> = {
+                rust_jsc::JSContext,
+                rust_jsc::JSObject,
+                &[rust_jsc::JSValue],
+            ) -> rust_jsc::JSResult<rust_jsc::JSValue> = {
                 #input
 
                 #fn_name ::<#generic_params>
