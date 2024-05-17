@@ -1,39 +1,40 @@
 use rust_jsc_sys::{
     JSCheckScriptSyntax, JSContextGetGlobalContext, JSContextGetGlobalObject,
-    JSContextGetGroup, JSContextGetSharedData, JSContextGroupCreate,
-    JSContextGroupRelease, JSContextGroupRetain, JSContextRef, JSContextSetSharedData,
-    JSEvaluateScript, JSGarbageCollect, JSGlobalContextCopyName,
-    JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable, JSGlobalContextRelease,
-    JSGlobalContextRetain, JSGlobalContextSetInspectable, JSGlobalContextSetName,
-    JSLoadAndEvaluateModule, JSValueRef,
+    JSContextGetGroup, JSContextGetSharedData, JSContextGroupCreate, JSContextGroupRef,
+    JSContextGroupRelease, JSContextRef, JSContextSetSharedData, JSEvaluateScript,
+    JSGarbageCollect, JSGlobalContextCopyName, JSGlobalContextCreate,
+    JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable, JSGlobalContextRef,
+    JSGlobalContextRelease, JSGlobalContextRetain, JSGlobalContextSetInspectable,
+    JSGlobalContextSetName, JSLoadAndEvaluateModule, JSValueRef,
 };
 
-use crate::{JSContext, JSContextGroup, JSObject, JSResult, JSString, JSValue};
+use crate::{JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSValue};
 
 impl JSContextGroup {
-    pub(crate) fn from(context: JSContextRef) -> Self {
-        let global_context = unsafe { JSContextGetGlobalContext(context) };
-        unsafe {
-            JSGlobalContextRetain(global_context);
-        }
-        let context_group = unsafe { JSContextGetGroup(global_context) };
-        unsafe {
-            JSContextGroupRetain(context_group);
-        }
-        Self {
-            context_group,
-            global_context,
-        }
+    pub fn new_context(&self) -> JSContext {
+        let ctx = unsafe {
+            JSGlobalContextCreateInGroup(self.context_group, std::ptr::null_mut())
+        };
+        JSContext::from(ctx)
+    }
+
+    pub fn new_context_with_class(&self, class: &JSClass) -> JSContext {
+        let ctx =
+            unsafe { JSGlobalContextCreateInGroup(self.context_group, class.inner) };
+        JSContext::from(ctx)
     }
 
     /// Creates a new `JSContextGroup` object.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let context_group = unsafe { JSContextGroupCreate() };
-        let global_context =
-            unsafe { JSGlobalContextCreateInGroup(context_group, std::ptr::null_mut()) };
+        Self { context_group }
+    }
+}
+
+impl From<JSContextGroupRef> for JSContextGroup {
+    fn from(group: JSContextGroupRef) -> Self {
         Self {
-            context_group,
-            global_context,
+            context_group: group,
         }
     }
 }
@@ -41,14 +42,8 @@ impl JSContextGroup {
 impl Drop for JSContextGroup {
     fn drop(&mut self) {
         unsafe {
-            JSGlobalContextRelease(self.global_context);
             JSContextGroupRelease(self.context_group);
         }
-
-        // TODO: Set the pointers to the shared data to null
-        // unsafe {
-        //     JSContextSetSharedData(self.global_context, std::ptr::null_mut());
-        // }
     }
 }
 
@@ -70,10 +65,13 @@ impl JSContext {
     /// let ctx = JSContext::new();
     /// ```
     pub fn new() -> Self {
-        let group = JSContextGroup::new();
-        let global_context = group.global_context;
-        let ctx = unsafe { JSContextGetGlobalContext(global_context) };
-        Self { inner: ctx, group }
+        let ctx = unsafe { JSGlobalContextCreate(std::ptr::null_mut()) };
+        Self { inner: ctx }
+    }
+
+    pub fn new_with_class(class: &JSClass) -> Self {
+        let ctx = unsafe { JSGlobalContextCreate(class.inner) };
+        Self { inner: ctx }
     }
 
     /// Garbage collects the JavaScript execution context.
@@ -134,16 +132,15 @@ impl JSContext {
         Ok(result)
     }
 
-    /// Creates a new `JSContext` object with a given group.
-    pub fn with_group(group: JSContextGroup) -> Self {
-        let ctx = unsafe { JSContextGetGlobalContext(group.global_context) };
-        Self { inner: ctx, group }
+    pub fn group(&self) -> JSContextGroup {
+        let group = unsafe { JSContextGetGroup(self.inner) };
+        JSContextGroup::from(group)
     }
 
     /// Gets the global object of the JavaScript execution context.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// use rust_jsc::JSContext;
     ///
@@ -151,7 +148,7 @@ impl JSContext {
     /// let global_object = ctx.global_object();
     /// assert_eq!(format!("{:?}", global_object), "JSObject");
     /// ```
-    /// 
+    ///
     /// # Returns
     /// Returns a `JSObject` object.
     pub fn global_object(&self) -> JSObject {
@@ -161,7 +158,7 @@ impl JSContext {
     /// Evaluates a JavaScript module.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```no_run
     /// use rust_jsc::JSContext;
     ///
@@ -247,7 +244,7 @@ impl JSContext {
     /// # Returns
     /// a boolean value. `true` if the context is inspectable, `false` otherwise.
     pub fn is_inspectable(&self) -> bool {
-        unsafe { JSGlobalContextIsInspectable(self.group.global_context) }
+        unsafe { JSGlobalContextIsInspectable(self.inner) }
     }
 
     /// Sets whether a context is inspectable.
@@ -261,7 +258,7 @@ impl JSContext {
     /// assert_eq!(ctx.is_inspectable(), true);
     /// ```
     pub fn set_inspectable(&self, inspectable: bool) {
-        unsafe { JSGlobalContextSetInspectable(self.group.global_context, inspectable) };
+        unsafe { JSGlobalContextSetInspectable(self.inner, inspectable) };
     }
 
     /// Sets the name exposed when inspecting a context.
@@ -276,7 +273,7 @@ impl JSContext {
     /// ```
     pub fn set_name(&self, name: &str) {
         let name: JSString = name.into();
-        unsafe { JSGlobalContextSetName(self.group.global_context, name.inner) }
+        unsafe { JSGlobalContextSetName(self.inner, name.inner) }
     }
 
     /// Gets a copy of the name of a context.
@@ -294,7 +291,7 @@ impl JSContext {
     ///
     /// Returns a `JSString` object.
     pub fn get_name(&self) -> JSString {
-        let name = unsafe { JSGlobalContextCopyName(self.group.global_context) };
+        let name = unsafe { JSGlobalContextCopyName(self.inner) };
         name.into()
     }
 
@@ -353,9 +350,34 @@ impl Default for JSContext {
 }
 
 impl From<JSContextRef> for JSContext {
-    fn from(ctx: JSContextRef) -> Self {
-        let group = JSContextGroup::from(ctx);
-        Self { inner: ctx, group }
+    fn from(context: JSContextRef) -> Self {
+        let global_context = unsafe { JSContextGetGlobalContext(context) };
+        unsafe {
+            JSGlobalContextRetain(global_context);
+        }
+
+        Self {
+            inner: global_context,
+        }
+    }
+}
+
+impl Drop for JSContext {
+    fn drop(&mut self) {
+        unsafe {
+            JSGlobalContextRelease(self.inner);
+        }
+
+        // TODO: Set the pointers to the shared data to null
+        // unsafe {
+        //     JSContextSetSharedData(self.global_context, std::ptr::null_mut());
+        // }
+    }
+}
+
+impl From<JSGlobalContextRef> for JSContext {
+    fn from(ctx: JSGlobalContextRef) -> Self {
+        Self { inner: ctx }
     }
 }
 
@@ -370,6 +392,13 @@ mod tests {
     }
 
     #[test]
+    fn test_js_context_name() {
+        let ctx = JSContext::new();
+        ctx.set_name("KedoJS");
+        assert_eq!(ctx.get_name().to_string(), "KedoJS");
+    }
+
+    #[test]
     fn test_js_context_group() {
         let group = JSContextGroup::new();
         assert_eq!(format!("{:?}", group), "JSContextGroup");
@@ -378,7 +407,7 @@ mod tests {
     #[test]
     fn test_js_context_with_group() {
         let group = JSContextGroup::new();
-        let ctx = JSContext::with_group(group);
+        let ctx = group.new_context();
         assert_eq!(format!("{:?}", ctx), "JSContext");
     }
 
@@ -391,7 +420,8 @@ mod tests {
     #[test]
     fn test_js_context_check_syntax() {
         let ctx = JSContext::new();
-        let result = ctx.check_syntax("console.log('Hello, world!');", 1);
+        let script = "console.log('Hello, world!');";
+        let result = ctx.check_syntax(script, 1);
         assert!(result.is_ok());
     }
 
@@ -422,7 +452,8 @@ mod tests {
     #[test]
     fn test_js_context_evaluate_script() {
         let ctx = JSContext::new();
-        let result = ctx.evaluate_script("console.log('Hello, world!'); 'kedojs'", None);
+        let script = "console.log('Hello, world!'); 'kedojs'";
+        let result = ctx.evaluate_script(script, None);
         assert!(result.is_ok());
     }
 

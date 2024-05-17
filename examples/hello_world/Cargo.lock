@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc"
-version = "0.1.2"
+version = "0.1.6"
 dependencies = [
  "rust_jsc_macros",
  "rust_jsc_sys",
@@ -51,7 +51,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc_sys"
-version = "0.1.2"
+version = "0.1.5"
 dependencies = [
  "pkg-config",
 ]

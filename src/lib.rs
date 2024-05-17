@@ -39,15 +39,12 @@ pub use rust_jsc_macros::*;
 pub use rust_jsc_sys as internal;
 
 pub struct JSContext {
-    pub(crate) inner: JSContextRef,
-    #[allow(dead_code)]
-    group: JSContextGroup,
+    pub(crate) inner: JSGlobalContextRef,
 }
 
 /// A JavaScript execution context group.
 pub struct JSContextGroup {
     context_group: JSContextGroupRef,
-    global_context: JSGlobalContextRef,
 }
 
 pub struct JSClass {
@@ -328,5 +325,49 @@ impl PropertyDescriptorBuilder {
         PropertyDescriptor {
             attributes: self.attributes,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_property_descriptor_builder() {
+        let builder = PropertyDescriptorBuilder::new();
+        let descriptor = builder
+            .writable(true)
+            .enumerable(true)
+            .configurable(true)
+            .build();
+        assert_eq!(descriptor.is_writable(), true);
+        assert_eq!(descriptor.is_enumerable(), true);
+        assert_eq!(descriptor.is_configurable(), true);
+
+        let builder = PropertyDescriptorBuilder::new();
+        let descriptor = builder
+            .writable(false)
+            .enumerable(false)
+            .configurable(false)
+            .build();
+        assert_eq!(descriptor.is_writable(), false);
+        assert_eq!(descriptor.is_enumerable(), false);
+        assert_eq!(descriptor.is_configurable(), false);
+
+        let builder = PropertyDescriptorBuilder::new();
+        let descriptor = builder
+            .writable(true)
+            .enumerable(false)
+            .configurable(true)
+            .build();
+        assert_eq!(descriptor.is_writable(), true);
+        assert_eq!(descriptor.is_enumerable(), false);
+        assert_eq!(descriptor.is_configurable(), true);
+
+        let builder = PropertyDescriptorBuilder::new();
+        let descriptor = builder.build();
+        assert_eq!(descriptor.is_writable(), true);
+        assert_eq!(descriptor.is_enumerable(), true);
+        assert_eq!(descriptor.is_configurable(), true);
     }
 }

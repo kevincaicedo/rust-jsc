@@ -1,7 +1,7 @@
 # Rust-JSC
 
 [![Crates.io](https://img.shields.io/crates/v/rust-jsc.svg)](https://crates.io/crates/rust-jsc)
-[![Docs.rs](https://docs.rs/rust-jsc/badge.svg)](https://docs.rs/rust-jsc)
+[![Docs.rs](https://docs.rs/rust_jsc/badge.svg)](https://docs.rs/rust_jsc)
 
 Rust-JSC is a Rust library that provides a low-level binding for the JavaScriptCore engine. It allows you to interact with JavaScript code from your Rust applications.
 
