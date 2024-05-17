@@ -94,6 +94,12 @@ fn extract_static_lib() {
 #[cfg(target_os = "macos")]
 #[cfg(feature = "patches")]
 fn main() {
+    let is_cargo_doc = env::var_os("DOCS_RS").is_some();
+    // if building docs, don't download the static lib
+    if is_cargo_doc {
+        return;
+    }
+
     // if custom path for the static lib is set use it, otherwise download the static lib
     if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
         println!("cargo:rustc-link-search=native={}", custom_build_path);
@@ -138,6 +144,12 @@ fn main() {
 #[cfg(target_os = "linux")]
 #[cfg(feature = "patches")]
 fn main() {
+    let is_cargo_doc = env::var_os("DOCS_RS").is_some();
+    // if building docs, don't download the static lib
+    if is_cargo_doc {
+        return;
+    }
+
     // if custom path for the static lib is set use it, otherwise download the static lib
     if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
         println!("cargo:rustc-link-search=native={}", custom_build_path);
