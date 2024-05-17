@@ -56,12 +56,17 @@ fn fetch_static_lib() {
 
     let output = std::process::Command::new("python3")
         .arg("scripts/download_file.py")
-        .arg(url)
+        .arg(url.clone())
         .arg(output_path)
         .arg(filename)
-        .output()
-        .expect("Failed to download static library");
+        .output();
 
+    if let Err(e) = output {
+        // panic and show the error and url
+        panic!("Failed to download static library: {}\n{}", e, url);
+    }
+
+    let output = output.unwrap();
     if !output.status.success() {
         panic!("Failed to download static library: {:?}", output);
     }

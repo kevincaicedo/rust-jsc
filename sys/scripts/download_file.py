@@ -7,6 +7,7 @@ def download_file(url, output_path, output_filename):
         os.makedirs(output_path)
 
     local_filename = os.path.join(output_path, output_filename)
+    print("Downloading file from {} to {}".format(url, local_filename))
     
     with urllib.request.urlopen(url) as response:
         total_length = response.getheader('content-length')
