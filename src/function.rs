@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use rust_jsc_sys::{
     JSObjectCallAsConstructorCallback, JSObjectCallAsFunctionCallback,
     JSObjectMakeConstructor, JSObjectMakeFunctionWithCallback,
@@ -122,11 +124,14 @@ impl JSFunction {
     ///
     /// # Returns
     /// A new function with the specified name and callback.
-    pub fn callback(
+    pub fn callback<T>(
         ctx: &JSContext,
-        name: Option<impl Into<JSString>>,
+        name: Option<T>,
         callback: JSObjectCallAsFunctionCallback,
-    ) -> Self {
+    ) -> Self
+    where
+        T: Into<JSString>,
+    {
         let result = unsafe {
             JSObjectMakeFunctionWithCallback(
                 ctx.inner,
@@ -181,6 +186,14 @@ impl JSFunction {
     }
 }
 
+impl Deref for JSFunction {
+    type Target = JSValue;
+
+    fn deref(&self) -> &JSValue {
+        &self.object.value
+    }
+}
+
 impl From<JSFunction> for JSObject {
     fn from(function: JSFunction) -> Self {
         function.object
@@ -201,7 +214,7 @@ impl From<JSObject> for JSFunction {
 
 #[cfg(test)]
 mod tests {
-    use crate as rust_jsc;
+    use crate::{self as rust_jsc, JSString};
     use rust_jsc_macros::{callback, constructor};
     use rust_jsc_sys::{JSContextRef, JSObjectRef, JSValueRef};
 
@@ -235,12 +248,10 @@ mod tests {
             .enumerable(true)
             .build();
         let function = JSFunction::callback(&ctx, Some("log"), Some(log_info));
-        object
-            .set_property(&"log".into(), &function.into(), attributes)
-            .unwrap();
+        object.set_property("log", &function, attributes).unwrap();
 
         global_object
-            .set_property(&"console".into(), &object.into(), attributes)
+            .set_property("console", &object, attributes)
             .unwrap();
 
         let result = ctx.evaluate_script("console.log('Hello, World!')", None);
@@ -259,7 +270,7 @@ mod tests {
             let message = arguments.get(0).unwrap().as_string().unwrap();
             println!("ERROR: {}", message);
 
-            let error = JSError::new_error(&ctx, arguments).unwrap();
+            let error = JSError::new(&ctx, arguments).unwrap();
             Err(error)
         }
 
@@ -273,12 +284,10 @@ mod tests {
             .enumerable(true)
             .build();
         let function = JSFunction::callback(&ctx, Some("log"), Some(log_error));
-        object
-            .set_property(&"log".into(), &function.into(), attributes)
-            .unwrap();
+        object.set_property("log", &function, attributes).unwrap();
 
         global_object
-            .set_property(&"console".into(), &object.into(), attributes)
+            .set_property("console", &object, attributes)
             .unwrap();
 
         let result = ctx.evaluate_script("console.log('Hello, World!')", None);
@@ -338,16 +347,17 @@ mod tests {
             std::ptr::null_mut()
         }
 
-        let function = JSFunction::callback(&ctx, Some("log"), Some(callback));
-        object
-            .set_property(&"log".into(), &function.into(), attributes)
-            .unwrap();
+        let function = JSFunction::callback::<JSString>(&ctx, None, Some(callback));
+        object.set_property("log", &function, attributes).unwrap();
+
+        object.set_property("error", &function, attributes).unwrap();
 
         global_object
-            .set_property(&"console".into(), &object.into(), attributes)
+            .set_property("console", &object, attributes)
             .unwrap();
 
-        let result = ctx.evaluate_script("console.log('Hello, World!')", None);
+        // function.call(None, &[]).unwrap();
+        let result = ctx.evaluate_script("console.error('Hello, World!')", None);
         assert!(result.is_ok());
     }
 
@@ -364,18 +374,10 @@ mod tests {
 
             let object = JSObject::new(&ctx);
             object
-                .set_property(
-                    &"name".into(),
-                    &JSValue::string(&ctx, name),
-                    Default::default(),
-                )
+                .set_property("name", &JSValue::string(&ctx, name), Default::default())
                 .unwrap();
             object
-                .set_property(
-                    &"age".into(),
-                    &JSValue::number(&ctx, age),
-                    Default::default(),
-                )
+                .set_property("age", &JSValue::number(&ctx, age), Default::default())
                 .unwrap();
 
             Ok(object.into())
@@ -392,7 +394,7 @@ mod tests {
         let class = JSClass::builder("Person").build().unwrap();
         let function = JSFunction::contructor(&ctx, &class, Some(new_object));
         global_object
-            .set_property(&"Person".into(), &function.into(), attributes)
+            .set_property("Person", &function.into(), attributes)
             .unwrap();
 
         let result = ctx
@@ -403,14 +405,14 @@ mod tests {
         let person = result.unwrap();
         assert!(person.is_object());
         let person = person.as_object().unwrap();
-        assert!(person.has_property(&"name".into()));
-        assert!(person.has_property(&"age".into()));
+        assert!(person.has_property("name"));
+        assert!(person.has_property("age"));
 
-        let name = person.get_property(&"name".into()).unwrap();
+        let name = person.get_property("name").unwrap();
         assert!(name.is_string());
         assert_eq!(name.as_string().unwrap(), "John Doe");
 
-        let age = person.get_property(&"age".into()).unwrap();
+        let age = person.get_property("age").unwrap();
         assert!(age.is_number());
         assert_eq!(age.as_number().unwrap(), 30.0);
     }

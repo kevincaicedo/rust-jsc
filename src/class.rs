@@ -282,7 +282,7 @@ impl JSClass {
     /// If an error occurs while registering the class.
     pub fn register(&self, ctx: &JSContext) -> JSResult<()> {
         ctx.global_object().set_property(
-            &self.name().into(),
+            self.name(),
             &self.object::<()>(ctx, None),
             Default::default(),
         )
@@ -311,7 +311,7 @@ mod tests {
             _arguments: &[JSValue],
         ) -> JSResult<JSValue> {
             let value = JSValue::string(&_ctx, "John");
-            this.set_property(&"name".into(), &value, Default::default())
+            this.set_property("name", &value, Default::default())
                 .unwrap();
             Ok(this.into())
         }
@@ -337,7 +337,7 @@ mod tests {
         let object = class.object::<i32>(&ctx, Some(Box::new(42)));
 
         ctx.global_object()
-            .set_property(&"Test".into(), &object, Default::default())
+            .set_property("Test", &object, Default::default())
             .unwrap();
         let result_object = ctx
             .evaluate_script("const obj = new Test(); obj", None)
@@ -346,9 +346,9 @@ mod tests {
         assert!(result_object.is_object_of_class(&class).unwrap());
         assert!(object.is_object());
         let object = object.as_object().unwrap();
-        assert!(object.has_property(&"name".into()));
+        assert!(object.has_property("name"));
         assert_eq!(
-            object.get_property(&"name".into()).unwrap(),
+            object.get_property("name").unwrap(),
             JSValue::string(&ctx, "John")
         );
     }
@@ -362,7 +362,7 @@ mod tests {
             _arguments: &[JSValue],
         ) -> JSResult<JSValue> {
             let value = JSValue::string(&_ctx, "John");
-            this.set_property(&"name".into(), &value, Default::default())
+            this.set_property("name", &value, Default::default())
                 .unwrap();
             Ok(this.into())
         }

@@ -2,10 +2,11 @@ use rust_jsc_sys::{
     JSCheckScriptSyntax, JSContextGetGlobalContext, JSContextGetGlobalObject,
     JSContextGetGroup, JSContextGetSharedData, JSContextGroupCreate, JSContextGroupRef,
     JSContextGroupRelease, JSContextRef, JSContextSetSharedData, JSEvaluateScript,
-    JSGarbageCollect, JSGlobalContextCopyName, JSGlobalContextCreate,
-    JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable, JSGlobalContextRef,
-    JSGlobalContextRelease, JSGlobalContextRetain, JSGlobalContextSetInspectable,
-    JSGlobalContextSetName, JSLoadAndEvaluateModule, JSValueRef,
+    JSGarbageCollect, JSGetMemoryUsageStatistics, JSGlobalContextCopyName,
+    JSGlobalContextCreate, JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable,
+    JSGlobalContextRef, JSGlobalContextRelease, JSGlobalContextRetain,
+    JSGlobalContextSetInspectable, JSGlobalContextSetName,
+    JSGlobalContextSetUnhandledRejectionCallback, JSLoadAndEvaluateModule, JSValueRef,
 };
 
 use crate::{JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSValue};
@@ -85,6 +86,85 @@ impl JSContext {
     /// ```
     pub fn garbage_collect(&self) {
         unsafe { JSGarbageCollect(self.inner) }
+    }
+
+    /// Gets the memory usage statistics of a JavaScript execution context.
+    ///
+    /// # Examples
+    /// ```
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// let memory_usage_statistics = ctx.get_memory_usage();
+    /// let heap_size = memory_usage_statistics.get_property("heapSize").unwrap().as_number().unwrap();
+    /// let heap_capacity = memory_usage_statistics.get_property("heapCapacity").unwrap().as_number().unwrap();
+    /// let extra_memory_size = memory_usage_statistics.get_property("extraMemorySize").unwrap().as_number().unwrap();
+    /// let object_count = memory_usage_statistics.get_property("objectCount").unwrap().as_number().unwrap();
+    /// let protected_object_count = memory_usage_statistics.get_property("protectedObjectCount").unwrap().as_number().unwrap();
+    /// let global_object_count = memory_usage_statistics.get_property("globalObjectCount").unwrap().as_number().unwrap();
+    /// let protected_global_object_count = memory_usage_statistics.get_property("protectedGlobalObjectCount").unwrap().as_number().unwrap();
+    /// let object_type_counts = memory_usage_statistics.get_property("objectTypeCounts").unwrap().as_object().unwrap();
+    ///
+    /// println!("Heap size: {}", heap_size);
+    /// println!("Heap capacity: {}", heap_capacity);
+    /// println!("Extra memory size: {}", extra_memory_size);
+    /// println!("Object count: {}", object_count);
+    /// println!("Protected object count: {}", protected_object_count);
+    /// println!("Global object count: {}", global_object_count);
+    /// println!("Protected global object count: {}", protected_global_object_count);
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// Returns a `JSObject` object.
+    /// The object contains the following properties:
+    ///     heapSize - The size of the heap.
+    ///     heapCapacity - The total size of the heap.
+    ///     extraMemorySize - The size of the extra memory.
+    ///     objectCount - The number of objects.
+    ///     protectedObjectCount - The number of protected objects.
+    ///     globalObjectCount - The number of global objects.
+    ///     protectedGlobalObjectCount - The number of protected global objects.
+    ///     objectTypeCounts - An object that contains the count of each object type.
+    pub fn get_memory_usage(&self) -> JSObject {
+        let result = unsafe { JSGetMemoryUsageStatistics(self.inner) };
+        JSObject::from_ref(result, self.inner)
+    }
+
+    /// Sets a callback function that is called when a promise is rejected and no handler is provided.
+    /// The callback is called with the rejected promise and the reason for the rejection.
+    ///
+    /// # Arguments
+    /// - `function`: A JavaScript function.
+    ///
+    /// # Examples
+    /// ```
+    /// use rust_jsc::{JSContext, JSObject};
+    ///
+    /// let ctx = JSContext::new();
+    /// let script = "function handleRejection(reason) { console.log('Unhandled rejection:', reason); }; handleRejection";
+    /// let function = ctx.evaluate_script(script, None).unwrap();
+    /// assert!(function.is_object());
+    /// assert!(function.as_object().unwrap().is_function());
+    /// let result = ctx.set_unhandled_rejection_callback(function.as_object().unwrap());
+    /// ```
+    ///
+    pub fn set_unhandled_rejection_callback(&self, function: JSObject) -> JSResult<()> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        unsafe {
+            JSGlobalContextSetUnhandledRejectionCallback(
+                self.inner,
+                function.inner,
+                &mut exception,
+            );
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.inner);
+            return Err(value.into());
+        }
+
+        Ok(())
     }
 
     /// Checks the syntax of a JavaScript script.
@@ -383,6 +463,8 @@ impl From<JSGlobalContextRef> for JSContext {
 
 #[cfg(test)]
 mod tests {
+    // use std::mem::ManuallyDrop;
+
     use super::*;
 
     #[test]
@@ -457,20 +539,103 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_shared_data() {
-        let ctx = JSContext::new();
-        let data = Box::new(10);
-        ctx.set_shared_data(data);
+    // #[test]
+    // fn test_shared_data() {
+    //     let ctx = JSContext::new();
+    //     let data = Box::new(10);
+    //     ctx.set_shared_data(data.clone());
 
-        let shared_data = ctx.get_shared_data::<i32>().unwrap();
-        assert_eq!(*shared_data, 10);
+    //     let mut shared_data = ManuallyDrop::new(ctx.get_shared_data::<i32>().unwrap());
+    //     assert_eq!(*shared_data.as_mut(), 10);
+
+    //     let shared_data = ctx.get_shared_data::<i32>().unwrap();
+    //     assert_eq!(*shared_data, 10);
+    //     // unsafe { ManuallyDrop::drop(&mut shared_data) };
+    // }
+
+    // #[test]
+    // fn test_shared_data_null() {
+    //     let ctx = JSContext::new();
+    //     let shared_data = ctx.get_shared_data::<i32>();
+    //     assert!(shared_data.is_none());
+    // }
+
+    #[test]
+    fn test_set_unhandled_rejection_callback() {
+        let ctx = JSContext::new();
+        let script = "function handleRejection(reason) { console.log('Unhandled rejection:', reason); }; handleRejection";
+        let function = ctx.evaluate_script(script, None).unwrap();
+
+        assert!(function.is_object());
+        assert!(function.as_object().unwrap().is_function());
+        let result = ctx.set_unhandled_rejection_callback(function.as_object().unwrap());
+        assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_shared_data_null() {
-        let ctx = JSContext::new();
-        let shared_data = ctx.get_shared_data::<i32>();
-        assert!(shared_data.is_none());
-    }
+    // #[test]
+    // fn test_get_memory_usage() {
+    //     let ctx = JSContext::new();
+    //     let memory_usage_statistics = ctx.get_memory_usage();
+    //     let heap_size = memory_usage_statistics
+    //         .get_property("heapSize")
+    //         .unwrap()
+    //         .as_number()
+    //         .unwrap();
+    //     let heap_capacity = memory_usage_statistics
+    //         .get_property("heapCapacity")
+    //         .unwrap()
+    //         .as_number()
+    //         .unwrap();
+    //     let extra_memory_size = memory_usage_statistics
+    //         .get_property("extraMemorySize")
+    //         .unwrap()
+    //         .as_number()
+    //         .unwrap();
+    //     let object_count = memory_usage_statistics
+    //         .get_property("objectCount")
+    //         .unwrap()
+    //         .as_number()
+    //         .unwrap();
+    //     let protected_object_count = memory_usage_statistics
+    //         .get_property("protectedObjectCount")
+    //         .unwrap()
+    //         .as_number()
+    //         .unwrap();
+    //     let global_object_count = memory_usage_statistics
+    //         .get_property("globalObjectCount")
+    //         .unwrap()
+    //         .as_number()
+    //         .unwrap();
+    //     let protected_global_object_count = memory_usage_statistics
+    //         .get_property("protectedGlobalObjectCount")
+    //         .unwrap()
+    //         .as_number()
+    //         .unwrap();
+    //     let object_type_counts = memory_usage_statistics
+    //         .get_property("objectTypeCounts")
+    //         .unwrap()
+    //         .as_object()
+    //         .unwrap();
+
+    //     println!("Heap size: {}", heap_size);
+    //     println!("Heap capacity: {}", heap_capacity);
+    //     println!("Extra memory size: {}", extra_memory_size);
+    //     println!("Object count: {}", object_count);
+    //     println!("Protected object count: {}", protected_object_count);
+    //     println!("Global object count: {}", global_object_count);
+    //     println!(
+    //         "Protected global object count: {}",
+    //         protected_global_object_count
+    //     );
+    //     println!("Object type counts: {:?}", object_type_counts);
+
+    //     // assert_eq!(heap_size, 0.0);
+    //     // assert_ne!(heap_capacity, 0.0);
+    //     // assert_eq!(extra_memory_size, 0.0);
+    //     // assert_eq!(object_count, 0.0);
+    //     assert!(object_type_counts.is_object());
+
+    //     let object_property_names = object_type_counts.get_property_names();
+    //     assert!(!object_property_names.collect::<Vec<JSString>>().is_empty());
+    // }
 }

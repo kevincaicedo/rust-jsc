@@ -29,3 +29,27 @@ impl From<JSDate> for JSObject {
         regexp.object
     }
 }
+
+impl From<JSObject> for JSDate {
+    fn from(object: JSObject) -> Self {
+        Self::new(object)
+    }
+}
+
+impl std::fmt::Display for JSDate {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Date: {:?}", self.object)
+    }
+}
+
+impl From<JSValue> for JSDate {
+    fn from(value: JSValue) -> Self {
+        Self::new(value.as_object().unwrap())
+    }
+}
+
+impl From<JSDate> for JSValue {
+    fn from(date: JSDate) -> Self {
+        date.object.into()
+    }
+}

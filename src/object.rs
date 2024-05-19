@@ -6,10 +6,10 @@ use rust_jsc_sys::{
     JSObjectGetPrivate, JSObjectGetProperty, JSObjectGetPropertyAtIndex,
     JSObjectGetPropertyForKey, JSObjectGetPrototype, JSObjectHasProperty,
     JSObjectHasPropertyForKey, JSObjectIsConstructor, JSObjectIsFunction, JSObjectMake,
-    JSObjectRef, JSObjectSetPrivate, JSObjectSetProperty, JSObjectSetPropertyAtIndex,
-    JSObjectSetPropertyForKey, JSObjectSetPrototype, JSPropertyNameArrayGetCount,
-    JSPropertyNameArrayGetNameAtIndex, JSPropertyNameArrayRef,
-    JSPropertyNameArrayRelease, JSStringRetain, JSValueRef,
+    JSObjectRef, JSObjectSetAsyncIterator, JSObjectSetIterator, JSObjectSetPrivate,
+    JSObjectSetProperty, JSObjectSetPropertyAtIndex, JSObjectSetPropertyForKey,
+    JSObjectSetPrototype, JSPropertyNameArrayGetCount, JSPropertyNameArrayGetNameAtIndex,
+    JSPropertyNameArrayRef, JSPropertyNameArrayRelease, JSStringRetain, JSValueRef,
 };
 
 use crate::{
@@ -66,6 +66,108 @@ impl JSObject {
         Self { inner, value }
     }
 
+    /// Sets an object's async iterator.
+    /// This function is the same as performing "object[Symbol.asyncIterator] = iterator" from JavaScript.
+    /// The iterator object must have a "next" method that returns a promise.
+    /// The promise must resolve to an object with a "value" property that contains the next value,
+    /// and a "done" property that indicates whether the iterator is done.
+    /// The iterator object may have a "return" method that cleans up resources when the iterator is done.
+    /// The return method may return a promise.
+    ///
+    /// Doc: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_async_iterator_and_async_iterable_protocols
+    ///
+    /// # Arguments
+    /// * `iterator` - The iterator object to set on the object.
+    /// * `descriptor` - The property descriptor to set on the object.
+    ///
+    /// # Example
+    /// ```
+    /// use rust_jsc::*;
+    ///
+    /// let ctx = JSContext::new();
+    /// let object = JSObject::new(&ctx);
+    /// let iterator = JSObject::new(&ctx);
+    ///
+    /// object.set_async_iterator(&iterator, PropertyDescriptor::default()).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    /// Returns a `JSError` if the operation fails.
+    ///
+    pub fn set_async_iterator(
+        &self,
+        iterator: &JSObject,
+        descriptor: PropertyDescriptor,
+    ) -> JSResult<()> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        unsafe {
+            JSObjectSetAsyncIterator(
+                self.ctx,
+                self.inner,
+                iterator.inner,
+                descriptor.attributes,
+                &mut exception,
+            );
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.value.ctx);
+            return Err(JSError::from(value));
+        }
+
+        Ok(())
+    }
+
+    /// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_async_iterator_and_async_iterable_protocols
+    /// Sets an object's iterator.
+    /// This function is the same as performing "object[Symbol.iterator] = iterator" from JavaScript.
+    /// The iterator object must have a "next" method that returns an object with a "value" property that contains the next value,
+    /// and a "done" property that indicates whether the iterator is done.
+    /// The iterator object may have a "return" method that cleans up resources when the iterator is done.
+    /// The return method may return an object with a "value" property that contains the return value.
+    /// The iterator object may have a "throw" method that cleans up resources when the iterator is done.
+    ///
+    /// # Arguments
+    /// * `iterator` - The iterator object to set on the object.
+    /// * `descriptor` - The property descriptor to set on the object.
+    ///
+    /// # Example
+    /// ```
+    /// use rust_jsc::*;
+    ///
+    /// let ctx = JSContext::new();
+    /// let object = JSObject::new(&ctx);
+    /// let iterator = JSObject::new(&ctx);
+    ///
+    /// object.set_iterator(&iterator, PropertyDescriptor::default()).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    /// Returns a `JSError` if the operation fails.
+    pub fn set_iterator(
+        &self,
+        iterator: &JSObject,
+        descriptor: PropertyDescriptor,
+    ) -> JSResult<()> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        unsafe {
+            JSObjectSetIterator(
+                self.ctx,
+                self.inner,
+                iterator.inner,
+                descriptor.attributes,
+                &mut exception,
+            );
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.value.ctx);
+            return Err(JSError::from(value));
+        }
+
+        Ok(())
+    }
+
     /// Tests whether an object has a given property.
     /// Returns true if the object has the property, otherwise false.
     /// This function is the same as performing "property in object" from JavaScript.
@@ -79,17 +181,16 @@ impl JSObject {
     ///
     /// let ctx = JSContext::new();
     /// let object = JSObject::new(&ctx);
-    /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(&name, &value, PropertyDescriptor::default());
-    /// assert_eq!(object.has_property(&name), true);
+    /// object.set_property("name", &value, PropertyDescriptor::default());
+    /// assert_eq!(object.has_property("name"), true);
     /// ```
     ///
     /// # Returns
     /// Returns boolean value indicating if the object has the property.
-    pub fn has_property(&self, name: &JSString) -> bool {
-        unsafe { JSObjectHasProperty(self.value.ctx, self.inner, name.inner) }
+    pub fn has_property(&self, name: impl Into<JSString>) -> bool {
+        unsafe { JSObjectHasProperty(self.value.ctx, self.inner, name.into().inner) }
     }
 
     /// Gets a property from an object using a JSString as the property key.
@@ -105,19 +206,23 @@ impl JSObject {
     ///
     /// let ctx = JSContext::new();
     /// let object = JSObject::new(&ctx);
-    /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(&name, &value, PropertyDescriptor::default());
-    /// assert_eq!(object.get_property(&name).unwrap(), value);
+    /// object.set_property("name", &value, PropertyDescriptor::default());
+    /// assert_eq!(object.get_property("name").unwrap(), value);
     /// ```
     ///
     /// # Returns
     /// Returns the value of the property if it exists, otherwise returns undefined.
-    pub fn get_property(&self, name: &JSString) -> JSResult<JSValue> {
+    pub fn get_property(&self, name: impl Into<JSString>) -> JSResult<JSValue> {
         let mut exception: JSValueRef = std::ptr::null_mut();
         let value = unsafe {
-            JSObjectGetProperty(self.value.ctx, self.inner, name.inner, &mut exception)
+            JSObjectGetProperty(
+                self.value.ctx,
+                self.inner,
+                name.into().inner,
+                &mut exception,
+            )
         };
 
         if !exception.is_null() {
@@ -345,15 +450,14 @@ impl JSObject {
     ///
     /// let ctx = JSContext::new();
     /// let object = JSObject::new(&ctx);
-    /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(&name, &value, PropertyDescriptor::default()).unwrap();
-    /// assert_eq!(object.get_property(&name).unwrap(), value);
+    /// object.set_property("name", &value, PropertyDescriptor::default()).unwrap();
+    /// assert_eq!(object.get_property("name").unwrap(), value);
     /// ```
     pub fn set_property(
         &self,
-        name: &JSString,
+        name: impl Into<JSString>,
         value: &JSValue,
         descriptor: PropertyDescriptor,
     ) -> JSResult<()> {
@@ -362,7 +466,7 @@ impl JSObject {
             JSObjectSetProperty(
                 self.value.ctx,
                 self.inner,
-                name.inner,
+                name.into().inner,
                 value.inner,
                 descriptor.attributes,
                 &mut exception,
@@ -428,21 +532,25 @@ impl JSObject {
     ///
     /// let ctx = JSContext::new();
     /// let object = JSObject::new(&ctx);
-    /// let name = JSString::from("name");
     /// let value = JSValue::string(&ctx, "value");
     ///
-    /// object.set_property(&name, &value, PropertyDescriptor::default());
-    /// assert_eq!(object.has_property(&name), true);
-    /// assert_eq!(object.delete_property(&name).unwrap(), true);
-    /// assert_eq!(object.has_property(&name), false);
+    /// object.set_property("name", &value, PropertyDescriptor::default());
+    /// assert_eq!(object.has_property("name"), true);
+    /// assert_eq!(object.delete_property("name").unwrap(), true);
+    /// assert_eq!(object.has_property("name"), false);
     /// ```
     ///
     /// # Returns
     /// Returns boolean value indicating if the delete operation succeeded.
-    pub fn delete_property(&self, name: &JSString) -> JSResult<bool> {
+    pub fn delete_property(&self, name: impl Into<JSString>) -> JSResult<bool> {
         let mut exception: JSValueRef = std::ptr::null_mut();
         let result = unsafe {
-            JSObjectDeleteProperty(self.value.ctx, self.inner, name.inner, &mut exception)
+            JSObjectDeleteProperty(
+                self.value.ctx,
+                self.inner,
+                name.into().inner,
+                &mut exception,
+            )
         };
 
         if !exception.is_null() {
@@ -730,7 +838,11 @@ impl From<JSObject> for JSObjectRef {
 
 #[cfg(test)]
 mod tests {
-    use crate::{JSContext, JSObject, JSString, JSValue, PropertyDescriptor};
+
+    use crate::{self as rust_jsc, JSString};
+    use rust_jsc_macros::callback;
+
+    use crate::{JSContext, JSFunction, JSObject, JSResult, JSValue, PropertyDescriptor};
 
     #[test]
     fn test_object() {
@@ -752,16 +864,16 @@ mod tests {
     fn test_object_property() {
         let ctx = JSContext::new();
         let object = JSObject::new(&ctx);
-        let name = JSString::from("name");
+        let name = "name";
         let value = JSValue::string(&ctx, "value");
 
         object
-            .set_property(&name, &value, PropertyDescriptor::default())
+            .set_property(name, &value, PropertyDescriptor::default())
             .unwrap();
-        assert_eq!(object.get_property(&name).unwrap(), value);
-        assert_eq!(object.has_property(&name), true);
-        assert_eq!(object.delete_property(&name).unwrap(), true);
-        assert_eq!(object.has_property(&name), false);
+        assert_eq!(object.get_property(name).unwrap(), value);
+        assert_eq!(object.has_property(name), true);
+        assert_eq!(object.delete_property(name).unwrap(), true);
+        assert_eq!(object.has_property(name), false);
     }
 
     #[test]
@@ -841,13 +953,12 @@ mod tests {
     fn test_object_set_property() {
         let ctx = JSContext::new();
         let object = JSObject::new(&ctx);
-        let name = JSString::from("name");
         let value = JSValue::string(&ctx, "value");
 
         object
-            .set_property(&name, &value, PropertyDescriptor::default())
+            .set_property("name", &value, PropertyDescriptor::default())
             .unwrap();
-        assert_eq!(object.get_property(&name).unwrap(), value);
+        assert_eq!(object.get_property("name").unwrap(), value);
     }
 
     #[test]
@@ -864,15 +975,15 @@ mod tests {
     fn test_object_delete_property() {
         let ctx = JSContext::new();
         let object = JSObject::new(&ctx);
-        let name = JSString::from("name");
+        let name = "name";
         let value = JSValue::string(&ctx, "value");
 
         object
-            .set_property(&name, &value, PropertyDescriptor::default())
+            .set_property(name, &value, PropertyDescriptor::default())
             .unwrap();
-        assert_eq!(object.has_property(&name), true);
-        assert_eq!(object.delete_property(&name).unwrap(), true);
-        assert_eq!(object.has_property(&name), false);
+        assert_eq!(object.has_property(name), true);
+        assert_eq!(object.delete_property(name).unwrap(), true);
+        assert_eq!(object.has_property(name), false);
     }
 
     #[test]
@@ -883,22 +994,21 @@ mod tests {
         let value = JSValue::string(&ctx, "value");
 
         object
-            .set_property(&name, &value, PropertyDescriptor::default())
+            .set_property(name, &value, PropertyDescriptor::default())
             .unwrap();
-        assert_eq!(object.has_property(&name), true);
+        assert_eq!(object.has_property("name"), true);
     }
 
     #[test]
     fn test_object_get_property() {
         let ctx = JSContext::new();
         let object = JSObject::new(&ctx);
-        let name = JSString::from("name");
         let value = JSValue::string(&ctx, "value");
 
         object
-            .set_property(&name, &value, PropertyDescriptor::default())
+            .set_property("name", &value, PropertyDescriptor::default())
             .unwrap();
-        assert_eq!(object.get_property(&name).unwrap(), value);
+        assert_eq!(object.get_property("name").unwrap(), value);
     }
 
     #[test]
@@ -1051,5 +1161,126 @@ mod tests {
         let mut property_names = object.get_property_names();
         assert_eq!(property_names.next(), Some(JSString::from("key")));
         assert_eq!(property_names.next(), None);
+    }
+
+    #[test]
+    fn test_iterator() {
+        #[callback]
+        fn log_info(
+            ctx: JSContext,
+            _function: JSObject,
+            _this: JSObject,
+            arguments: &[JSValue],
+        ) -> JSResult<JSValue> {
+            let message = arguments.get(0).unwrap().as_string().unwrap();
+            println!("INFO: {}", message);
+
+            Ok(JSValue::undefined(&ctx))
+        }
+
+        let ctx = JSContext::new();
+        let object = JSObject::new(&ctx);
+        let iterator = r#"
+        const myIterator = () => {
+            let i = 0;
+            return {
+              next() {
+                i++;
+                console.log(`Returning ${i}`);
+                if (i === 4) return { done: true };
+                return { done: false, value: i };
+              },
+              return() {
+                console.log("Closing");
+                return { done: true };
+              },
+            };
+        };
+        myIterator
+        "#;
+        let iterator_object = ctx
+            .evaluate_script(iterator, None)
+            .unwrap()
+            .as_object()
+            .unwrap();
+        object
+            .set_iterator(&iterator_object, PropertyDescriptor::default())
+            .unwrap();
+
+        let function = JSFunction::callback(&ctx, Some("log"), Some(log_info));
+        object
+            .set_property("log", &function, Default::default())
+            .unwrap();
+        ctx.global_object()
+            .set_property("console", &object, Default::default())
+            .unwrap();
+        ctx.global_object()
+            .set_property("myObjectIter", &object, PropertyDescriptor::default())
+            .unwrap();
+
+        let evaluate_script = r#"
+        let counter = 0;
+        for (let i of myObjectIter) {
+            console.log(i);
+            counter += i;
+        }
+        counter
+        "#;
+
+        let result = ctx.evaluate_script(evaluate_script, None);
+
+        assert_eq!(result.is_ok(), true);
+        let result = result.unwrap();
+        assert_eq!(result.as_number().unwrap(), 6.0);
+    }
+
+    #[test]
+    fn test_async_iterator() {
+        let ctx = JSContext::new();
+        let object = JSObject::new(&ctx);
+        let async_iterator = r#"
+        const myAsyncIterator = () => {
+            let i = 0;
+            return {
+              async next() {
+                i++;
+                console.log(`Returning ${i}`);
+                if (i === 4) return { done: true };
+                return { done: false, value: i };
+              },
+              async return() {
+                console.log("Closing");
+                return { done: true };
+              },
+            };
+        };
+        myAsyncIterator
+        "#;
+
+        let async_iterator_object = ctx
+            .evaluate_script(async_iterator, None)
+            .unwrap()
+            .as_object()
+            .unwrap();
+        object
+            .set_async_iterator(&async_iterator_object, PropertyDescriptor::default())
+            .unwrap();
+        ctx.global_object()
+            .set_property("myObjectIter", &object, PropertyDescriptor::default())
+            .unwrap();
+
+        let evaluate_script = r#"
+        let counter = 0;
+        (async function () {
+            for await (let i of myObjectIter) {
+                console.log(i);
+                counter += i;
+            }
+        })();
+        "#;
+
+        let result = ctx.evaluate_script(evaluate_script, None);
+
+        assert_eq!(result.is_ok(), true);
     }
 }

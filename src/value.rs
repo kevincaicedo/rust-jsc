@@ -1,5 +1,12 @@
 use rust_jsc_sys::{
-    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueGetType, JSValueIsArray, JSValueIsBoolean, JSValueIsDate, JSValueIsEqual, JSValueIsInstanceOfConstructor, JSValueIsNull, JSValueIsNumber, JSValueIsObject, JSValueIsObjectOfClass, JSValueIsStrictEqual, JSValueIsString, JSValueIsSymbol, JSValueIsUndefined, JSValueMakeBoolean, JSValueMakeFromJSONString, JSValueMakeNull, JSValueMakeNumber, JSValueMakeString, JSValueMakeSymbol, JSValueMakeUndefined, JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueToStringCopy, JSValueUnprotect
+    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueGetType, JSValueIsArray,
+    JSValueIsBoolean, JSValueIsDate, JSValueIsEqual, JSValueIsInstanceOfConstructor,
+    JSValueIsNull, JSValueIsNumber, JSValueIsObject, JSValueIsObjectOfClass,
+    JSValueIsStrictEqual, JSValueIsString, JSValueIsSymbol, JSValueIsUndefined,
+    JSValueMakeBoolean, JSValueMakeFromJSONString, JSValueMakeNull, JSValueMakeNumber,
+    JSValueMakeString, JSValueMakeSymbol, JSValueMakeUndefined, JSValueProtect,
+    JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueToStringCopy,
+    JSValueUnprotect,
 };
 
 use crate::{
@@ -736,14 +743,6 @@ mod tests {
         let value: JSValue = ctx.evaluate_script("new Date()", None).unwrap();
         assert!(value.is_date());
     }
-
-    // #[test]
-    // fn test_is_instance_of() {
-    //     let ctx = crate::JSContext::new();
-    //     let value = JSValue::object(&ctx);
-    //     let constructor = ctx.evaluate_script("Object").unwrap();
-    //     assert!(value.is_instance_of(&constructor).is_ok());
-    // }
 
     #[test]
     fn test_is_object_of_class() {

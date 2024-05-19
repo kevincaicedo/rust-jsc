@@ -38,6 +38,7 @@ pub use rust_jsc_macros::*;
 #[doc(hidden)]
 pub use rust_jsc_sys as internal;
 
+/// A JavaScript context.
 pub struct JSContext {
     pub(crate) inner: JSGlobalContextRef,
 }
@@ -47,57 +48,74 @@ pub struct JSContextGroup {
     context_group: JSContextGroupRef,
 }
 
+/// A JavaScript class.
 pub struct JSClass {
     // pub(crate) ctx: JSContextRef,
     pub(crate) inner: JSClassRef,
     pub(crate) name: String,
 }
 
+/// A JavaScript object.
 #[derive(Clone)]
 pub struct JSObject {
     inner: JSObjectRef,
     value: JSValue,
 }
 
+/// A JavaScript function object.
 #[derive(Clone)]
 pub struct JSFunction {
     pub(crate) object: JSObject,
 }
 
+/// A JavaScript date object.
 pub struct JSDate {
     pub(crate) object: JSObject,
 }
 
+/// A JavaScript regular expression object.
 pub struct JSRegExp {
     pub(crate) object: JSObject,
 }
 
+/// A JavaScript typed array.
 #[derive(Debug, Clone)]
 pub struct JSTypedArray {
     pub(crate) object: JSObject,
 }
 
+/// A JavaScript array buffer.
 #[derive(Debug, Clone)]
 pub struct JSArrayBuffer {
     pub(crate) object: JSObject,
 }
 
+/// A JavaScript array.
 pub struct JSArray {
     pub(crate) object: JSObject,
 }
 
+/// A JavaScript promise.
 pub struct JSPromise {
     this: JSObject,
+    resolver: JSPromiseResolvingFunctions,
+}
+
+/// A JavaScript promise resolving functions.
+#[derive(Debug, Clone)]
+pub struct JSPromiseResolvingFunctions {
     resolve: JSObject,
     reject: JSObject,
 }
 
+/// A JavaScript value.
 #[derive(Debug, Clone)]
 pub struct JSValue {
     pub(crate) inner: JSValueRef,
     pub(crate) ctx: JSContextRef,
 }
 
+/// A JavaScript class attribute.
 pub enum JSClassAttribute {
     /// Specifies that a class has no special attributes.
     None = kJSClassAttributeNone as isize,
@@ -118,6 +136,7 @@ impl Into<JSClassAttributes> for JSClassAttribute {
     }
 }
 
+/// A JavaScript value type.
 #[derive(Debug, PartialEq)]
 pub enum JSValueType {
     Undefined = JSType_kJSTypeUndefined as isize,
@@ -128,21 +147,6 @@ pub enum JSValueType {
     Object = JSType_kJSTypeObject as isize,
     Symbol = JSType_kJSTypeSymbol as isize,
 }
-
-// lazy_static! {
-//     static ref JS_VALUE_TYPE_LOOKUP: Vec<Option<JSTypedArrayType>> = {
-//         let mut table = vec![None; 7]; // Adjust size according to the highest enum value + 1
-//         table[JSType_kJSTypeUndefined as usize] = Some(JSValueType::Undefined);
-//         table[JSType_kJSTypeNull as usize] = Some(JSValueType::Null);
-//         table[JSType_kJSTypeBoolean as usize] = Some(JSValueType::Boolean);
-//         table[JSType_kJSTypeNumber as usize] = Some(JSValueType::Number);
-//         table[JSType_kJSTypeString as usize] = Some(JSValueType::String);
-//         table[JSType_kJSTypeObject as usize] = Some(JSValueType::Object);
-//         table[JSType_kJSTypeSymbol as usize] = Some(JSValueType::Symbol);
-
-//         table
-//     };
-// }
 
 impl JSValueType {
     pub(crate) fn from_js_type(value: JSType) -> JSValueType {
@@ -159,6 +163,7 @@ impl JSValueType {
     }
 }
 
+/// A JavaScript typed array type.
 #[derive(Debug, PartialEq)]
 pub enum JSTypedArrayType {
     Int8Array = JSTypedArrayType_kJSTypedArrayTypeInt8Array as isize,
@@ -234,13 +239,13 @@ impl JSTypedArrayType {
     }
 }
 
+/// A JavaScript error.
 #[derive(Debug)]
 pub struct JSError {
     object: JSObject,
 }
 
 /// A JavaScript string.
-#[derive(Clone)]
 pub struct JSString {
     pub(crate) inner: JSStringRef,
 }

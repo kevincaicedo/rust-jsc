@@ -100,6 +100,11 @@ fn main() {
         return;
     }
 
+    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_BUILD_PATH");
+    println!("cargo:rerun-if-env-changed={}", "SYSTEM_LIBS_PATH");
+    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_MIRROR");
+    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_ARCHIVE");
+
     // if custom path for the static lib is set use it, otherwise download the static lib
     if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
         println!("cargo:rustc-link-search=native={}", custom_build_path);
@@ -150,6 +155,11 @@ fn main() {
         return;
     }
 
+    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_BUILD_PATH");
+    println!("cargo:rerun-if-env-changed={}", "SYSTEM_LIBS_PATH");
+    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_MIRROR");
+    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_ARCHIVE");
+    
     // if custom path for the static lib is set use it, otherwise download the static lib
     if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
         println!("cargo:rustc-link-search=native={}", custom_build_path);

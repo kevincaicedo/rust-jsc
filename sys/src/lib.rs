@@ -2495,6 +2495,10 @@ extern "C" {
     #[doc = "@function JSGarbageCollect\n@abstract Performs a JavaScript garbage collection.\n@param ctx The execution context to use.\n@discussion JavaScript values that are on the machine stack, in a register,\nprotected by JSValueProtect, set as the global object of an execution context,\nor reachable from any such value will not be collected.\n\nDuring JavaScript execution, you are not required to call this function; the\nJavaScript engine will garbage collect as needed. JavaScript values created\nwithin a context group are automatically destroyed when the last reference\nto the context group is released."]
     pub fn JSGarbageCollect(ctx: JSContextRef);
 }
+extern "C" {
+    #[doc = "@function JSGetMemoryUsageStatistics\n@abstract Returns the current memory usage of a context.\n@param ctx The execution context to use.\n@result A JSObjectRef containing the memory usage statistics."]
+    pub fn JSGetMemoryUsageStatistics(ctx: JSContextRef) -> JSObjectRef;
+}
 pub type __int8_t = ::std::os::raw::c_schar;
 pub type __uint8_t = ::std::os::raw::c_uchar;
 pub type __int16_t = ::std::os::raw::c_short;
@@ -30151,6 +30155,14 @@ extern "C" {
     ) -> JSObjectRef;
 }
 extern "C" {
+    #[doc = "@function\n@abstract Creates a JavaScript TypeError object, as if by invoking the built-in TypeError constructor.\n@param ctx The execution context to use.\n@param message A JSString containing the message for the TypeError's 'message' property.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result A JSObject that is an TypeError."]
+    pub fn JSObjectMakeTypeError(
+        ctx: JSContextRef,
+        message: JSStringRef,
+        exception: *mut JSValueRef,
+    ) -> JSObjectRef;
+}
+extern "C" {
     #[doc = "@function\n@abstract Creates a JavaScript RegExp object, as if by invoking the built-in RegExp constructor.\n@param ctx The execution context to use.\n@param argumentCount An integer count of the number of arguments in arguments.\n@param arguments A JSValue array of arguments to pass to the RegExp Constructor. Pass NULL if argumentCount is 0.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result A JSObject that is a RegExp."]
     pub fn JSObjectMakeRegExp(
         ctx: JSContextRef,
@@ -30267,6 +30279,26 @@ extern "C" {
         propertyKey: JSValueRef,
         exception: *mut JSValueRef,
     ) -> bool;
+}
+extern "C" {
+    #[doc = "@function\n@abstract Implement the async iterable protocol on an object.\n@param ctx The execution context to use.\n@param object The JSObject to implement the async iterable protocol on.\n@param value A zero-argument function that returns an object, conforming to the async iterator protocol.\n@param attributes A logically ORed set of JSPropertyAttributes to give to the property.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception."]
+    pub fn JSObjectSetAsyncIterator(
+        ctx: JSContextRef,
+        object: JSObjectRef,
+        value: JSValueRef,
+        attributes: JSPropertyAttributes,
+        exception: *mut JSValueRef,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Implement the iterator protocol on an object.\n@param ctx The execution context to use.\n@param object The JSObject to implement the iterator protocol on.\n@param value A zero-argument function that returns an object, conforming to the iterator protocol.\n@param attributes A logically ORed set of JSPropertyAttributes to give to the property.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception."]
+    pub fn JSObjectSetIterator(
+        ctx: JSContextRef,
+        object: JSObjectRef,
+        value: JSValueRef,
+        attributes: JSPropertyAttributes,
+        exception: *mut JSValueRef,
+    );
 }
 extern "C" {
     #[doc = "@function\n@abstract Gets a property from an object by numeric index.\n@param ctx The execution context to use.\n@param object The JSObject whose property you want to get.\n@param propertyIndex An integer value that is the property's name.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result The property's value if object has the property, otherwise the undefined value.\n@discussion Calling JSObjectGetPropertyAtIndex is equivalent to calling JSObjectGetProperty with a string containing propertyIndex, but JSObjectGetPropertyAtIndex provides optimized access to numeric properties."]
@@ -30404,6 +30436,14 @@ extern "C" {
 extern "C" {
     #[doc = "@function\n@abstract Gets the shared data pointer\n@param ctx The JSContext whose global object you want to get.\n@result A void* that is the context's shared data, if the context has shared data, otherwise NULL."]
     pub fn JSContextGetSharedData(ctx: JSContextRef) -> *mut ::std::os::raw::c_void;
+}
+extern "C" {
+    #[doc = "@function\n@abstract Sets the callback function that will be called when an unhandled promise rejection occurs.\n@param ctx The JSGlobalContext whose unhandled promise rejection callback you want to set.\n@param function The JSObjectRef to call when an unhandled promise rejection occurs. Pass NULL to remove the callback.\n@param exception The exception to pass to the callback. Pass NULL to specify no exception."]
+    pub fn JSGlobalContextSetUnhandledRejectionCallback(
+        ctx: JSGlobalContextRef,
+        function: JSObjectRef,
+        exception: *mut JSValueRef,
+    );
 }
 extern "C" {
     #[doc = "@function\n@abstract Gets the context group to which a JavaScript execution context belongs.\n@param ctx The JSContext whose group you want to get.\n@result ctx's group."]

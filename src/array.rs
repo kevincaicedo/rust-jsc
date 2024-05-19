@@ -147,7 +147,7 @@ impl JSArray {
     /// # Returns
     /// The length of the array.
     pub fn length(&self) -> JSResult<f64> {
-        self.object.get_property(&"length".into())?.as_number()
+        self.object.get_property("length")?.as_number()
     }
 
     /// Pushes a value to the end of the array.

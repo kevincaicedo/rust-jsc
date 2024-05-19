@@ -112,7 +112,7 @@ impl JSTypedArray {
         if result.is_null() {
             return Err(JSError::with_message(
                 ctx,
-                "Failed to create typed array".into(),
+                "Failed to create typed array",
             )
             .unwrap());
         }
@@ -614,7 +614,7 @@ impl JSArrayBuffer {
         if result.is_null() {
             return Err(JSError::with_message(
                 ctx,
-                "Failed to create array array".into(),
+                "Failed to create array array",
             )
             .unwrap());
         }
@@ -709,7 +709,7 @@ mod tests {
 
         ctx.global_object()
             .set_property(
-                &"custom_array".into(),
+                "custom_array",
                 &typed_array.clone().into(),
                 Default::default(),
             )
@@ -751,7 +751,7 @@ mod tests {
 
         ctx.global_object()
             .set_property(
-                &"custom_array".into(),
+                "custom_array",
                 &typed_array.clone().into(),
                 Default::default(),
             )

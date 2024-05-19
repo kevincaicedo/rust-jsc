@@ -72,7 +72,7 @@ impl JSRegExp {
     pub fn exec(&self, ctx: &JSContext, string: &str) -> JSResult<JSValue> {
         let string = JSValue::string(ctx, string);
         self.object
-            .get_property(&"exec".into())?
+            .get_property("exec")?
             .as_object()?
             .call(Some(&self.object), &[string])
     }
@@ -104,7 +104,7 @@ impl JSRegExp {
     pub fn test(&self, ctx: &JSContext, string: &str) -> JSResult<JSValue> {
         let string = JSValue::string(ctx, string);
         self.object
-            .get_property(&"test".into())?
+            .get_property("test")?
             .as_object()?
             .call(Some(&self.object), &[string])
     }

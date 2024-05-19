@@ -81,6 +81,12 @@ impl From<JSStringRef> for JSString {
     }
 }
 
+impl Clone for JSString {
+    fn clone(&self) -> Self {
+        self.to_string().into()
+    }
+}
+
 impl Debug for JSString {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         let max_len = self.len() + 1;
