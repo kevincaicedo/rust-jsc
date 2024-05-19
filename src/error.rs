@@ -133,6 +133,12 @@ impl Deref for JSError {
     }
 }
 
+impl From<JSError> for JSValue {
+    fn from(error: JSError) -> Self {
+        error.object.into()
+    }
+}
+
 impl From<JSError> for JSObject {
     fn from(error: JSError) -> Self {
         error.object

@@ -7,6 +7,24 @@ use crate::{
     JSValue,
 };
 
+impl JSPromiseResolvingFunctions {
+    pub fn resolve(
+        &self,
+        this: Option<&JSObject>,
+        arguments: &[JSValue],
+    ) -> JSResult<JSValue> {
+        self.resolve.call(this, arguments)
+    }
+
+    pub fn reject(
+        &self,
+        this: Option<&JSObject>,
+        arguments: &[JSValue],
+    ) -> JSResult<JSValue> {
+        self.reject.call(this, arguments)
+    }
+}
+
 impl JSPromise {
     pub fn new_pending(ctx: &JSContext) -> JSResult<(Self, JSPromiseResolvingFunctions)> {
         let mut exception: JSValueRef = std::ptr::null_mut();
@@ -54,37 +72,25 @@ impl JSPromise {
         self.resolver.reject.call(this, arguments)
     }
 
-    pub fn then(
-        &self,
-        this: Option<&JSObject>,
-        arguments: &[JSValue],
-    ) -> JSResult<JSValue> {
+    pub fn then(self, arguments: &[JSValue]) -> JSResult<JSValue> {
         self.this
             .get_property("then")?
             .as_object()?
-            .call(this, arguments)
+            .call(Some(&self.this), arguments)
     }
 
-    pub fn catch(
-        &self,
-        this: Option<&JSObject>,
-        arguments: &[JSValue],
-    ) -> JSResult<JSValue> {
+    pub fn catch(&self, arguments: &[JSValue]) -> JSResult<JSValue> {
         self.this
             .get_property("catch")?
             .as_object()?
-            .call(this, arguments)
+            .call(Some(&self.this), arguments)
     }
 
-    pub fn finally(
-        &self,
-        this: Option<&JSObject>,
-        arguments: &[JSValue],
-    ) -> JSResult<JSValue> {
+    pub fn finally(&self, arguments: &[JSValue]) -> JSResult<JSValue> {
         self.this
             .get_property("finally")?
             .as_object()?
-            .call(this, arguments)
+            .call(Some(&self.this), arguments)
     }
 }
 
@@ -112,6 +118,9 @@ unsafe impl Send for JSPromise {}
 
 #[cfg(test)]
 mod tests {
+    use crate::{self as rust_jsc, JSFunction};
+    use rust_jsc_macros::callback;
+
     use crate::{JSContext, JSValue};
 
     use super::*;
@@ -139,5 +148,32 @@ mod tests {
         let value = JSValue::number(&ctx, 42.0);
         let result = promise.reject(None, &[value]).unwrap();
         assert_eq!(result.is_undefined(), true);
+    }
+
+    #[test]
+    fn test_resolve_function() {
+        #[callback]
+        fn log_info(
+            ctx: JSContext,
+            _function: JSObject,
+            _this: JSObject,
+            _arguments: &[JSValue],
+        ) -> JSResult<JSValue> {
+            let arg = _arguments.get(0).unwrap();
+            println!("INFO: {}", arg.as_number().unwrap());
+
+            assert_eq!(arg.as_number().unwrap(), 42.0);
+            Ok(JSValue::undefined(&ctx))
+        }
+
+        let ctx = JSContext::new();
+        let (promise, resolver) = JSPromise::new_pending(&ctx).unwrap();
+        let value = JSValue::number(&ctx, 42.0);
+
+        resolver.resolve(None, &[value]).unwrap();
+        let function = JSFunction::callback::<String>(&ctx, None, Some(log_info));
+        let result = promise.then(&[function.into()]);
+
+        assert_eq!(result.unwrap().is_object(), true);
     }
 }
