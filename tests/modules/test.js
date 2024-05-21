@@ -1,5 +1,5 @@
-// import { myFunction } from './script.js';
-// import './script2.js';
+import { myFunction } from './script.js';
+import './script2.js';
 // import * as data from './test.json';
 
 console.log("Meta Inf :", import.meta.filename, import.meta.path, import.meta.main);
@@ -7,7 +7,11 @@ console.log("Meta Inf :", import.meta.filename, import.meta.path, import.meta.ma
 const promise = Promise.resolve();
 
 promise.then(() => {
-    // console.log("Here :", myFunction());
+    console.log("Here :", myFunction());
+    
+    for (let i = 0; i < 100000; i++) {
+        console.log("Here :", i);
+    }
 
     promise.then(() => {
         console.log("Here :", new Array().test());
@@ -22,19 +26,3 @@ try {
 } catch (error) {
     console.log(error);
 }
-// console.log(myFunction());
-
-// var arr = [];
-// (async () => {
-//     try {
-//         await import('./script.mjs').then(module => { module.myFunction(); })
-//     } catch (error) {
-//         errorMessage = String(error);
-//         console.log(errorMessage);
-//     }
-//     await 1;
-//     arr.push(3);
-// })();
-// arr.push(1);
-// arr.push(2);
-// arr;

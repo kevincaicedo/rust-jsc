@@ -297,8 +297,8 @@ impl Drop for JSClass {
 
 #[cfg(test)]
 mod tests {
-    use crate as rust_jsc;
-    use rust_jsc_macros::constructor;
+    use crate::{self as rust_jsc, PrivateData};
+    use rust_jsc_macros::{constructor, finalize, has_instance, initialize};
 
     use crate::{JSClass, JSClassAttribute, JSContext, JSObject, JSResult, JSValue};
 
@@ -420,5 +420,87 @@ mod tests {
 
         let error = result.unwrap_err();
         assert_eq!(error.name().unwrap(), "TypeError");
+    }
+
+    #[test]
+    fn test_class_initialize() {
+        #[constructor]
+        fn constructor(
+            _ctx: JSContext,
+            this: JSObject,
+            _arguments: &[JSValue],
+        ) -> JSResult<JSValue> {
+            println!("Constructor");
+            let value = JSValue::string(&_ctx, "John");
+            this.set_property("name", &value, Default::default())
+                .unwrap();
+            Ok(this.into())
+        }
+
+        #[initialize]
+        fn initialize(_ctx: JSContext, _object: JSObject) {
+            println!("Initialize");
+        }
+
+        #[finalize]
+        fn finalize(_data_ptr: PrivateData) {
+            println!("Finalize");
+        }
+
+        #[has_instance]
+        fn has_instance(
+            _ctx: JSContext,
+            _constructor: JSObject,
+            _instance: JSValue,
+        ) -> JSResult<bool> {
+            println!("Has instance");
+            let name = _constructor
+                .get_property("name")
+                .unwrap()
+                .as_string()
+                .unwrap();
+
+            println!("Name: {}", name);
+            if name == "John" {
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("Test")
+            .set_version(1)
+            .set_attributes(JSClassAttribute::None.into())
+            .set_initialize(Some(initialize))
+            .set_finalize(Some(finalize))
+            .call_as_function(None)
+            .call_as_constructor(Some(constructor))
+            .has_instance(Some(has_instance))
+            .build()
+            .unwrap();
+
+        class.register(&ctx).unwrap();
+        let result = ctx
+            .evaluate_script(
+                r#"
+                let obj = new Test();
+                obj instanceof Test;
+            "#,
+                None,
+            )
+            .unwrap();
+
+        assert!(result.is_boolean());
+        assert_eq!(result.as_boolean(), true);
+
+        let object = ctx.evaluate_script("obj", None).unwrap();
+        assert!(object.is_object_of_class(&class).unwrap());
+
+        let object = object.as_object().unwrap();
+        let object_data = Box::new(42);
+        let result = object.set_private_data(object_data);
+        assert!(result);
+        assert_eq!(*object.get_private_data::<i32>().unwrap(), 42);
     }
 }

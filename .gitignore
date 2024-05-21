@@ -8,3 +8,5 @@ target
 .libs
 *.swp
 public
+.DS_Store
+.vscode

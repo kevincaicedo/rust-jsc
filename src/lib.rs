@@ -43,6 +43,8 @@ pub struct JSContext {
     pub(crate) inner: JSGlobalContextRef,
 }
 
+pub type PrivateData = *mut ::std::os::raw::c_void;
+
 /// A JavaScript execution context group.
 pub struct JSContextGroup {
     context_group: JSContextGroupRef,

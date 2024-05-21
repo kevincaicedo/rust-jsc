@@ -18,7 +18,7 @@ Add the following line to your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-rust_jsc = { version = "0.1.2" }
+rust_jsc = { version = "0.1.10" }
 ```
 
 # Usage

@@ -572,70 +572,54 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // #[test]
-    // fn test_get_memory_usage() {
-    //     let ctx = JSContext::new();
-    //     let memory_usage_statistics = ctx.get_memory_usage();
-    //     let heap_size = memory_usage_statistics
-    //         .get_property("heapSize")
-    //         .unwrap()
-    //         .as_number()
-    //         .unwrap();
-    //     let heap_capacity = memory_usage_statistics
-    //         .get_property("heapCapacity")
-    //         .unwrap()
-    //         .as_number()
-    //         .unwrap();
-    //     let extra_memory_size = memory_usage_statistics
-    //         .get_property("extraMemorySize")
-    //         .unwrap()
-    //         .as_number()
-    //         .unwrap();
-    //     let object_count = memory_usage_statistics
-    //         .get_property("objectCount")
-    //         .unwrap()
-    //         .as_number()
-    //         .unwrap();
-    //     let protected_object_count = memory_usage_statistics
-    //         .get_property("protectedObjectCount")
-    //         .unwrap()
-    //         .as_number()
-    //         .unwrap();
-    //     let global_object_count = memory_usage_statistics
-    //         .get_property("globalObjectCount")
-    //         .unwrap()
-    //         .as_number()
-    //         .unwrap();
-    //     let protected_global_object_count = memory_usage_statistics
-    //         .get_property("protectedGlobalObjectCount")
-    //         .unwrap()
-    //         .as_number()
-    //         .unwrap();
-    //     let object_type_counts = memory_usage_statistics
-    //         .get_property("objectTypeCounts")
-    //         .unwrap()
-    //         .as_object()
-    //         .unwrap();
+    #[allow(dead_code)]
+    fn memory_usage(ctx: &JSContext) {
+        let memory_usage_statistics = ctx.get_memory_usage();
+        let heap_size = memory_usage_statistics
+            .get_property("heapSize")
+            .unwrap()
+            .as_number()
+            .unwrap();
+        let heap_capacity = memory_usage_statistics
+            .get_property("heapCapacity")
+            .unwrap()
+            .as_number()
+            .unwrap();
+        let extra_memory_size = memory_usage_statistics
+            .get_property("extraMemorySize")
+            .unwrap()
+            .as_number()
+            .unwrap();
+        let object_count = memory_usage_statistics
+            .get_property("objectCount")
+            .unwrap()
+            .as_number()
+            .unwrap();
+        let protected_object_count = memory_usage_statistics
+            .get_property("protectedObjectCount")
+            .unwrap()
+            .as_number()
+            .unwrap();
+        let global_object_count = memory_usage_statistics
+            .get_property("globalObjectCount")
+            .unwrap()
+            .as_number()
+            .unwrap();
+        let protected_global_object_count = memory_usage_statistics
+            .get_property("protectedGlobalObjectCount")
+            .unwrap()
+            .as_number()
+            .unwrap();
 
-    //     println!("Heap size: {}", heap_size);
-    //     println!("Heap capacity: {}", heap_capacity);
-    //     println!("Extra memory size: {}", extra_memory_size);
-    //     println!("Object count: {}", object_count);
-    //     println!("Protected object count: {}", protected_object_count);
-    //     println!("Global object count: {}", global_object_count);
-    //     println!(
-    //         "Protected global object count: {}",
-    //         protected_global_object_count
-    //     );
-    //     println!("Object type counts: {:?}", object_type_counts);
-
-    //     // assert_eq!(heap_size, 0.0);
-    //     // assert_ne!(heap_capacity, 0.0);
-    //     // assert_eq!(extra_memory_size, 0.0);
-    //     // assert_eq!(object_count, 0.0);
-    //     assert!(object_type_counts.is_object());
-
-    //     let object_property_names = object_type_counts.get_property_names();
-    //     assert!(!object_property_names.collect::<Vec<JSString>>().is_empty());
-    // }
+        println!("Heap size: {}", heap_size);
+        println!("Heap capacity: {}", heap_capacity);
+        println!("Extra memory size: {}", extra_memory_size);
+        println!("Object count: {}", object_count);
+        println!("Protected object count: {}", protected_object_count);
+        println!("Global object count: {}", global_object_count);
+        println!(
+            "Protected global object count: {}",
+            protected_global_object_count
+        );
+    }
 }
