@@ -1,0 +1,9 @@
+WebKit/LayoutTests
+**/*.o
+**/*.a
+.git
+WebKit/**/CMakeCache.txt
+WebKit/CMakeCache.txt
+WebKit/WebKitBuild
+WebKit/Websites
+WebKit/WebDriverTests

@@ -1,0 +1,73 @@
+# Use an Alpine base image for musl support
+FROM alpine:3.18 as builder
+
+# Set the working directory
+WORKDIR /usr/src/app
+
+# Install required packages
+RUN apk add --no-cache \
+    cmake \
+    ninja \
+    icu-dev \
+    g++ \
+    make \
+    python3 \
+    libatomic \
+    libc-dev \
+    ruby \
+    bison \
+    flex \
+    perl \
+    file
+
+# Set environment variable for C++ compiler
+ENV CXX /usr/bin/g++
+
+# Clone the WebKit repository
+COPY ./WebKit ./WebKit
+
+# Set the working directory to the WebKit directory
+WORKDIR /usr/src/app/WebKit
+
+# Ensure the build-webkit script is executable
+RUN chmod +x Tools/Scripts/build-webkit
+
+# Build JavaScriptCore only as a static library for musl
+RUN Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
+
+# Move back to the main working directory
+WORKDIR /usr/src/app
+
+# Extract static libraries from JavaScriptCore
+RUN mkdir libs && \
+    cp /usr/src/app/WebKit/WebKitBuild/JSCOnly/Release/lib/*.a libs/
+
+
+FROM builder as build_icu
+
+RUN apk add --no-cache cpio curl icu-dev tar
+
+WORKDIR /icu-src
+
+RUN --mount=type=tmpfs,target=/icu-src; curl -L https://github.com/unicode-org/icu/releases/download/release-73-1/icu4c-73_1-src.tgz > icu4c-73_1-src.tgz && \
+    tar -xzf icu4c-73_1-src.tgz && \
+    rm icu4c-73_1-src.tgz && \
+    cd icu/source && \
+    ./configure --enable-static --disable-shared && \
+    make -j$(nproc) && \
+    mkdir -p /icu && \
+    cp -r lib/*.a /icu
+
+FROM scratch
+
+COPY --from=builder /usr/src/app/libs/libJavaScriptCore.a /
+COPY --from=builder /usr/src/app/libs/libWTF.a /
+COPY --from=builder /usr/src/app/libs/libbmalloc.a /
+COPY --from=builder /usr/lib/libstdc++.a /
+COPY --from=builder /usr/lib/libdl.a /
+# COPY --from=builder /usr/lib/libicui18n.a /
+# COPY --from=builder /usr/lib/libicuuc.a /
+# COPY --from=builder /usr/lib/libicudata.a /
+COPY --from=build_icu /icu/*.a /
+COPY --from=builder /usr/lib/libatomic.a /
+# COPY --from=builder /usr/lib/gcc/x86_64-alpine-linux-musl/12.2.1/libatomic.a /

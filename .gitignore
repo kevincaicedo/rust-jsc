@@ -10,3 +10,5 @@ target
 public
 .DS_Store
 .vscode
+.libs-arm
+.libs-musl

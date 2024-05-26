@@ -30,6 +30,30 @@ build-docker-jsc:
 	fi
 	DOCKER_BUILDKIT=1 docker build -o ./.libs -t $(IMAGE_NAME) .
 
+# Build the Docker image
+build-docker-jsc-musl:
+# Check if WebKit submodule is initialized otherwise initialize it
+	@if [ ! -d "WebKit" ]; then \
+		git submodule update --init --recursive; \
+	fi
+# if .libs directory does not exist, create it
+	@if [ ! -d ".libs-musl" ]; then \
+		mkdir .libs-musl; \
+	fi
+	DOCKER_BUILDKIT=1 docker build -o ./.libs-musl -t "$(IMAGE_NAME)-musl" -f Dockerfile.musl .
+
+# Build the Docker image
+build-docker-jsc-arm:
+# Check if WebKit submodule is initialized otherwise initialize it
+	@if [ ! -d "WebKit" ]; then \
+		git submodule update --init --recursive; \
+	fi
+# if .libs directory does not exist, create it
+	@if [ ! -d ".libs-arm" ]; then \
+		mkdir .libs-arm; \
+	fi
+	DOCKER_BUILDKIT=1 docker build -o ./.libs-arm -t "$(IMAGE_NAME)-arm" -f Dockerfile.arm .
+
 build-jsc:
 # Check if WebKit submodule is initialized otherwise initialize it
 	@if [ ! -d "WebKit/Tools" ]; then \
