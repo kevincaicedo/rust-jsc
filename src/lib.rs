@@ -38,6 +38,9 @@ pub use rust_jsc_macros::*;
 #[doc(hidden)]
 pub use rust_jsc_sys as internal;
 
+// re export JSAPIModuleLoader from rust_jsc_sys as JSModuleLoader
+pub use rust_jsc_sys::JSAPIModuleLoader as JSModuleLoader;
+
 /// A JavaScript context.
 pub struct JSContext {
     pub(crate) inner: JSGlobalContextRef,
@@ -248,9 +251,17 @@ pub struct JSError {
 }
 
 /// A JavaScript string.
+/// This struct is used to retain a reference to a JavaScript string.
+/// It will release the string when it goes out of scope.
 pub struct JSString {
     pub(crate) inner: JSStringRef,
 }
+
+/// A JavaScript string reference.
+/// This struct is used to retain a reference to a JavaScript string.
+/// It won't release the string when it goes out of scope.
+/// To release the string, use the `release` method.
+pub struct JSStringRetain(JSStringRef);
 
 pub type JSResult<T> = Result<T, JSError>;
 

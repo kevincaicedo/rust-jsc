@@ -13,7 +13,7 @@ use rust_jsc_sys::{
 };
 
 use crate::{
-    JSContext, JSError, JSObject, JSResult, JSString, JSValue, PropertyDescriptor,
+    JSContext, JSError, JSObject, JSResult, JSString, JSValue, PrivateData, PropertyDescriptor
 };
 
 pub struct JSPropertyNameIter {
@@ -688,6 +688,16 @@ impl JSObject {
         }
 
         Some(unsafe { Box::from_raw(data_ptr as *mut T) })
+    }
+
+    pub fn get_private_data_ptr(&self) -> Option<PrivateData> {
+        let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
+
+        if data_ptr.is_null() {
+            return None;
+        }
+
+        Some(data_ptr)
     }
 
     /// Tests whether an object is a constructor.

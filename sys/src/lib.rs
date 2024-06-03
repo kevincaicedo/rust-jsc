@@ -149,6 +149,7 @@ pub const __MAC_14_1: u32 = 140100;
 pub const __MAC_14_2: u32 = 140200;
 pub const __MAC_14_3: u32 = 140300;
 pub const __MAC_14_4: u32 = 140400;
+pub const __MAC_14_5: u32 = 140500;
 pub const __IPHONE_2_0: u32 = 20000;
 pub const __IPHONE_2_1: u32 = 20100;
 pub const __IPHONE_2_2: u32 = 20200;
@@ -227,6 +228,7 @@ pub const __IPHONE_17_1: u32 = 170100;
 pub const __IPHONE_17_2: u32 = 170200;
 pub const __IPHONE_17_3: u32 = 170300;
 pub const __IPHONE_17_4: u32 = 170400;
+pub const __IPHONE_17_5: u32 = 170500;
 pub const __WATCHOS_1_0: u32 = 10000;
 pub const __WATCHOS_2_0: u32 = 20000;
 pub const __WATCHOS_2_1: u32 = 20100;
@@ -273,6 +275,7 @@ pub const __WATCHOS_10_1: u32 = 100100;
 pub const __WATCHOS_10_2: u32 = 100200;
 pub const __WATCHOS_10_3: u32 = 100300;
 pub const __WATCHOS_10_4: u32 = 100400;
+pub const __WATCHOS_10_5: u32 = 100500;
 pub const __TVOS_9_0: u32 = 90000;
 pub const __TVOS_9_1: u32 = 90100;
 pub const __TVOS_9_2: u32 = 90200;
@@ -320,6 +323,7 @@ pub const __TVOS_17_1: u32 = 170100;
 pub const __TVOS_17_2: u32 = 170200;
 pub const __TVOS_17_3: u32 = 170300;
 pub const __TVOS_17_4: u32 = 170400;
+pub const __TVOS_17_5: u32 = 170500;
 pub const __BRIDGEOS_2_0: u32 = 20000;
 pub const __BRIDGEOS_3_0: u32 = 30000;
 pub const __BRIDGEOS_3_1: u32 = 30100;
@@ -345,6 +349,7 @@ pub const __BRIDGEOS_8_1: u32 = 80100;
 pub const __BRIDGEOS_8_2: u32 = 80200;
 pub const __BRIDGEOS_8_3: u32 = 80300;
 pub const __BRIDGEOS_8_4: u32 = 80400;
+pub const __BRIDGEOS_8_5: u32 = 80500;
 pub const __DRIVERKIT_19_0: u32 = 190000;
 pub const __DRIVERKIT_20_0: u32 = 200000;
 pub const __DRIVERKIT_21_0: u32 = 210000;
@@ -357,8 +362,10 @@ pub const __DRIVERKIT_23_1: u32 = 230100;
 pub const __DRIVERKIT_23_2: u32 = 230200;
 pub const __DRIVERKIT_23_3: u32 = 230300;
 pub const __DRIVERKIT_23_4: u32 = 230400;
+pub const __DRIVERKIT_23_5: u32 = 230500;
 pub const __VISIONOS_1_0: u32 = 10000;
 pub const __VISIONOS_1_1: u32 = 10100;
+pub const __VISIONOS_1_2: u32 = 10200;
 pub const MAC_OS_X_VERSION_10_0: u32 = 1000;
 pub const MAC_OS_X_VERSION_10_1: u32 = 1010;
 pub const MAC_OS_X_VERSION_10_2: u32 = 1020;
@@ -419,6 +426,7 @@ pub const MAC_OS_VERSION_14_1: u32 = 140100;
 pub const MAC_OS_VERSION_14_2: u32 = 140200;
 pub const MAC_OS_VERSION_14_3: u32 = 140300;
 pub const MAC_OS_VERSION_14_4: u32 = 140400;
+pub const MAC_OS_VERSION_14_5: u32 = 140500;
 pub const MAC_OS_X_VERSION_MAX_ALLOWED: u32 = 140000;
 pub const __API_TO_BE_DEPRECATED: u32 = 100000;
 pub const __API_TO_BE_DEPRECATED_MACOS: u32 = 100000;
@@ -428,7 +436,7 @@ pub const __API_TO_BE_DEPRECATED_WATCHOS: u32 = 100000;
 pub const __API_TO_BE_DEPRECATED_TVOS: u32 = 100000;
 pub const __API_TO_BE_DEPRECATED_DRIVERKIT: u32 = 100000;
 pub const __API_TO_BE_DEPRECATED_VISIONOS: u32 = 100000;
-pub const __MAC_OS_X_VERSION_MAX_ALLOWED: u32 = 140400;
+pub const __MAC_OS_X_VERSION_MAX_ALLOWED: u32 = 140500;
 pub const __ENABLE_LEGACY_MAC_AVAILABILITY: u32 = 1;
 pub const __AVAILABILITY_MACROS_USES_AVAILABILITY: u32 = 1;
 pub const __IPHONE_COMPAT_VERSION: u32 = 40000;
@@ -2258,6 +2266,7 @@ pub const CPUFAMILY_ARM_IBIZA: u32 = 4197663070;
 pub const CPUFAMILY_ARM_PALMA: u32 = 1912690738;
 pub const CPUFAMILY_ARM_COLL: u32 = 678884789;
 pub const CPUFAMILY_ARM_LOBOS: u32 = 1598941843;
+pub const CPUFAMILY_ARM_DONAN: u32 = 1867590060;
 pub const CPUSUBFAMILY_UNKNOWN: u32 = 0;
 pub const CPUSUBFAMILY_ARM_HP: u32 = 1;
 pub const CPUSUBFAMILY_ARM_HG: u32 = 2;
@@ -2402,6 +2411,8 @@ pub const __COREFOUNDATION_CFXMLNODE__: u32 = 1;
 pub const __CFXMLNode_DEPRECATION_MSG : & [u8 ; 83] = b"CFXMLNode is deprecated, use NSXMLParser, NSXMLDocument or libxml2 library instead\0" ;
 pub const __COREFOUNDATION_CFXMLPARSER__: u32 = 1;
 pub const __CFXMLParser_DEPRECATION_MSG : & [u8 ; 85] = b"CFXMLParser is deprecated, use NSXMLParser, NSXMLDocument or libxml2 library instead\0" ;
+pub type wchar_t = ::std::os::raw::c_int;
+pub type max_align_t = f64;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct OpaqueJSContextGroup {
@@ -2462,6 +2473,126 @@ pub struct OpaqueJSValue {
 pub type JSValueRef = *const OpaqueJSValue;
 #[doc = " @typedef JSObjectRef A JavaScript object. A JSObject is a JSValue."]
 pub type JSObjectRef = *mut OpaqueJSValue;
+#[doc = "@typedef JSModuleLoaderResolve\n@abstract The callback invoked when resolving a module specifier.\n@param ctx The execution context to use.\n@param keyValue A JSValue containing the module specifier to resolve.\n@param referrerValue A JSValue containing the referrer URL.\n@param scriptFetcher A JSValue containing the script fetcher.\n@result A JSString containing the resolved module specifier."]
+pub type JSModuleLoaderResolve = ::std::option::Option<
+    unsafe extern "C" fn(
+        ctx: JSContextRef,
+        keyValue: JSValueRef,
+        referrerValue: JSValueRef,
+        scriptFetcher: JSValueRef,
+    ) -> JSStringRef,
+>;
+#[doc = "@typedef JSModuleLoaderEvaluate\n@abstract The callback invoked when evaluating a module.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier to evaluate.\n@param scriptFetcher A JSValue containing the script fetcher.\n@param sentValue A JSValue containing the value to send to the module.\n@param resumeMode A JSValue containing the resume mode.\n@result A JSValue containing the result of evaluating the module."]
+pub type JSModuleLoaderEvaluate = ::std::option::Option<
+    unsafe extern "C" fn(ctx: JSContextRef, key: JSValueRef) -> JSValueRef,
+>;
+#[doc = "@typedef JSModuleLoaderFetch\n@abstract The callback invoked when fetching a module.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier to fetch.\n@param attributesValue A JSValue containing the attributes.\n@param scriptFetcher A JSValue containing the script fetcher.\n@result A JSStringRef containing the fetched module."]
+pub type JSModuleLoaderFetch = ::std::option::Option<
+    unsafe extern "C" fn(
+        ctx: JSContextRef,
+        key: JSValueRef,
+        attributesValue: JSValueRef,
+        scriptFetcher: JSValueRef,
+    ) -> JSStringRef,
+>;
+#[doc = "@typedef JSModuleLoaderCreateImportMetaProperties\n@abstract The callback invoked when creating import meta properties.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier.\n@param scriptFetcher A JSValue containing the script fetcher.\n@result A JSObjectRef containing the import meta properties."]
+pub type JSModuleLoaderCreateImportMetaProperties = ::std::option::Option<
+    unsafe extern "C" fn(
+        ctx: JSContextRef,
+        key: JSValueRef,
+        scriptFetcher: JSValueRef,
+    ) -> JSObjectRef,
+>;
+#[doc = "@struct JSAPIModuleLoader\n@abstract The callbacks used to load and evaluate modules.\n@field moduleLoaderResolve The callback used to resolve a module specifier.\n@field moduleLoaderEvaluate The callback used to evaluate a module.\n@field moduleLoaderFetch The callback used to fetch a module."]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct JSAPIModuleLoader {
+    pub disableBuiltinFileSystemLoader: bool,
+    pub moduleLoaderResolve: JSModuleLoaderResolve,
+    pub moduleLoaderEvaluate: JSModuleLoaderEvaluate,
+    pub moduleLoaderFetch: JSModuleLoaderFetch,
+    pub moduleLoaderCreateImportMetaProperties: JSModuleLoaderCreateImportMetaProperties,
+}
+#[test]
+fn bindgen_test_layout_JSAPIModuleLoader() {
+    const UNINIT: ::std::mem::MaybeUninit<JSAPIModuleLoader> =
+        ::std::mem::MaybeUninit::uninit();
+    let ptr = UNINIT.as_ptr();
+    assert_eq!(
+        ::std::mem::size_of::<JSAPIModuleLoader>(),
+        40usize,
+        concat!("Size of: ", stringify!(JSAPIModuleLoader))
+    );
+    assert_eq!(
+        ::std::mem::align_of::<JSAPIModuleLoader>(),
+        8usize,
+        concat!("Alignment of ", stringify!(JSAPIModuleLoader))
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).disableBuiltinFileSystemLoader) as usize
+                - ptr as usize
+        },
+        0usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSAPIModuleLoader),
+            "::",
+            stringify!(disableBuiltinFileSystemLoader)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).moduleLoaderResolve) as usize - ptr as usize
+        },
+        8usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSAPIModuleLoader),
+            "::",
+            stringify!(moduleLoaderResolve)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).moduleLoaderEvaluate) as usize - ptr as usize
+        },
+        16usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSAPIModuleLoader),
+            "::",
+            stringify!(moduleLoaderEvaluate)
+        )
+    );
+    assert_eq!(
+        unsafe { ::std::ptr::addr_of!((*ptr).moduleLoaderFetch) as usize - ptr as usize },
+        24usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSAPIModuleLoader),
+            "::",
+            stringify!(moduleLoaderFetch)
+        )
+    );
+    assert_eq!(
+        unsafe {
+            ::std::ptr::addr_of!((*ptr).moduleLoaderCreateImportMetaProperties) as usize
+                - ptr as usize
+        },
+        32usize,
+        concat!(
+            "Offset of field: ",
+            stringify!(JSAPIModuleLoader),
+            "::",
+            stringify!(moduleLoaderCreateImportMetaProperties)
+        )
+    );
+}
+extern "C" {
+    #[doc = "@function JSSetAPIModuleLoader\n@abstract Sets the moduleLoader used to load and evaluate modules.\n@param ctx The execution context to use.\n@param moduleLoader A JSAPIModuleLoader structure containing the callbacks to use."]
+    pub fn JSSetAPIModuleLoader(ctx: JSContextRef, moduleLoader: JSAPIModuleLoader);
+}
 extern "C" {
     #[doc = "@function JSEvaluateScript\n@abstract Evaluates a string of JavaScript.\n@param ctx The execution context to use.\n@param script A JSString containing the script to evaluate.\n@param thisObject The object to use as \"this,\" or NULL to use the global object as \"this.\"\n@param sourceURL A JSString containing a URL for the script's source file. This is used by debuggers and when reporting exceptions. Pass NULL if you do not care to include source file information.\n@param startingLineNumber An integer value specifying the script's starting line number in the file located at sourceURL. This is only used when reporting exceptions. The value is one-based, so the first line is line 1 and invalid values are clamped to 1.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result The JSValue that results from evaluating script, or NULL if an exception is thrown."]
     pub fn JSEvaluateScript(
@@ -2479,6 +2610,49 @@ extern "C" {
         ctx: JSContextRef,
         filename: JSStringRef,
         exception: *mut JSValueRef,
+    );
+}
+extern "C" {
+    #[doc = "@function JSLoadAndEvaluateModuleFromSource\n@abstract Evaluates a string of JavaScript as a module.\n@param ctx The execution context to use.\n@param module A JSString containing the module code to evaluate.\n@param sourceURLString A JSString containing a URL for the script's source file. This is used by debuggers and when reporting exceptions. Pass NULL if you do not care to include source file information.\n@param startingLineNumber An integer value specifying the script's starting line number in the file located at sourceURL. This is only used when reporting exceptions. The value is one-based, so the first line is line 1 and invalid values are clamped to 1.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception."]
+    pub fn JSLoadAndEvaluateModuleFromSource(
+        ctx: JSContextRef,
+        module: JSStringRef,
+        sourceURLString: JSStringRef,
+        startingLineNumber: ::std::os::raw::c_int,
+        exception: *mut JSValueRef,
+    );
+}
+extern "C" {
+    #[doc = "@function JSLoadModule\n@abstract Loads a module.\n@param ctx The execution context to use.\n@param moduleKey A JSString containing the module key to load.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception."]
+    pub fn JSLoadModule(
+        ctx: JSContextRef,
+        moduleKey: JSStringRef,
+        exception: *mut JSValueRef,
+    );
+}
+extern "C" {
+    #[doc = "@function JSLoadModuleFromSource\n@abstract Loads a module from a string of JavaScript.\n@param ctx The execution context to use.\n@param module A JSString containing the module code to load.\n@param sourceURLString A JSString containing a URL for the script's source file. This is used by debuggers and when reporting exceptions. Pass NULL if you do not care to include source file information.\n@param startingLineNumber An integer value specifying the script's starting line number in the file located at sourceURL. This is only used when reporting exceptions. The value is one-based, so the first line is line 1 and invalid values are clamped to 1.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception."]
+    pub fn JSLoadModuleFromSource(
+        ctx: JSContextRef,
+        module: JSStringRef,
+        sourceURLString: JSStringRef,
+        startingLineNumber: ::std::os::raw::c_int,
+        exception: *mut JSValueRef,
+    );
+}
+extern "C" {
+    #[doc = "@function JSLinkAndEvaluateModule\n@abstract Links and evaluates a module.\n@param ctx The execution context to use.\n@param moduleKey A JSString containing the module key to link and evaluate.\n@result The JSValue that results from evaluating the module, or NULL if an exception is thrown."]
+    pub fn JSLinkAndEvaluateModule(
+        ctx: JSContextRef,
+        moduleKey: JSStringRef,
+    ) -> JSValueRef;
+}
+extern "C" {
+    #[doc = "@function JSSetSyntheticModuleKeys\n@abstract Sets the synthetic module keys.\n@param ctx The execution context to use.\n@param argumentCount The number of keys.\n@param keys An array of JSString containing the keys.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception."]
+    pub fn JSSetSyntheticModuleKeys(
+        ctx: JSContextRef,
+        argumentCount: usize,
+        keys: *const JSStringRef,
     );
 }
 extern "C" {
@@ -3260,7 +3434,6 @@ pub type __darwin_wctrans_t = ::std::os::raw::c_int;
 pub type __darwin_wctype_t = __uint32_t;
 pub type ct_rune_t = __darwin_ct_rune_t;
 pub type rune_t = __darwin_rune_t;
-pub type wchar_t = __darwin_wchar_t;
 pub type wint_t = __darwin_wint_t;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -6323,7 +6496,6 @@ extern "C" {
         arg3: *mut sigvec,
     ) -> ::std::os::raw::c_int;
 }
-pub type max_align_t = f64;
 extern "C" {
     pub fn renameat(
         arg1: ::std::os::raw::c_int,

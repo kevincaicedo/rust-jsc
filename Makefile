@@ -18,6 +18,9 @@ test:
 all-tests:
 	cargo test
 
+run-example:
+	(cd examples/hello_world && cargo run)
+
 # Build the Docker image
 build-docker-jsc:
 # Check if WebKit submodule is initialized otherwise initialize it
@@ -65,7 +68,7 @@ build-jsc:
 			brew install cmake; \
 		fi; \
 	fi
-	WebKit/Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF"
+	WebKit/Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF"
 
 # (cd examples/hello_world && cargo build --release &> output.txt)
 # archive all *.a files from JSOnly build receive the name libjsc-<platform>.a.gz, platforn is a parameter

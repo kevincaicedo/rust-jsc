@@ -1,4 +1,4 @@
-local/*
+local
 tmp/*
 .tmp
 *.log
@@ -12,3 +12,4 @@ public
 .vscode
 .libs-arm
 .libs-musl
+libjsc*.gz

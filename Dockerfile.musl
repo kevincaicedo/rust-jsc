@@ -33,7 +33,7 @@ WORKDIR /usr/src/app/WebKit
 RUN chmod +x Tools/Scripts/build-webkit
 
 # Build JavaScriptCore only as a static library for musl
-RUN Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
+RUN Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DUSE_THIN_ARCHIVES=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
 
 # Move back to the main working directory
 WORKDIR /usr/src/app

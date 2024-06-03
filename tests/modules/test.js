@@ -1,6 +1,8 @@
 import { myFunction } from './script.js';
 import './script2.js';
-// import * as data from './test.json';
+import data from './test.json';
+
+console.log(`Data : ${JSON.stringify(data)}`);
 
 console.log("Meta Inf :", import.meta.filename, import.meta.path, import.meta.main);
 
@@ -26,3 +28,5 @@ try {
 } catch (error) {
     console.log(error);
 }
+
+globalThis.message = myFunction();

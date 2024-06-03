@@ -43,7 +43,7 @@ RUN chmod +x Tools/Scripts/build-webkit
 # RUN perl -v && head -n 1 Tools/Scripts/build-webkit
 
 # Build JavaScriptCore only as a static library
-RUN Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF"
+RUN Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF -DENABLE_REMOTE_INSPECTOR=ON"
 
 # Move back to the main working directory
 WORKDIR /usr/src/app

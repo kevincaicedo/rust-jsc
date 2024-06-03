@@ -232,3 +232,158 @@ pub fn has_instance(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
+
+#[proc_macro_attribute]
+pub fn module_resolve(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __key_value: rust_jsc::internal::JSValueRef,
+            __referrer: rust_jsc::internal::JSValueRef,
+            __script_fetcher: rust_jsc::internal::JSValueRef,
+        ) -> *mut rust_jsc::internal::OpaqueJSString
+        #where_clause {
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
+            let referrer = rust_jsc::JSValue::new(__referrer, __ctx_ref);
+            let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
+
+            let func: fn(
+                rust_jsc::JSContext,
+                rust_jsc::JSValue,
+                rust_jsc::JSValue,
+                rust_jsc::JSValue,
+            ) -> rust_jsc::JSStringRetain = {
+                #input
+
+                #fn_name ::<#generic_params>
+            };
+
+            let result = func(ctx, key_value, referrer, script_fetcher);
+            rust_jsc::internal::JSStringRef::from(result)
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn module_evaluate(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __key_value: rust_jsc::internal::JSValueRef,
+        ) -> *const rust_jsc::internal::OpaqueJSValue
+        #where_clause {
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
+
+            let func: fn(
+                rust_jsc::JSContext,
+                rust_jsc::JSValue,
+            ) -> rust_jsc::JSValue = {
+                #input
+
+                #fn_name ::<#generic_params>
+            };
+
+            let result = func(ctx, key_value);
+            result.into()
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn module_fetch(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __key_value: rust_jsc::internal::JSValueRef,
+            __attributes_value: rust_jsc::internal::JSValueRef,
+            __script_fetcher: rust_jsc::internal::JSValueRef,
+        ) -> *mut rust_jsc::internal::OpaqueJSString
+        #where_clause {
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
+            let attributes_value = rust_jsc::JSValue::new(__attributes_value, __ctx_ref);
+            let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
+
+            let func: fn(
+                rust_jsc::JSContext,
+                rust_jsc::JSValue,
+                rust_jsc::JSValue,
+                rust_jsc::JSValue,
+            ) -> rust_jsc::JSStringRetain = {
+                #input
+
+                #fn_name ::<#generic_params>
+            };
+
+            let result = func(ctx, key_value, attributes_value, script_fetcher);
+            rust_jsc::internal::JSStringRef::from(result)
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn module_import_meta(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __key_value: rust_jsc::internal::JSValueRef,
+            __script_fetcher: rust_jsc::internal::JSValueRef,
+        ) -> *mut rust_jsc::internal::OpaqueJSValue
+        #where_clause {
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
+            let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
+
+            let func: fn(
+                rust_jsc::JSContext,
+                rust_jsc::JSValue,
+                rust_jsc::JSValue,
+            ) -> rust_jsc::JSObject = {
+                #input
+
+                #fn_name ::<#generic_params>
+            };
+
+            let result = func(ctx, key_value, script_fetcher);
+            rust_jsc::internal::JSObjectRef::from(result)
+        }
+    };
+
+    TokenStream::from(expanded)
+}

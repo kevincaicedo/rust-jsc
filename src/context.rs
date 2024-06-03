@@ -1,15 +1,21 @@
 use rust_jsc_sys::{
-    JSCheckScriptSyntax, JSContextGetGlobalContext, JSContextGetGlobalObject,
-    JSContextGetGroup, JSContextGetSharedData, JSContextGroupCreate, JSContextGroupRef,
-    JSContextGroupRelease, JSContextRef, JSContextSetSharedData, JSEvaluateScript,
-    JSGarbageCollect, JSGetMemoryUsageStatistics, JSGlobalContextCopyName,
-    JSGlobalContextCreate, JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable,
-    JSGlobalContextRef, JSGlobalContextRelease, JSGlobalContextRetain,
-    JSGlobalContextSetInspectable, JSGlobalContextSetName,
-    JSGlobalContextSetUnhandledRejectionCallback, JSLoadAndEvaluateModule, JSValueRef,
+    JSAPIModuleLoader, JSCheckScriptSyntax, JSContextGetGlobalContext,
+    JSContextGetGlobalObject, JSContextGetGroup, JSContextGetSharedData,
+    JSContextGroupCreate, JSContextGroupRef, JSContextGroupRelease, JSContextRef,
+    JSContextSetSharedData, JSEvaluateScript, JSGarbageCollect,
+    JSGetMemoryUsageStatistics, JSGlobalContextCopyName, JSGlobalContextCreate,
+    JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable, JSGlobalContextRef,
+    JSGlobalContextRelease, JSGlobalContextRetain, JSGlobalContextSetInspectable,
+    JSGlobalContextSetName, JSGlobalContextSetUnhandledRejectionCallback,
+    JSLinkAndEvaluateModule, JSLoadAndEvaluateModule, JSLoadAndEvaluateModuleFromSource,
+    JSLoadModule, JSLoadModuleFromSource, JSSetAPIModuleLoader, JSSetSyntheticModuleKeys,
+    JSStringRef, JSValueRef,
 };
 
-use crate::{JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSValue};
+use crate::{
+    JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSStringRetain,
+    JSValue,
+};
 
 impl JSContextGroup {
     pub fn new_context(&self) -> JSContext {
@@ -263,6 +269,203 @@ impl JSContext {
         Ok(())
     }
 
+    /// Loads a module.
+    /// The module is loaded using the module loader set for the context.
+    /// LoadModule:
+    ///     - Fetches the module source text.
+    ///     - Parses the module source text.
+    ///     - Requests dependencies.
+    ///
+    /// a new entry will be added to the registry with all dependencies satisfied.
+    ///
+    /// # Arguments
+    /// - `key`: The key of the module.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// let result = ctx.load_module("test");
+    /// assert!(result.is_ok());
+    /// ```
+    pub fn load_module(&self, key: &str) -> JSResult<()> {
+        let module_key: JSString = key.into();
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        unsafe { JSLoadModule(self.inner, module_key.inner, &mut exception) };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.inner);
+            return Err(value.into());
+        }
+
+        Ok(())
+    }
+
+    /// Links and evaluates a module.
+    /// https://262.ecma-international.org/6.0/#sec-moduledeclarationinstantiation
+    /// The module is linked and evaluated using the module loader set for the context.
+    ///
+    /// LinkAndEvaluateModule:
+    ///     - Initialize a new module environment.
+    ///     - Ensure all the indirect exports are correctly resolved to unique bindings.
+    ///     - Instantiate namespace objects and initialize the bindings with them if required.
+    ///     - Initialize heap allocated function declarations.
+    ///     - Initialize heap allocated variable declarations.
+    ///     - link namespace objects to the module environment.
+    ///     - set the module environment to the global environment.
+    ///     - Evaluate the module.
+    ///
+    /// # Arguments
+    /// - `key`: The key of the module.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// let result = ctx.link_and_evaluate_module("test");
+    /// assert!(result.is_undefined());
+    /// ```
+    pub fn link_and_evaluate_module(&self, key: &str) -> JSValue {
+        let module_key: JSString = key.into();
+        let result = unsafe { JSLinkAndEvaluateModule(self.inner, module_key.inner) };
+
+        JSValue::new(result, self.inner)
+    }
+
+    /// Loads a module from source.
+    /// The module is loaded using the module loader set for the context.
+    ///
+    /// # Arguments
+    /// - `source`: The source of the module.
+    /// - `source_url`: The URL of the source.
+    /// - `starting_line_number`: The line number to start parsing the source.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// let result = ctx.load_module_from_source("console.log('Hello, World!')", "test.js", 0);
+    /// assert!(result.is_ok());
+    /// ```
+    #[allow(dead_code)]
+    fn load_module_from_source(
+        &self,
+        source: &str,
+        source_url: &str,
+        starting_line_number: i32,
+    ) -> JSResult<()> {
+        let source: JSString = source.into();
+        let source_url: JSString = source_url.into();
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        unsafe {
+            JSLoadModuleFromSource(
+                self.inner,
+                source.inner,
+                source_url.inner,
+                starting_line_number,
+                &mut exception,
+            )
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.inner);
+            return Err(value.into());
+        }
+
+        Ok(())
+    }
+
+    /// Evaluates a module from source.
+    /// The module is evaluated using the module loader set for the context.
+    ///
+    /// # Arguments
+    /// - `source`: The source of the module.
+    /// - `source_url`: The URL of the source.
+    /// - `starting_line_number`: The line number to start parsing the source.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// let result = ctx.evaluate_module_from_source("console.log('Hello, World!')", "test.js", 0);
+    /// assert!(result.is_ok());
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a `JSError` if the module has a syntax error.
+    #[allow(dead_code)]
+    fn evaluate_module_from_source(
+        &self,
+        source: &str,
+        source_url: &str,
+        starting_line_number: i32,
+    ) -> JSResult<()> {
+        let source: JSString = source.into();
+        let source_url: JSString = source_url.into();
+        let mut exception: JSValueRef = std::ptr::null_mut();
+
+        unsafe {
+            JSLoadAndEvaluateModuleFromSource(
+                self.inner,
+                source.inner,
+                source_url.inner,
+                starting_line_number,
+                &mut exception,
+            )
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.inner);
+            return Err(value.into());
+        }
+
+        Ok(())
+    }
+
+    /// Sets the module loader for a context.
+    /// The module loader is used to load modules when evaluating a module.
+    /// The module loader is called with the module key and the context.
+    /// All fn pointers must be provided. so that the module loader can be used.
+    ///
+    /// # Arguments
+    /// - `module_loader`: A module loader.
+    pub fn set_module_loader(&self, module_loader: JSAPIModuleLoader) {
+        unsafe { JSSetAPIModuleLoader(self.inner, module_loader) };
+    }
+
+    /// Sets the keys for all virtual modules.
+    /// The keys are used to identify virtual modules when loading modules.
+    ///
+    /// # Arguments
+    /// - `keys`: An array of keys.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rust_jsc::{JSContext, JSStringRetain};
+    ///
+    /// let ctx = JSContext::new();
+    /// let keys = &[
+    ///    JSStringRetain::from("@rust-jsc"),
+    /// ];
+    /// ctx.set_virtual_module_keys(keys);
+    /// ```
+    pub fn set_virtual_module_keys(&self, keys: &[JSStringRetain]) {
+        let keys: Vec<JSStringRef> = keys.iter().map(|key| key.0).collect();
+        unsafe {
+            JSSetSyntheticModuleKeys(self.inner, keys.len(), keys.as_ptr());
+        };
+    }
+
     /// Evaluates a JavaScript script.
     ///
     /// # Arguments
@@ -318,7 +521,7 @@ impl JSContext {
     ///
     /// let ctx = JSContext::new();
     /// let is_inspectable = ctx.is_inspectable();
-    /// assert_eq!(is_inspectable, false);
+    /// assert_eq!(is_inspectable, true);
     /// ```
     ///
     /// # Returns
@@ -466,6 +669,81 @@ mod tests {
     // use std::mem::ManuallyDrop;
 
     use super::*;
+    use crate::{self as rust_jsc};
+
+    use rust_jsc_macros::*;
+
+    #[module_resolve]
+    fn module_loader_resolve_virtual(
+        _ctx: JSContext,
+        _key: JSValue,
+        _referrer: JSValue,
+        _script_fetcher: JSValue,
+    ) -> JSStringRetain {
+        // let key_value = key.as_string().unwrap();
+        JSStringRetain::from("@rust-jsc")
+    }
+
+    #[module_evaluate]
+    fn module_loader_evaluate_virtual(ctx: JSContext, _key: JSValue) -> JSValue {
+        let object = JSObject::new(&ctx);
+        let keydata = JSValue::string(&ctx, "name");
+        let value = JSValue::string(&ctx, "John Doe");
+        object.set(&keydata, &value, Default::default()).unwrap();
+
+        object.into()
+    }
+
+    #[module_resolve]
+    fn module_loader_resolve_non_virtual(
+        _ctx: JSContext,
+        key: JSValue,
+        _referrer: JSValue,
+        _script_fetcher: JSValue,
+    ) -> JSStringRetain {
+        let key_value = key.as_string().unwrap();
+        // resolve path to file system
+        let test_module_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/modules");
+        // module key can start with ./ or ../
+        let path = std::path::Path::new(test_module_dir).join(key_value.to_string());
+        let module_path = std::fs::canonicalize(path).unwrap();
+
+        JSStringRetain::from(module_path.to_str().unwrap())
+    }
+
+    #[module_fetch]
+    fn module_loader_fetch(
+        _ctx: JSContext,
+        _key: JSValue,
+        _attributes_value: JSValue,
+        _script_fetcher: JSValue,
+    ) -> JSStringRetain {
+        // read file content
+        let path_key = _key.as_string().unwrap().to_string();
+        println!("Path key: {:?}", path_key);
+        // check if the path is a file
+        let file_content = match std::fs::read_to_string(&path_key) {
+            Ok(content) => content,
+            Err(error) => {
+                unreachable!("Error reading file: {:?}", error);
+            }
+        };
+
+        JSStringRetain::from(file_content)
+    }
+
+    #[module_import_meta]
+    fn module_loader_create_import_meta_properties(
+        ctx: JSContext,
+        key: JSValue,
+        _script_fetcher: JSValue,
+    ) -> JSObject {
+        let object = JSObject::new(&ctx);
+        object
+            .set_property("url", &key, Default::default())
+            .unwrap();
+        object
+    }
 
     #[test]
     fn test_js_context() {
@@ -559,6 +837,69 @@ mod tests {
     //     let shared_data = ctx.get_shared_data::<i32>();
     //     assert!(shared_data.is_none());
     // }
+
+    #[test]
+    fn test_inspectable() {
+        let ctx = JSContext::new();
+        ctx.set_inspectable(true);
+        assert_eq!(ctx.is_inspectable(), true);
+    }
+
+    #[test]
+    fn test_virtual_module() {
+        let ctx = JSContext::new();
+        let keys = &[JSStringRetain::from("@rust-jsc")];
+        ctx.set_virtual_module_keys(keys);
+
+        let callbacks = JSAPIModuleLoader {
+            disableBuiltinFileSystemLoader: false,
+            moduleLoaderResolve: Some(module_loader_resolve_virtual),
+            moduleLoaderEvaluate: Some(module_loader_evaluate_virtual),
+            moduleLoaderFetch: Some(module_loader_fetch),
+            moduleLoaderCreateImportMetaProperties: Some(
+                module_loader_create_import_meta_properties,
+            ),
+        };
+        ctx.set_module_loader(callbacks);
+
+        let module_test_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/modules");
+        let test_dir = format!("{}/virtual_module.js", module_test_dir);
+        let result = ctx.evaluate_module(&test_dir);
+        assert!(result.is_ok());
+
+        let result = ctx.evaluate_script("lib.name", None);
+        
+        assert!(result.is_ok());
+        let result_value = result.unwrap();
+        assert_eq!(result_value.as_string().unwrap(), "John Doe");
+    }
+
+    #[test]
+    fn test_non_virtual_module() {
+        let ctx = JSContext::new();
+
+        let callbacks = JSAPIModuleLoader {
+            disableBuiltinFileSystemLoader: true,
+            moduleLoaderResolve: Some(module_loader_resolve_non_virtual),
+            moduleLoaderEvaluate: Some(module_loader_evaluate_virtual),
+            moduleLoaderFetch: Some(module_loader_fetch),
+            moduleLoaderCreateImportMetaProperties: Some(
+                module_loader_create_import_meta_properties,
+            ),
+        };
+        ctx.set_module_loader(callbacks);
+
+        let module_test_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/modules");
+        let test_dir = format!("{}/test.js", module_test_dir);
+        let result = ctx.evaluate_module(&test_dir);
+        assert!(result.is_ok());
+
+        let result = ctx.evaluate_script("message", None);
+        assert!(result.is_ok());
+
+        let result_value = result.unwrap();
+        assert_eq!(result_value.as_string().unwrap(), "Hello World KEDO");
+    }
 
     #[test]
     fn test_set_unhandled_rejection_callback() {

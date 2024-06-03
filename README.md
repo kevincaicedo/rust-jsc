@@ -3,13 +3,14 @@
 [![Crates.io](https://img.shields.io/crates/v/rust-jsc.svg)](https://crates.io/crates/rust-jsc)
 [![Docs.rs](https://docs.rs/rust_jsc/badge.svg)](https://docs.rs/rust_jsc)
 
-Rust-JSC is a Rust library that provides a low-level binding for the JavaScriptCore engine. It allows you to interact with JavaScript code from your Rust applications.
+Rust-JSC is a Rust library that provides a High-level binding for the JavaScriptCore engine. It allows you to interact with JavaScript code from your Rust applications.
 
 ## Features
 
-- Low-level binding to the JavaScriptCore engine
+- High-level binding to the JavaScriptCore engine
 - Extended API to interact with JavaScriptCore
-- Support for esmodules
+- Support for ES Modules
+- Support for rust native modules (Synthetic Modules)
 
 
 ## Installation
@@ -18,7 +19,7 @@ Add the following line to your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-rust_jsc = { version = "0.1.10" }
+rust_jsc = { version = "0.1.12" }
 ```
 
 # Usage
@@ -110,15 +111,96 @@ let attributes = PropertyDescriptorBuilder::new()
     .build();
 let function = JSFunction::callback(&ctx, Some("log"), Some(log_info));
 object
-    .set_property(&"log".into(), &function.into(), attributes)
+    .set_property("log", &function, attributes)
     .unwrap();
 
 global_object
-    .set_property(&"console".into(), &object.into(), attributes)
+    .set_property("console", &object, attributes)
     .unwrap();
 
 let result = ctx.evaluate_script("console.log('Hello, World!')", None);
 assert!(result.is_ok());
+```
+
+### Synthetic Modules
+
+```rust
+use rust_jsc::{
+    callback, module_evaluate, module_fetch, module_import_meta, module_resolve,
+    JSContext, JSFunction, JSObject, JSResult, JSString, JSStringRetain, JSValue, JSPromise,
+    PropertyDescriptorBuilder, JSModuleLoader, PropertyDescriptor,
+};
+
+#[module_resolve]
+fn module_loader_resolve(
+    ctx: JSContext,
+    key: JSValue,
+    referrer: JSValue,
+    script_fetcher: JSValue,
+) -> JSStringRetain {
+    JSStringRetain::from("@rust-jsc")
+}
+
+#[module_evaluate]
+fn module_loader_evaluate(
+    ctx: JSContext,
+    key: JSValue,
+) -> JSValue {
+
+    // Module Loader Evaluate
+    // is called only when evaluating Synthetic Modules
+    let object = JSObject::new(&ctx);
+    let keydata = JSValue::string(&ctx, "name");
+    let value = JSValue::string(&ctx, "John Doe");
+    object.set(&keydata, &value, PropertyDescriptor::default()).unwrap();
+
+    object.into()
+}
+
+#[module_fetch]
+fn module_loader_fetch(
+    ctx: JSContext,
+    key: JSValue,
+    attributes_value: JSValue,
+    script_fetcher: JSValue,
+) -> JSStringRetain {
+    // Module Loader Fetch
+    // fetch the content from file or network
+    JSStringRetain::from("let name = 'Kedojs'; export default name;")
+}
+
+#[module_import_meta]
+fn module_loader_create_import_meta_properties(
+    ctx: JSContext,
+    key: JSValue,
+    script_fetcher: JSValue,
+) -> JSObject {
+    let key_value = key.as_string().unwrap();
+
+    let object = JSObject::new(&ctx);
+    object.set_property("url", &key, Default::default()).unwrap();
+    object
+}
+
+fn main() {
+    let ctx = JSContext::new();
+    let global_object = ctx.global_object();
+
+    let module_loader = JSAPIModuleLoader {
+        // Disable the builtin file system loader
+        disableBuiltinFileSystemLoader: true,
+        moduleLoaderResolve: Some(module_loader_resolve),
+        moduleLoaderEvaluate: Some(module_loader_evaluate),
+        moduleLoaderFetch: Some(module_loader_fetch),
+        moduleLoaderCreateImportMetaProperties: Some(
+            module_loader_create_import_meta_properties,
+        ),
+    };
+    ctx.set_module_loader(module_loader);
+
+    let result = ctx.evaluate_module("./test.js");
+    assert!(result.is_ok());
+}
 ```
 
 ## Supported Platforms
