@@ -207,13 +207,15 @@ fn main() {
 
 Table below shows the supported platforms:
 
-| Platform | Arch | Supported | 
-|----------|------|-----------|
-| macOS    | x86_64 | ✅ |
-| macOS    | aarch64 | ✅ |
-| Linux    | x86_64 | ✅ |
-| Linux    | aarch64 | Soon.. |
-| Windows  | x86_64 | ❌ |
+| Platform | Arch | Target | Supported | 
+|----------|------|--------|-----------|
+| macOS    | x86_64 | x86_64-apple-darwin | ✅ |
+| macOS    | aarch64 | aarch64-apple-darwin | ✅ |
+| Linux    | x86_64 | x86_64-unknown-linux-gnu | ✅ |
+| Linux    | aarch64 | aarch64-unknown-linux-gnu | Soon.. |
+| Linux    | x86_64 | x86_64-unknown-linux-musl | Soon.. |
+| Linux    | aarch64 | aarch64-unknown-linux-musl | Soon.. |
+| Windows  | x86_64 | x86_64-pc-windows-msvc | ❌ |
 
 
 ## FAQ
