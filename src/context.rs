@@ -395,19 +395,18 @@ impl JSContext {
     /// use rust_jsc::JSContext;
     ///
     /// let ctx = JSContext::new();
-    /// let result = ctx.evaluate_module_from_source("console.log('Hello, World!')", "test.js", 0);
+    /// let result = ctx.evaluate_module_from_source("console.log('Hello, World!')", "test.js", None);
     /// assert!(result.is_ok());
     /// ```
     ///
     /// # Errors
     ///
     /// Returns a `JSError` if the module has a syntax error.
-    #[allow(dead_code)]
-    fn evaluate_module_from_source(
+    pub fn evaluate_module_from_source(
         &self,
         source: &str,
         source_url: &str,
-        starting_line_number: i32,
+        starting_line_number: Option<i32>
     ) -> JSResult<()> {
         let source: JSString = source.into();
         let source_url: JSString = source_url.into();
@@ -418,7 +417,7 @@ impl JSContext {
                 self.inner,
                 source.inner,
                 source_url.inner,
-                starting_line_number,
+                starting_line_number.unwrap_or(1),
                 &mut exception,
             )
         };
@@ -666,7 +665,6 @@ impl From<JSGlobalContextRef> for JSContext {
 
 #[cfg(test)]
 mod tests {
-    // use std::mem::ManuallyDrop;
 
     use super::*;
     use crate::{self as rust_jsc};
@@ -680,17 +678,27 @@ mod tests {
         _referrer: JSValue,
         _script_fetcher: JSValue,
     ) -> JSStringRetain {
-        // let key_value = key.as_string().unwrap();
         JSStringRetain::from("@rust-jsc")
     }
 
     #[module_evaluate]
     fn module_loader_evaluate_virtual(ctx: JSContext, _key: JSValue) -> JSValue {
         let object = JSObject::new(&ctx);
-        let keydata = JSValue::string(&ctx, "name");
         let value = JSValue::string(&ctx, "John Doe");
-        object.set(&keydata, &value, Default::default()).unwrap();
+        object.set_property("name", &value, Default::default()).unwrap();
 
+        let default = JSObject::new(&ctx);
+        default.set_property("name", &value, Default::default()).unwrap();
+
+        default.set_property("default", &object, Default::default()).unwrap();
+        default.into()
+    }
+
+    #[module_evaluate]
+    fn module_loader_evaluate_no_default_virtual(ctx: JSContext, _key: JSValue) -> JSValue {
+        let object = JSObject::new(&ctx);
+        let value = JSValue::string(&ctx, "John Doe");
+        object.set_property("name", &value, Default::default()).unwrap();
         object.into()
     }
 
@@ -817,6 +825,15 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[test]
+    // #[should_panic]
+    fn test_js_context_evaluate_module_source() {
+        let ctx = JSContext::new();
+        let script = "console.log('Hello, world!'); 'kedojs'";
+        let result = ctx.evaluate_module_from_source(script, "source.js", None);
+        assert!(result.is_ok());
+    }
+
     // #[test]
     // fn test_shared_data() {
     //     let ctx = JSContext::new();
@@ -862,16 +879,64 @@ mod tests {
         };
         ctx.set_module_loader(callbacks);
 
-        let module_test_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/modules");
-        let test_dir = format!("{}/virtual_module.js", module_test_dir);
-        let result = ctx.evaluate_module(&test_dir);
+        // let module_test_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/modules");
+        // let test_dir = format!("{}/virtual_module.js", module_test_dir);
+        let result = ctx.evaluate_module_from_source(r"
+            import lib from '@rust-jsc'; 
+            globalThis.lib = lib;
+        ", "virtual_module.js", None);
         assert!(result.is_ok());
 
         let result = ctx.evaluate_script("lib.name", None);
-        
+
         assert!(result.is_ok());
         let result_value = result.unwrap();
         assert_eq!(result_value.as_string().unwrap(), "John Doe");
+
+        let result = ctx.evaluate_module_from_source(r"
+            import { name } from '@rust-jsc'; 
+            globalThis.name = name;
+        ", "virtual_module.js", None);
+        assert!(result.is_ok());
+
+        let result = ctx.evaluate_script("name", None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_string().unwrap(), "John Doe");
+
+    }
+
+    #[test]
+    fn test_virtual_module_no_default() {
+        let ctx = JSContext::new();
+        let keys = &[JSStringRetain::from("@rust-jsc")];
+        ctx.set_virtual_module_keys(keys);
+
+        let callbacks = JSAPIModuleLoader {
+            disableBuiltinFileSystemLoader: false,
+            moduleLoaderResolve: Some(module_loader_resolve_virtual),
+            moduleLoaderEvaluate: Some(module_loader_evaluate_no_default_virtual),
+            moduleLoaderFetch: Some(module_loader_fetch),
+            moduleLoaderCreateImportMetaProperties: Some(
+                module_loader_create_import_meta_properties,
+            ),
+        };
+        ctx.set_module_loader(callbacks);
+
+        let result = ctx.evaluate_module_from_source(r"
+            import { name } from '@rust-jsc'; 
+            globalThis.name = name;
+        ", "virtual_module.js", None);
+        assert!(result.is_ok());
+
+        let result = ctx.evaluate_script("name", None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_string().unwrap(), "John Doe");
+
+        let result = ctx.evaluate_module_from_source(r"
+            import lib from '@rust-jsc'; 
+            globalThis.lib = lib;
+        ", "virtual_module.js", None);
+        assert!(result.is_err());
     }
 
     #[test]

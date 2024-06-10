@@ -2,12 +2,14 @@ import { myFunction } from './script.js';
 import './script2.js';
 import mod from '@rust-jsc';
 import rust from '@rust-jsc';
+import { name } from '@rust-jsc';
 import data from './test.json';
 
 // import { name } from '@rust-jsc'
 
 console.log(`Data: ${data}`);
 console.log(`Virtual: ${mod.name} - ${rust.name}`);
+console.log(`Name: ${name} , equal: ${mod.name === name}`);
 
 // console.log(object);
 console.log(`Filename: ${import.meta.filename}`);

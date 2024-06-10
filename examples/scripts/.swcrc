@@ -1,0 +1,27 @@
+{
+    "$schema": "https://swc.rs/schema.json",
+    "env": {
+        "targets": {
+            "node": "18"
+        },
+        "mode": "entry"
+    },
+    "minify": true,
+    "module": {
+        "type": "es6",
+        // These are defaults.
+        "strict": false,
+        "strictMode": true,
+        "lazy": false,
+        "noInterop": false
+    },
+    "jsc": {
+        // "target": "webkit",
+        "minify": {
+            "compress": true, // equivalent to {}
+            "mangle": true
+        },
+        "keepClassNames": true
+    },
+    "isModule": true
+}

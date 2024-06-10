@@ -30,8 +30,8 @@ fn moduleLoaderResolve(
     script_fetcher: JSValue,
 ) -> JSStringRetain {
     let key_value = key.as_string().unwrap();
-    let referrer_value = referrer.as_string().unwrap();
-    let script = script_fetcher.as_string().unwrap();
+    // let referrer_value = referrer.as_string().unwrap();
+    // let script = script_fetcher.as_string().unwrap();
 
     // println!("ModuleLoaderResolve, Key: {:?}", key_value);
 
@@ -60,7 +60,11 @@ fn moduleLoaderEvaluate(
         }
     }
 
-    object.into()
+    let default = JSObject::new(&ctx);
+    default.set_property("default", &object.into(), PropertyDescriptor::default()).unwrap();
+    default.set_property("name", &value, PropertyDescriptor::default()).unwrap();
+
+    default.into()
 }
 
 #[module_fetch]
@@ -86,7 +90,7 @@ fn moduleLoaderCreateImportMetaProperties(
     script_fetcher: JSValue,
 ) -> JSObject {
     let script = script_fetcher.as_string().unwrap();
-    let key_value = key.as_string().unwrap();
+    // let key_value = key.as_string().unwrap();
 
     // println!("ImportMeta, Key: {:?}", key_value);
 
@@ -127,17 +131,20 @@ fn main() {
     };
 
     ctx.set_module_loader(callbacks);
+    
     let keys = &[
         JSStringRetain::from("@rust-jsc"),
     ];
     ctx.set_virtual_module_keys(keys);
+    
     // let result = ctx.evaluate_script("console.log('Hello, World!')", None);
-    let result = ctx.evaluate_module("../scripts/test.js");
+    // let result = ctx.evaluate_module("../scripts/test.js");
     // let result = ctx.load_module("../scripts/test.js");
-    assert!(result.is_ok());
+    // assert!(result.is_ok());
     // read module from file system
-    // let module_source = std::fs::read_to_string("../scripts/test.js").unwrap();
-    // let result = ctx.evaluate_module_from_source("console.log('Hello, World!')", "test.js", 0);
+    let module_source = std::fs::read_to_string("../scripts/output/jsc.js").unwrap();
+    let result = ctx.evaluate_module_from_source(&module_source, "../scripts/output/jsc.js", None);
+    // println!("Hello, World!");
     // let result = ctx.link_and_evaluate_module("test.js");
     // println!("Result: {:?}", result.is_undefined());
     match result {
