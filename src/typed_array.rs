@@ -2,8 +2,9 @@ use rust_jsc_sys::{
     JSObjectGetArrayBufferByteLength, JSObjectGetArrayBufferBytesPtr,
     JSObjectGetTypedArrayBuffer, JSObjectGetTypedArrayByteLength,
     JSObjectGetTypedArrayByteOffset, JSObjectGetTypedArrayBytesPtr,
-    JSObjectGetTypedArrayLength, JSObjectMakeArrayBufferWithBytesNoCopy,
-    JSObjectMakeTypedArray, JSObjectMakeTypedArrayWithArrayBuffer,
+    JSObjectGetTypedArrayLength, JSObjectIsDetachedBuffer,
+    JSObjectMakeArrayBufferWithBytesNoCopy, JSObjectMakeTypedArray,
+    JSObjectMakeTypedArrayWithArrayBuffer,
     JSObjectMakeTypedArrayWithArrayBufferAndOffset,
     JSObjectMakeTypedArrayWithBytesNoCopy, JSValueGetTypedArrayType, JSValueRef,
 };
@@ -110,11 +111,9 @@ impl JSTypedArray {
         }
 
         if result.is_null() {
-            return Err(JSError::with_message(
-                ctx,
-                "Failed to create typed array",
-            )
-            .unwrap());
+            return Err(
+                JSError::with_message(ctx, "Failed to create typed array").unwrap()
+            );
         }
 
         Ok(Self {
@@ -574,6 +573,18 @@ impl JSArrayBuffer {
         Ok(bytes)
     }
 
+    /// Checks if the ArrayBuffer is detached.
+    /// Detached ArrayBuffers are ArrayBuffers that have been detached from their backing store.
+    /// This can happen when the backing store is transferred to another object.
+    pub fn is_detached(&self) -> bool {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        let result = unsafe {
+            JSObjectIsDetachedBuffer(self.object.ctx, self.object.inner, &mut exception)
+        };
+
+        result
+    }
+
     /// Gets the bytes of the ArrayBuffer as a Vec.
     ///
     /// # Example
@@ -612,11 +623,9 @@ impl JSArrayBuffer {
         }
 
         if result.is_null() {
-            return Err(JSError::with_message(
-                ctx,
-                "Failed to create array array",
-            )
-            .unwrap());
+            return Err(
+                JSError::with_message(ctx, "Failed to create array array").unwrap()
+            );
         }
 
         Ok(Self {
@@ -848,5 +857,25 @@ mod tests {
             array_buffer.array_type().unwrap(),
             JSTypedArrayType::ArrayBuffer
         );
+    }
+
+    #[test]
+    fn test_array_buffer_is_detached() {
+        let ctx = JSContext::new();
+        let mut bytes = vec![6; 10];
+        let array_buffer = JSArrayBuffer::new(&ctx, bytes.as_mut_slice()).unwrap();
+        assert_eq!(array_buffer.is_detached(), false);
+
+        let array_buffer = ctx
+            .evaluate_script("const buffer = new ArrayBuffer(10); buffer", None)
+            .unwrap();
+        let array_buffer = JSArrayBuffer::from_object(array_buffer.as_object().unwrap());
+        let _result = ctx
+            .evaluate_script(
+                "var sample = new DataView(buffer, 0); var dest = buffer.transfer(5);",
+                None,
+            )
+            .unwrap();
+        assert_eq!(array_buffer.is_detached(), true);
     }
 }

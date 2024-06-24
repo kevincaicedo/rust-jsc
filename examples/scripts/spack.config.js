@@ -1,6 +1,6 @@
 const { config } = require("@swc/core/spack");
 
-module.exports = config({
+const options = config({
     entry: {
         jsc: __dirname + "/test.js",
     },
@@ -10,3 +10,5 @@ module.exports = config({
     target: "node",
     externalModules: ["@rust-jsc"],
 });
+
+module.exports = options;

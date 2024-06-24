@@ -30788,6 +30788,14 @@ extern "C" {
     ) -> JSObjectRef;
 }
 extern "C" {
+    #[doc = "@function\n@abstract           Returns a boolean value indicating whether or not a JavaScript value is a detached Typed Array object.\n@param ctx          The execution context to use.\n@param objectRef    The JSObjectRef whose Typed Array type data pointer to obtain.\n@param exception    A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result             A boolean value indicating whether or not objectRef is a detached Typed Array object."]
+    pub fn JSObjectIsDetachedBuffer(
+        ctx: JSContextRef,
+        objectRef: JSObjectRef,
+        exception: *mut JSValueRef,
+    ) -> bool;
+}
+extern "C" {
     #[doc = "@function\n@abstract         Returns a pointer to the data buffer that serves as the backing store for a JavaScript Typed Array object.\n@param object     The Array Buffer object whose internal backing store pointer to return.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result           A pointer to the raw data buffer that serves as object's backing store or NULL if object is not an Array Buffer object.\n@discussion       The pointer returned by this function is temporary and is not guaranteed to remain valid across JavaScriptCore API calls."]
     pub fn JSObjectGetArrayBufferBytesPtr(
         ctx: JSContextRef,
