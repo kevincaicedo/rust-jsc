@@ -6,10 +6,12 @@ use rust_jsc_sys::{
     JSGetMemoryUsageStatistics, JSGlobalContextCopyName, JSGlobalContextCreate,
     JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable, JSGlobalContextRef,
     JSGlobalContextRelease, JSGlobalContextRetain, JSGlobalContextSetInspectable,
-    JSGlobalContextSetName, JSGlobalContextSetUnhandledRejectionCallback,
-    JSLinkAndEvaluateModule, JSLoadAndEvaluateModule, JSLoadAndEvaluateModuleFromSource,
-    JSLoadModule, JSLoadModuleFromSource, JSSetAPIModuleLoader, JSSetSyntheticModuleKeys,
-    JSStringRef, JSValueRef,
+    JSGlobalContextSetName, JSGlobalContextSetUncaughtExceptionAtEventLoopCallback,
+    JSGlobalContextSetUncaughtExceptionHandler,
+    JSGlobalContextSetUnhandledRejectionCallback, JSLinkAndEvaluateModule,
+    JSLoadAndEvaluateModule, JSLoadAndEvaluateModuleFromSource, JSLoadModule,
+    JSLoadModuleFromSource, JSSetAPIModuleLoader, JSSetSyntheticModuleKeys, JSStringRef,
+    JSUncaughtExceptionAtEventLoop, JSUncaughtExceptionHandler, JSValueRef,
 };
 
 use crate::{
@@ -171,6 +173,64 @@ impl JSContext {
         }
 
         Ok(())
+    }
+
+    /// Sets a callback function that is called when an exception is not caught.
+    /// The callback is called with the exception value.
+    /// The callback is called on the context thread.
+    ///
+    /// # Arguments
+    /// - `handler`: A native function
+    ///
+    /// # Examples
+    /// 
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// #[uncaught_exception]
+    /// fn uncaught_exception_handler(ctx: JSContext, filename: JSString, exception: JSValue) {
+    ///    println!("Uncaught exception: {:?}", exception.as_json_string(1));
+    /// }
+    ///
+    /// fn main() {
+    ///     let ctx = JSContext::new();
+    ///     ctx.set_uncaught_exception_handler(uncaught_exception_handler);
+    /// }
+    /// ```
+    pub fn set_uncaught_exception_handler(&self, handler: JSUncaughtExceptionHandler) {
+        unsafe {
+            JSGlobalContextSetUncaughtExceptionHandler(self.inner, handler);
+        };
+    }
+
+    /// Sets a callback function that is called when an exception is not caught at the event loop.
+    /// The callback is called with the exception value.
+    /// The callback is called on the event loop thread.
+    ///
+    /// # Arguments
+    /// - `callback`: A native function
+    ///
+    /// # Examples
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// #[uncaught_exception_event_loop]
+    /// fn uncaught_exception_event_loop(ctx: JSContext, exception: JSValue) {
+    ///   println!("Uncaught exception: {:?}", exception.as_json_string(1));
+    /// }
+    ///
+    /// fn main() {
+    ///     let ctx = JSContext::new();
+    ///     ctx.set_uncaught_exception_at_event_loop_callback(uncaught_exception_event_loop);
+    /// }
+    /// ```
+    pub fn set_uncaught_exception_at_event_loop_callback(
+        &self,
+        callback: JSUncaughtExceptionAtEventLoop,
+    ) {
+        unsafe {
+            JSGlobalContextSetUncaughtExceptionAtEventLoopCallback(self.inner, callback);
+        };
     }
 
     /// Checks the syntax of a JavaScript script.
@@ -406,7 +466,7 @@ impl JSContext {
         &self,
         source: &str,
         source_url: &str,
-        starting_line_number: Option<i32>
+        starting_line_number: Option<i32>,
     ) -> JSResult<()> {
         let source: JSString = source.into();
         let source_url: JSString = source_url.into();
@@ -685,21 +745,46 @@ mod tests {
     fn module_loader_evaluate_virtual(ctx: JSContext, _key: JSValue) -> JSValue {
         let object = JSObject::new(&ctx);
         let value = JSValue::string(&ctx, "John Doe");
-        object.set_property("name", &value, Default::default()).unwrap();
+        object
+            .set_property("name", &value, Default::default())
+            .unwrap();
 
         let default = JSObject::new(&ctx);
-        default.set_property("name", &value, Default::default()).unwrap();
+        default
+            .set_property("name", &value, Default::default())
+            .unwrap();
 
-        default.set_property("default", &object, Default::default()).unwrap();
+        default
+            .set_property("default", &object, Default::default())
+            .unwrap();
         default.into()
     }
 
     #[module_evaluate]
-    fn module_loader_evaluate_no_default_virtual(ctx: JSContext, _key: JSValue) -> JSValue {
+    fn module_loader_evaluate_no_default_virtual(
+        ctx: JSContext,
+        _key: JSValue,
+    ) -> JSValue {
         let object = JSObject::new(&ctx);
         let value = JSValue::string(&ctx, "John Doe");
-        object.set_property("name", &value, Default::default()).unwrap();
+        object
+            .set_property("name", &value, Default::default())
+            .unwrap();
         object.into()
+    }
+
+    #[uncaught_exception]
+    fn uncaught_exception_handler(
+        _ctx: JSContext,
+        _filename: JSString,
+        exception: JSValue,
+    ) {
+        println!("Uncaught exception: {:?}", exception.as_json_string(1));
+    }
+
+    #[uncaught_exception_event_loop]
+    fn uncaught_exception_event_loop(_ctx: JSContext, exception: JSValue) {
+        println!("Uncaught exception: {:?}", exception.as_json_string(1));
     }
 
     #[module_resolve]
@@ -881,10 +966,14 @@ mod tests {
 
         // let module_test_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/modules");
         // let test_dir = format!("{}/virtual_module.js", module_test_dir);
-        let result = ctx.evaluate_module_from_source(r"
-            import lib from '@rust-jsc'; 
+        let result = ctx.evaluate_module_from_source(
+            r"
+            import lib from '@rust-jsc';
             globalThis.lib = lib;
-        ", "virtual_module.js", None);
+        ",
+            "virtual_module.js",
+            None,
+        );
         assert!(result.is_ok());
 
         let result = ctx.evaluate_script("lib.name", None);
@@ -893,16 +982,19 @@ mod tests {
         let result_value = result.unwrap();
         assert_eq!(result_value.as_string().unwrap(), "John Doe");
 
-        let result = ctx.evaluate_module_from_source(r"
-            import { name } from '@rust-jsc'; 
+        let result = ctx.evaluate_module_from_source(
+            r"
+            import { name } from '@rust-jsc';
             globalThis.name = name;
-        ", "virtual_module.js", None);
+        ",
+            "virtual_module.js",
+            None,
+        );
         assert!(result.is_ok());
 
         let result = ctx.evaluate_script("name", None);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_string().unwrap(), "John Doe");
-
     }
 
     #[test]
@@ -922,20 +1014,28 @@ mod tests {
         };
         ctx.set_module_loader(callbacks);
 
-        let result = ctx.evaluate_module_from_source(r"
-            import { name } from '@rust-jsc'; 
+        let result = ctx.evaluate_module_from_source(
+            r"
+            import { name } from '@rust-jsc';
             globalThis.name = name;
-        ", "virtual_module.js", None);
+        ",
+            "virtual_module.js",
+            None,
+        );
         assert!(result.is_ok());
 
         let result = ctx.evaluate_script("name", None);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_string().unwrap(), "John Doe");
 
-        let result = ctx.evaluate_module_from_source(r"
-            import lib from '@rust-jsc'; 
+        let result = ctx.evaluate_module_from_source(
+            r"
+            import lib from '@rust-jsc';
             globalThis.lib = lib;
-        ", "virtual_module.js", None);
+        ",
+            "virtual_module.js",
+            None,
+        );
         assert!(result.is_err());
     }
 
@@ -976,6 +1076,29 @@ mod tests {
         assert!(function.as_object().unwrap().is_function());
         let result = ctx.set_unhandled_rejection_callback(function.as_object().unwrap());
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_set_uncaught_exception_handler() {
+        let ctx = JSContext::new();
+        ctx.set_uncaught_exception_handler(Some(uncaught_exception_handler));
+
+        let script =
+            "function throwError() { throw new Error('Error thrown'); }; throwError();";
+        let result = ctx.evaluate_module_from_source(
+            script,
+            "uncaught_exception_handler.js",
+            None,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_set_uncaught_exception_at_event_loop_callback() {
+        let ctx = JSContext::new();
+        ctx.set_uncaught_exception_at_event_loop_callback(Some(
+            uncaught_exception_event_loop,
+        ));
     }
 
     #[allow(dead_code)]

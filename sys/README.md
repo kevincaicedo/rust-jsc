@@ -9,7 +9,7 @@ Add the following to your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-rust_jsc_sys = { features = ["patches"], version = "0.1.2" }
+rust_jsc_sys = { features = ["patches"], version = "0.2.2" }
 ```
 
 ## Custom static libs

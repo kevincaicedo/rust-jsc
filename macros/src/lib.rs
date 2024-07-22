@@ -387,3 +387,72 @@ pub fn module_import_meta(_attr: TokenStream, item: TokenStream) -> TokenStream 
 
     TokenStream::from(expanded)
 }
+
+#[proc_macro_attribute]
+pub fn uncaught_exception(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __filename: rust_jsc::internal::JSStringRef,
+            __exception: rust_jsc::internal::JSValueRef,
+        ) #where_clause {
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let filename = rust_jsc::JSString::from(__filename);
+            let exception = rust_jsc::JSValue::new(__exception, __ctx_ref);
+
+            let func: fn(
+                rust_jsc::JSContext,
+                rust_jsc::JSString,
+                rust_jsc::JSValue,
+            ) = {
+                #input
+
+                #fn_name ::<#generic_params>
+            };
+
+            func(ctx, filename, exception);
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn uncaught_exception_event_loop(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __exception: rust_jsc::internal::JSValueRef,
+        ) #where_clause {
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let exception = rust_jsc::JSValue::new(__exception, __ctx_ref);
+
+            let func: fn(
+                rust_jsc::JSContext,
+                rust_jsc::JSValue,
+            ) = {
+                #input
+
+                #fn_name ::<#generic_params>
+            };
+
+            func(ctx, exception);
+        }
+    };
+
+    TokenStream::from(expanded)
+}

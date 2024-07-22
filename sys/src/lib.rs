@@ -2589,6 +2589,13 @@ fn bindgen_test_layout_JSAPIModuleLoader() {
         )
     );
 }
+#[doc = "@typedef JSUncaughtExceptionAtEventLoop\n@abstract The callback invoked when an exception is not caught in the event loop.\n@param ctx The execution context to use.\n@param exception A JSValue containing the uncaught exception."]
+pub type JSUncaughtExceptionAtEventLoop =
+    ::std::option::Option<unsafe extern "C" fn(ctx: JSContextRef, exception: JSValueRef)>;
+#[doc = "@typedef JSUncaughtExceptionHandler\n@abstract The callback invoked when an exception is not caught.\n@param ctx The execution context to use.\n@param exception A JSValue containing the uncaught exception."]
+pub type JSUncaughtExceptionHandler = ::std::option::Option<
+    unsafe extern "C" fn(ctx: JSContextRef, filename: JSStringRef, exception: JSValueRef),
+>;
 extern "C" {
     #[doc = "@function JSSetAPIModuleLoader\n@abstract Sets the moduleLoader used to load and evaluate modules.\n@param ctx The execution context to use.\n@param moduleLoader A JSAPIModuleLoader structure containing the callbacks to use."]
     pub fn JSSetAPIModuleLoader(ctx: JSContextRef, moduleLoader: JSAPIModuleLoader);
@@ -30615,6 +30622,20 @@ extern "C" {
         ctx: JSGlobalContextRef,
         function: JSObjectRef,
         exception: *mut JSValueRef,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Sets the callback function that will be called when an uncaught exception occurs on the main thread.\n@param ctx The JSGlobalContext whose uncaught exception callback you want to set.\n@param callback The JSObjectRef to call when an uncaught exception occurs. Pass NULL to remove the callback."]
+    pub fn JSGlobalContextSetUncaughtExceptionAtEventLoopCallback(
+        ctx: JSGlobalContextRef,
+        callback: JSUncaughtExceptionAtEventLoop,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Sets the callback function that will be called when an uncaught exception occurs.\n@param ctx The JSGlobalContext whose uncaught exception callback you want to set.\n@param callback The JSObjectRef to call when an uncaught exception occurs. Pass NULL to remove the callback."]
+    pub fn JSGlobalContextSetUncaughtExceptionHandler(
+        ctx: JSGlobalContextRef,
+        handler: JSUncaughtExceptionHandler,
     );
 }
 extern "C" {
