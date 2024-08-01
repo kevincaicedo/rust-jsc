@@ -6,6 +6,7 @@ import { name } from '@rust-jsc';
 import data from './test.json';
 
 // import { name } from '@rust-jsc'
+console.log("démonstration.html");
 
 console.log(`Data: ${data}`);
 console.log(`Virtual: ${mod.name} - ${rust.name}`);

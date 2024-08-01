@@ -161,8 +161,8 @@ fn main() {
     ctx.set_virtual_module_keys(keys);
     
     // let result = ctx.evaluate_script("console.log('Hello, World!')", None);
-    // let result = ctx.evaluate_module("../scripts/test.js");
-    let result = ctx.evaluate_module("../scripts/jsc-test.mjs");
+    let result = ctx.evaluate_module("../scripts/test.js");
+    // let result = ctx.evaluate_module("../scripts/jsc-test.mjs");
     ctx.check_syntax("console.log('Kevin')", 0).unwrap();
     println!("Result: M");
     // let result = ctx.load_module("../scripts/test.js");

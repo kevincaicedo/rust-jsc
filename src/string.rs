@@ -1,8 +1,9 @@
 use std::{ffi::CString, fmt::Debug};
 
 use rust_jsc_sys::{
-    JSStringCreateWithUTF8CString, JSStringGetLength, JSStringGetUTF8CString,
-    JSStringIsEqual, JSStringIsEqualToUTF8CString, JSStringRef, JSStringRelease,
+    JSStringCreateWithUTF8CString, JSStringGetLength, JSStringGetMaximumUTF8CStringSize,
+    JSStringGetUTF8CString, JSStringIsEqual, JSStringIsEqualToUTF8CString, JSStringRef,
+    JSStringRelease,
 };
 
 use crate::{JSString, JSStringRetain};
@@ -51,7 +52,7 @@ impl From<JSStringRetain> for JSStringRef {
 
 impl std::fmt::Display for JSStringRetain {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let max_len = self.len() + 1;
+        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.0) };
         let mut buffer = vec![0u8; max_len];
         let new_size = unsafe {
             JSStringGetUTF8CString(self.0, buffer.as_mut_ptr() as *mut i8, max_len)
@@ -152,7 +153,7 @@ impl Clone for JSString {
 
 impl Debug for JSString {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let max_len = self.len() + 1;
+        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
         let mut buffer = vec![0u8; max_len];
         let new_size = unsafe {
             JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
@@ -167,7 +168,7 @@ impl Debug for JSString {
 
 impl std::fmt::Display for JSString {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let max_len = self.len() + 1;
+        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
         let mut buffer = vec![0u8; max_len];
         let new_size = unsafe {
             JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
@@ -203,11 +204,95 @@ mod tests {
     fn test_js_string_eq() {
         let s1 = JSString::from("Hello, World!");
         let s2 = JSString::from("Hello, World!");
+        let s3 = JSString::from("démonstration.html");
         assert_eq!(s1, s2);
         assert_eq!(s1, "Hello, World!");
         assert_eq!(s2, "Hello, World!");
+        assert_eq!(s3.to_string(), "démonstration.html");
         assert_eq!("Hello, World!", s1);
         assert_eq!("Hello, World!", s2);
+        assert_eq!("démonstration.html", s3);
+    }
+
+    #[test]
+    fn test_js_string_retain_eq_utf8() {
+        let s1 = JSStringRetain::from("Hello, World!");
+        let s2 = JSStringRetain::from("Hello, World!");
+        let s3 = JSStringRetain::from("démonstration.html");
+        let s4 = JSStringRetain::from("こんにちは世界");
+        let s5 = JSStringRetain::from("Привет, мир!");
+        let s6 = JSStringRetain::from("😊👍🏽");
+        let s7 = JSStringRetain::from("");
+        let s8 = JSStringRetain::from("你好，世界！");
+        let s9 = JSStringRetain::from("Bonjour le monde!");
+
+        // Test equality with the same content
+        assert_eq!(s1.to_string(), s2.to_string());
+
+        // Test special characters and different languages
+        assert_eq!(s3.to_string(), "démonstration.html");
+        assert_eq!(s4.to_string(), "こんにちは世界");
+        assert_eq!(s5.to_string(), "Привет, мир!");
+        assert_eq!(s6.to_string(), "😊👍🏽");
+        assert_eq!(s8.to_string(), "你好，世界！");
+        assert_eq!(s9.to_string(), "Bonjour le monde!");
+
+        // Test empty string
+        assert!(s7.is_empty());
+        assert_eq!(s7.len(), 0);
+    }
+
+    #[test]
+    fn test_js_string_eq_utf8() {
+        let s1 = JSString::from("Hello, World!");
+        let s2 = JSString::from("Hello, World!");
+        let s3 = JSString::from("démonstration.html");
+        let s4 = JSString::from("こんにちは世界");
+        let s5 = JSString::from("Привет, мир!");
+        let s6 = JSString::from("😊👍🏽");
+        let s7 = JSString::from("");
+        let s8 = JSString::from("你好，世界！");
+        let s9 = JSString::from("Bonjour le monde!");
+
+        // Test equality with the same content
+        assert_eq!(s1, s2);
+        assert_eq!(s1, "Hello, World!");
+        assert_eq!(s2, "Hello, World!");
+
+        // Test special characters and different languages
+        assert_eq!(s3.to_string(), "démonstration.html");
+        assert_eq!(s4.to_string(), "こんにちは世界");
+        assert_eq!(s5.to_string(), "Привет, мир!");
+        assert_eq!(s6.to_string(), "😊👍🏽");
+        assert_eq!(s8.to_string(), "你好，世界！");
+        assert_eq!(s9.to_string(), "Bonjour le monde!");
+
+        // Test empty string
+        assert!(s7.is_empty());
+        assert_eq!(s7.len(), 0);
+
+        // Test reverse equality with &str and String
+        assert_eq!("Hello, World!", s1);
+        assert_eq!("Hello, World!", s2);
+        assert_eq!("démonstration.html", s3);
+        assert_eq!("こんにちは世界", s4);
+        assert_eq!("Привет, мир!", s5);
+        assert_eq!("😊👍🏽", s6);
+        assert_eq!("", s7);
+        assert_eq!("你好，世界！", s8);
+        assert_eq!("Bonjour le monde!", s9);
+    }
+
+    #[test]
+    fn test_js_string_debug() {
+        let js_string = JSString::from("debug test");
+        assert_eq!(format!("{:?}", js_string), r#""debug test""#);
+    }
+
+    #[test]
+    fn test_js_string_display() {
+        let js_string = JSString::from("display test");
+        assert_eq!(format!("{}", js_string), "display test");
     }
 
     #[test]
