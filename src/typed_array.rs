@@ -58,7 +58,7 @@ impl JSTypedArray {
     }
 
     /// Creates a JSTypedArray from a given JSValue.
-    pub fn from_value(value: JSValue) -> JSResult<Self> {
+    pub fn from_value(value: &JSValue) -> JSResult<Self> {
         let object = value.as_object()?;
         Ok(Self { object })
     }
@@ -490,6 +490,12 @@ impl From<JSTypedArray> for JSValue {
     }
 }
 
+impl From<JSObject> for JSTypedArray {
+    fn from(object: JSObject) -> Self {
+        Self { object }
+    }
+}
+
 impl JSArrayBuffer {
     /// Creates a new `JSArrayBuffer` object from a given JSObject.
     pub fn from_object(object: JSObject) -> Self {
@@ -728,7 +734,7 @@ mod tests {
             .evaluate_script("new Uint8Array(custom_array.buffer, 1, 3)", None)
             .unwrap();
 
-        let typed_array = JSTypedArray::from_value(result).unwrap();
+        let typed_array = JSTypedArray::from_value(&result).unwrap();
         assert_eq!(typed_array.len().unwrap(), 3);
         assert_eq!(typed_array.byte_len().unwrap(), 3);
         assert_eq!(typed_array.byte_offset().unwrap(), 1);
@@ -769,7 +775,7 @@ mod tests {
             .evaluate_script("new Uint16Array(custom_array.buffer, 2, 4)", None)
             .unwrap();
 
-        let typed_array = JSTypedArray::from_value(result).unwrap();
+        let typed_array = JSTypedArray::from_value(&result).unwrap();
         assert_eq!(typed_array.len().unwrap(), 4);
         assert_eq!(typed_array.byte_len().unwrap(), 8);
         assert_eq!(typed_array.byte_offset().unwrap(), 2);
@@ -789,7 +795,7 @@ mod tests {
         let array = ctx
             .evaluate_script("const array = new Uint8Array([5, 4, 4, 5]); array", None)
             .unwrap();
-        let array = JSTypedArray::from_value(array).unwrap();
+        let array = JSTypedArray::from_value(&array).unwrap();
 
         assert_eq!(array.array_type().unwrap(), JSTypedArrayType::Uint8Array);
         assert_eq!(array.len().unwrap(), 4);
@@ -851,7 +857,7 @@ mod tests {
     fn test_array_buffer_with_bytes() {
         let ctx = JSContext::new();
         let array_buffer = ctx.evaluate_script("new ArrayBuffer(10)", None).unwrap();
-        let array_buffer = JSTypedArray::from_value(array_buffer).unwrap();
+        let array_buffer = JSTypedArray::from_value(&array_buffer).unwrap();
 
         assert_eq!(
             array_buffer.array_type().unwrap(),

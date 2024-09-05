@@ -130,6 +130,45 @@ impl From<&str> for JSString {
     }
 }
 
+impl<'a> Into<Vec<u8>> for JSString {
+    fn into(self) -> Vec<u8> {
+        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
+        let mut buffer = vec![0u8; max_len];
+        let new_size = unsafe {
+            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
+        };
+        unsafe {
+            buffer.set_len(new_size - 1);
+        };
+
+        return buffer;
+    }
+}
+
+impl From<&[u8]> for JSString {
+    fn from(s: &[u8]) -> Self {
+        let c = CString::new(s).unwrap();
+        JSString {
+            inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
+        }
+    }
+}
+
+impl From<&mut [u8]> for JSString {
+    fn from(s: &mut [u8]) -> Self {
+        let c = CString::new(s).unwrap();
+        JSString {
+            inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
+        }
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for JSString {
+    fn from(s: &[u8; N]) -> Self {
+        JSString::from(&s[..])
+    }
+}
+
 impl From<String> for JSString {
     fn from(s: String) -> Self {
         let c = CString::new(s.as_bytes()).unwrap();
@@ -305,6 +344,31 @@ mod tests {
     fn test_js_string_is_empty() {
         let s = JSString::from("");
         assert_eq!(s.is_empty(), true);
+    }
+
+    #[test]
+    fn test_js_string_from_bytes() {
+        let s = JSString::from(b"Hello, World!");
+        assert_eq!(s.to_string(), "Hello, World!");
+
+        let s = JSString::from(&b"Hello, World!"[..]);
+        assert_eq!(s.to_string(), "Hello, World!");
+
+        let mut data = b"Hello, World!".clone();
+        let s = JSString::from(&mut data[..]);
+        assert_eq!(s.to_string(), "Hello, World!");
+
+        // "\uFFFD\uFFFD\uFFFD" in bytes
+        let bytes = &[0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD];
+        let s = JSString::from(bytes);
+        assert_eq!(s.to_string(), "\u{FFFD}\u{FFFD}\u{FFFD}");
+    }
+
+    #[test]
+    fn test_js_string_into_bytes() {
+        let s = JSString::from(b"Hello, World!");
+        let bytes: Vec<u8> = s.into();
+        assert_eq!(bytes, b"Hello, World!");
     }
 
     #[test]
