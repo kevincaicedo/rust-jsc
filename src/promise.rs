@@ -118,7 +118,7 @@ unsafe impl Send for JSPromise {}
 
 #[cfg(test)]
 mod tests {
-    use crate::{self as rust_jsc, JSFunction};
+    use crate::{self as rust_jsc, JSFunction, JSString};
     use rust_jsc_macros::callback;
 
     use crate::{JSContext, JSValue};
@@ -171,7 +171,7 @@ mod tests {
         let value = JSValue::number(&ctx, 42.0);
 
         resolver.resolve(None, &[value]).unwrap();
-        let function = JSFunction::callback::<String>(&ctx, None, Some(log_info));
+        let function = JSFunction::callback::<JSString>(&ctx, None, Some(log_info));
         let result = promise.then(&[function.into()]);
 
         assert_eq!(result.unwrap().is_object(), true);
