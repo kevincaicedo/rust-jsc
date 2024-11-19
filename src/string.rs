@@ -1,4 +1,7 @@
-use std::{ffi::CString, fmt::Debug};
+use std::{
+    ffi::{CString, NulError},
+    fmt::Debug,
+};
 
 use rust_jsc_sys::{
     JSStringCreateWithUTF8CString, JSStringGetLength, JSStringGetMaximumUTF8CStringSize,
@@ -26,14 +29,16 @@ impl JSStringRetain {
 
 impl From<&str> for JSStringRetain {
     fn from(s: &str) -> Self {
-        let c = CString::new(s.as_bytes()).unwrap();
+        let c =
+            CString::new(s.as_bytes()).expect("&str to JSStringRetain conversion failed");
         Self(unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) })
     }
 }
 
 impl From<String> for JSStringRetain {
     fn from(s: String) -> Self {
-        let c = CString::new(s.as_bytes()).unwrap();
+        let c = CString::new(s.as_bytes())
+            .expect("String to JSStringRetain conversion failed");
         Self(unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) })
     }
 }
@@ -60,7 +65,7 @@ impl std::fmt::Display for JSStringRetain {
         unsafe {
             buffer.set_len(new_size - 1);
         };
-        let s = String::from_utf8(buffer).unwrap();
+        let s = String::from_utf8(buffer).map_err(|_| std::fmt::Error)?;
         write!(fmt, "{}", s)
     }
 }
@@ -95,35 +100,39 @@ impl PartialEq for JSString {
 
 impl<'s> PartialEq<&'s str> for JSString {
     fn eq(&self, other: &&'s str) -> bool {
-        let utf8 = CString::new(other.as_bytes()).unwrap();
+        let utf8 =
+            CString::new(other.as_bytes()).expect("JSString to &str conversion failed");
         unsafe { JSStringIsEqualToUTF8CString(self.inner, utf8.as_ptr()) }
     }
 }
 
 impl PartialEq<String> for JSString {
     fn eq(&self, other: &String) -> bool {
-        let utf8 = CString::new(other.as_bytes()).unwrap();
+        let utf8 =
+            CString::new(other.as_bytes()).expect("String to JSString conversion failed");
         unsafe { JSStringIsEqualToUTF8CString(self.inner, utf8.as_ptr()) }
     }
 }
 
 impl<'s> PartialEq<JSString> for &'s str {
     fn eq(&self, other: &JSString) -> bool {
-        let utf8 = CString::new(self.as_bytes()).unwrap();
+        let utf8 =
+            CString::new(self.as_bytes()).expect("JSString to &str conversion failed");
         unsafe { JSStringIsEqualToUTF8CString(other.inner, utf8.as_ptr()) }
     }
 }
 
 impl PartialEq<JSString> for String {
     fn eq(&self, other: &JSString) -> bool {
-        let utf8 = CString::new(self.as_bytes()).unwrap();
+        let utf8 =
+            CString::new(self.as_bytes()).expect("JSString to String conversion failed");
         unsafe { JSStringIsEqualToUTF8CString(other.inner, utf8.as_ptr()) }
     }
 }
 
 impl From<&str> for JSString {
     fn from(s: &str) -> Self {
-        let c = CString::new(s.as_bytes()).unwrap();
+        let c = CString::new(s.as_bytes()).expect("&str to JSString conversion failed");
         JSString {
             inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
         }
@@ -145,33 +154,39 @@ impl<'a> Into<Vec<u8>> for JSString {
     }
 }
 
-impl From<&[u8]> for JSString {
-    fn from(s: &[u8]) -> Self {
-        let c = CString::new(s).unwrap();
-        JSString {
+impl TryFrom<&[u8]> for JSString {
+    type Error = NulError;
+
+    fn try_from(s: &[u8]) -> Result<Self, Self::Error> {
+        let c = CString::new(s)?;
+        Ok(JSString {
             inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
-        }
+        })
     }
 }
 
-impl From<&mut [u8]> for JSString {
-    fn from(s: &mut [u8]) -> Self {
-        let c = CString::new(s).unwrap();
-        JSString {
+impl TryFrom<&mut [u8]> for JSString {
+    type Error = NulError;
+
+    fn try_from(s: &mut [u8]) -> Result<Self, Self::Error> {
+        let c = CString::new(s)?;
+        Ok(JSString {
             inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
-        }
+        })
     }
 }
 
-impl<const N: usize> From<&[u8; N]> for JSString {
-    fn from(s: &[u8; N]) -> Self {
-        JSString::from(&s[..])
+impl<const N: usize> TryFrom<&[u8; N]> for JSString {
+    type Error = NulError;
+
+    fn try_from(s: &[u8; N]) -> Result<Self, Self::Error> {
+        JSString::try_from(&s[..])
     }
 }
 
 impl From<String> for JSString {
     fn from(s: String) -> Self {
-        let c = CString::new(s.as_bytes()).unwrap();
+        let c = CString::new(s.as_bytes()).expect("String to JSString conversion failed");
         JSString {
             inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
         }
@@ -200,7 +215,7 @@ impl Debug for JSString {
         unsafe {
             buffer.set_len(new_size - 1);
         };
-        let s = String::from_utf8(buffer).unwrap();
+        let s = String::from_utf8(buffer).map_err(|_| std::fmt::Error)?;
         write!(fmt, "{:?}", s)
     }
 }
@@ -215,7 +230,7 @@ impl std::fmt::Display for JSString {
         unsafe {
             buffer.set_len(new_size - 1);
         };
-        let s = String::from_utf8(buffer).unwrap();
+        let s = String::from_utf8(buffer).map_err(|_| std::fmt::Error)?;
         write!(fmt, "{}", s)
     }
 }
@@ -348,25 +363,25 @@ mod tests {
 
     #[test]
     fn test_js_string_from_bytes() {
-        let s = JSString::from(b"Hello, World!");
+        let s = JSString::try_from(b"Hello, World!").unwrap();
         assert_eq!(s.to_string(), "Hello, World!");
 
-        let s = JSString::from(&b"Hello, World!"[..]);
+        let s = JSString::try_from(&b"Hello, World!"[..]).unwrap();
         assert_eq!(s.to_string(), "Hello, World!");
 
         let mut data = b"Hello, World!".clone();
-        let s = JSString::from(&mut data[..]);
+        let s = JSString::try_from(&mut data[..]).unwrap();
         assert_eq!(s.to_string(), "Hello, World!");
 
         // "\uFFFD\uFFFD\uFFFD" in bytes
         let bytes = &[0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD, 0xEF, 0xBF, 0xBD];
-        let s = JSString::from(bytes);
+        let s = JSString::try_from(bytes).unwrap();
         assert_eq!(s.to_string(), "\u{FFFD}\u{FFFD}\u{FFFD}");
     }
 
     #[test]
     fn test_js_string_into_bytes() {
-        let s = JSString::from(b"Hello, World!");
+        let s = JSString::try_from(b"Hello, World!").unwrap();
         let bytes: Vec<u8> = s.into();
         assert_eq!(bytes, b"Hello, World!");
     }
