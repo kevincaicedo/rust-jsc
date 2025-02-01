@@ -261,7 +261,7 @@ pub struct JSString {
 /// This struct is used to retain a reference to a JavaScript string.
 /// It won't release the string when it goes out of scope.
 /// To release the string, use the `release` method.
-pub struct JSStringRetain(JSStringRef);
+pub struct JSStringProctected(JSStringRef);
 
 pub type JSResult<T> = Result<T, JSError>;
 

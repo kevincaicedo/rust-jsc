@@ -17,9 +17,9 @@ checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.82"
+version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ad3d49ab951a01fbaafe34f2ec74122942fe18a3f9814c3268f1bb72042131b"
+checksum = "60946a68e5f9d28b0dc1c21bb8a97ee7d018a8b322fa57838ba31cc878e22d99"
 dependencies = [
  "unicode-ident",
 ]
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "rust_jsc_macros",
  "rust_jsc_sys",
@@ -43,8 +43,9 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc_macros"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
 ]

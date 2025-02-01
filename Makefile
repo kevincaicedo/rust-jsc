@@ -68,7 +68,21 @@ build-jsc:
 			brew install cmake; \
 		fi; \
 	fi
-	WebKit/Tools/Scripts/build-webkit --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF"
+	WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Release"
+
+build-jsc-debug:
+# Check if WebKit submodule is initialized otherwise initialize it
+	@if [ ! -d "WebKit/Tools" ]; then \
+		git submodule update --init --recursive; \
+	fi
+# if it is macOS, build with cmake, check if cmake is installed or install it with brew
+	@if [ "$(shell uname)" = "Darwin" ]; then \
+		if [ ! -x "$(shell command -v cmake)" ]; then \
+			brew install cmake; \
+		fi; \
+	fi
+# WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_EXE_LINKER_FLAGS='-framework Foundation -framework CoreFoundation' -DCMAKE_SHARED_LINKER_FLAGS='-framework Foundation -framework CoreFoundation' -DCMAKE_CXX_FLAGS='-Wno-deprecated-declarations' -DCMAKE_BUILD_TYPE=Debug"
+	WebKit/Tools/Scripts/build-jsc --jsc-only --debug --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Debug"
 
 # (cd examples/hello_world && cargo build --release &> output.txt)
 # archive all *.a files from JSOnly build receive the name libjsc-<platform>.a.gz, platforn is a parameter
@@ -81,6 +95,18 @@ archive:
 	fi
 
 	@cd WebKit/WebKitBuild/JSCOnly/Release/lib/ && \
+	tar -czf libjsc-$(platform).a.gz *.a && \
+	mv libjsc-$(platform).a.gz ../../../../../
+
+archive-debug:
+	@echo "Archiving the build artifacts..."
+
+	@if [ -z "$(platform)" ]; then \
+		echo "Please provide the platform parameter"; \
+		exit 1; \
+	fi
+
+	@cd WebKit/WebKitBuild/JSCOnly/Debug/lib/ && \
 	tar -czf libjsc-$(platform).a.gz *.a && \
 	mv libjsc-$(platform).a.gz ../../../../../
 

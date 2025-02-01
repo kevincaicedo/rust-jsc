@@ -15,7 +15,7 @@ use rust_jsc_sys::{
 };
 
 use crate::{
-    JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSStringRetain,
+    JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSStringProctected,
     JSValue,
 };
 
@@ -510,15 +510,15 @@ impl JSContext {
     /// # Examples
     ///
     /// ```
-    /// use rust_jsc::{JSContext, JSStringRetain};
+    /// use rust_jsc::{JSContext, JSStringProctected};
     ///
     /// let ctx = JSContext::new();
     /// let keys = &[
-    ///    JSStringRetain::from("@rust-jsc"),
+    ///    JSStringProctected::from("@rust-jsc"),
     /// ];
     /// ctx.set_virtual_module_keys(keys);
     /// ```
-    pub fn set_virtual_module_keys(&self, keys: &[JSStringRetain]) {
+    pub fn set_virtual_module_keys(&self, keys: &[JSStringProctected]) {
         let keys: Vec<JSStringRef> = keys.iter().map(|key| key.0).collect();
         unsafe {
             JSSetSyntheticModuleKeys(self.inner, keys.len(), keys.as_ptr());
@@ -737,8 +737,8 @@ mod tests {
         _key: JSValue,
         _referrer: JSValue,
         _script_fetcher: JSValue,
-    ) -> JSStringRetain {
-        JSStringRetain::from("@rust-jsc")
+    ) -> JSStringProctected {
+        JSStringProctected::from("@rust-jsc")
     }
 
     #[module_evaluate]
@@ -793,7 +793,7 @@ mod tests {
         key: JSValue,
         _referrer: JSValue,
         _script_fetcher: JSValue,
-    ) -> JSStringRetain {
+    ) -> JSStringProctected {
         let key_value = key.as_string().unwrap();
         // resolve path to file system
         let test_module_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/modules");
@@ -801,7 +801,7 @@ mod tests {
         let path = std::path::Path::new(test_module_dir).join(key_value.to_string());
         let module_path = std::fs::canonicalize(path).unwrap();
 
-        JSStringRetain::from(module_path.to_str().unwrap())
+        JSStringProctected::from(module_path.to_str().unwrap())
     }
 
     #[module_fetch]
@@ -810,7 +810,7 @@ mod tests {
         _key: JSValue,
         _attributes_value: JSValue,
         _script_fetcher: JSValue,
-    ) -> JSStringRetain {
+    ) -> JSStringProctected {
         // read file content
         let path_key = _key.as_string().unwrap().to_string();
         println!("Path key: {:?}", path_key);
@@ -822,7 +822,7 @@ mod tests {
             }
         };
 
-        JSStringRetain::from(file_content)
+        JSStringProctected::from(file_content)
     }
 
     #[module_import_meta]
@@ -950,7 +950,7 @@ mod tests {
     #[test]
     fn test_virtual_module() {
         let ctx = JSContext::new();
-        let keys = &[JSStringRetain::from("@rust-jsc")];
+        let keys = &[JSStringProctected::from("@rust-jsc")];
         ctx.set_virtual_module_keys(keys);
 
         let callbacks = JSAPIModuleLoader {
@@ -1000,7 +1000,7 @@ mod tests {
     #[test]
     fn test_virtual_module_no_default() {
         let ctx = JSContext::new();
-        let keys = &[JSStringRetain::from("@rust-jsc")];
+        let keys = &[JSStringProctected::from("@rust-jsc")];
         ctx.set_virtual_module_keys(keys);
 
         let callbacks = JSAPIModuleLoader {

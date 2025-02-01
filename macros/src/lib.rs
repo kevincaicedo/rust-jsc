@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, ItemFn};
+use quote::{format_ident, quote};
+use syn::{parse_macro_input, FnArg, ItemFn, PatType, Type, TypePath};
 
 #[proc_macro_attribute]
 pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -8,6 +8,158 @@ pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    // Collect typed params (excluding the first three)
+    // e.g. ctx, func, this -> skip them
+    let params: Vec<_> = input.sig.inputs.iter().skip(3).collect();
+
+    // Check if using raw arguments slice
+    if params.len() == 1 {
+        if let FnArg::Typed(PatType { ty, .. }) = &params[0] {
+            if let Type::Reference(_) = &**ty {
+                // Handle old-style with raw arguments slice
+                return generate_legacy_callback(&input, fn_name, visibility, generics);
+            }
+        }
+    }
+
+    // Generate argument parsing code
+    let mut parse_stmts = Vec::new();
+    for (i, param) in params.iter().enumerate() {
+        if let FnArg::Typed(PatType { pat, ty, .. }) = param {
+            let idx = syn::Index::from(i);
+            let var_ident = format_ident!("arg_{}", i);
+            let param_name = quote!(#pat).to_string();
+
+            parse_stmts.push(match &**ty {
+                Type::Path(TypePath { path, .. }) => {
+                    let is_optional = path
+                        .segments
+                        .last()
+                        .map(|s| s.ident == "Option")
+                        .unwrap_or(false);
+
+                    if is_optional {
+                        generate_optional_param_parsing(idx, var_ident)
+                    } else {
+                        generate_required_param_parsing(
+                            idx,
+                            var_ident,
+                            fn_name.to_string().as_str(),
+                            param_name.as_str(),
+                        )
+                    }
+                }
+                _ => quote! {
+                    panic!("[callback] Unsupported parameter type for {}", #param_name);
+                },
+            });
+        }
+    }
+
+    let call_args: Vec<_> = params
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            let var_ident = format_ident!("arg_{}", i);
+            quote!(#var_ident)
+        })
+        .collect();
+
+    let func_call = quote! {
+        #fn_name ::<#generic_params>(ctx, function, this_object, #(#call_args),*)
+    };
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __function: rust_jsc::internal::JSObjectRef,
+            __this_object: rust_jsc::internal::JSObjectRef,
+            __argument_count: usize,
+            __arguments: *const rust_jsc::internal::JSValueRef,
+            __exception: *mut rust_jsc::internal::JSValueRef,
+        ) -> *const rust_jsc::internal::OpaqueJSValue
+        #where_clause {
+            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let function = rust_jsc::JSObject::from_ref(__function, __ctx_ref);
+            let this_object = rust_jsc::JSObject::from_ref(__this_object, __ctx_ref);
+            let arguments = if __arguments.is_null() || __argument_count == 0 {
+                vec![]
+            } else {
+                unsafe { std::slice::from_raw_parts(__arguments, __argument_count) }
+                    .iter()
+                    .map(|__inner_value| rust_jsc::JSValue::new(*__inner_value, __ctx_ref))
+                    .collect::<Vec<_>>()
+            };
+
+            #(#parse_stmts)*
+
+            let result = (|| {
+                #input
+                #func_call
+            })();
+
+            match result {
+                Ok(value) => {
+                    *__exception = std::ptr::null_mut();
+                    value.into()
+                }
+                Err(exception) => {
+                    *__exception = rust_jsc::internal::JSValueRef::from(exception) as *mut _;
+                    std::ptr::null_mut()
+                }
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+fn generate_optional_param_parsing(
+    idx: syn::Index,
+    var_ident: syn::Ident,
+) -> proc_macro2::TokenStream {
+    quote! {
+        let #var_ident = match arguments.get(#idx).map(|value| value.try_into()) {
+            Some(Ok(value)) => Some(value),
+            Some(Err(err)) => {
+                *__exception = rust_jsc::internal::JSValueRef::from(err) as *mut _;
+                return std::ptr::null_mut();
+            },
+            None => None,
+        };
+    }
+}
+
+fn generate_required_param_parsing(
+    idx: syn::Index,
+    var_ident: syn::Ident,
+    fn_name: &str,
+    param_name: &str,
+) -> proc_macro2::TokenStream {
+    quote! {
+        let #var_ident = match arguments.get(#idx).map(|value| value.try_into()) {
+            Some(Ok(value)) => value,
+            Some(Err(err)) => {
+                *__exception = rust_jsc::internal::JSValueRef::from(err) as *mut _;
+                return std::ptr::null_mut();
+            },
+            None => {
+                *__exception = rust_jsc::JSError::new_typ_raw(&ctx, format!("[{}] Missing argument {}", #fn_name, #param_name)) as *mut _;
+                return std::ptr::null_mut();
+            },
+        };
+    }
+}
+
+fn generate_legacy_callback(
+    input: &ItemFn,
+    fn_name: &syn::Ident,
+    visibility: &syn::Visibility,
+    generics: &syn::Generics,
+) -> TokenStream {
     let generic_params = &generics.params;
     let where_clause = &generics.where_clause;
 
@@ -260,7 +412,7 @@ pub fn module_resolve(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 rust_jsc::JSValue,
                 rust_jsc::JSValue,
                 rust_jsc::JSValue,
-            ) -> rust_jsc::JSStringRetain = {
+            ) -> rust_jsc::JSStringProctected = {
                 #input
 
                 #fn_name ::<#generic_params>
@@ -336,7 +488,7 @@ pub fn module_fetch(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 rust_jsc::JSValue,
                 rust_jsc::JSValue,
                 rust_jsc::JSValue,
-            ) -> rust_jsc::JSStringRetain = {
+            ) -> rust_jsc::JSStringProctected = {
                 #input
 
                 #fn_name ::<#generic_params>
@@ -425,7 +577,10 @@ pub fn uncaught_exception(_attr: TokenStream, item: TokenStream) -> TokenStream 
 }
 
 #[proc_macro_attribute]
-pub fn uncaught_exception_event_loop(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn uncaught_exception_event_loop(
+    _attr: TokenStream,
+    item: TokenStream,
+) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;

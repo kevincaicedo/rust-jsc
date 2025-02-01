@@ -13,3 +13,4 @@ public
 .libs-arm
 .libs-musl
 libjsc*.gz
+__cmake_systeminformation

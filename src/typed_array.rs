@@ -336,7 +336,13 @@ impl JSTypedArray {
             return Err(JSError::from(value));
         }
 
-        assert!(!result.is_null(), "TypedArray pointer is null");
+        if result.is_null() {
+            let context = JSContext::from(self.object.ctx);
+            return Err(JSError::with_message(
+                &context,
+                "Typed array bytes pointer is null",
+            )?);
+        }
 
         let byte_offset = self.byte_offset()?;
         let bytes = unsafe {

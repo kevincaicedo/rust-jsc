@@ -16,6 +16,16 @@ impl JSPromiseResolvingFunctions {
         self.resolve.call(this, arguments)
     }
 
+    pub fn protect(&self) {
+        self.resolve.protect();
+        self.reject.protect();
+    }
+
+    pub fn unprotect(&self) {
+        self.resolve.unprotect();
+        self.reject.unprotect();
+    }
+
     pub fn reject(
         &self,
         this: Option<&JSObject>,
