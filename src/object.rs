@@ -896,17 +896,6 @@ mod tests {
         assert_eq!(object.get_prototype(), prototype.into());
     }
 
-    // #[test]
-    // fn test_object_private_data() {
-    //     let ctx = JSContext::new();
-    //     let object = JSObject::new(&ctx);
-    //     let data = Box::new(42);
-
-    //     object.set_private_data(data.clone());
-    //     let private_data: Box<i32> = object.get_private_data().unwrap();
-    //     assert_eq!(*private_data, 42);
-    // }
-
     #[test]
     fn test_object_constructor() {
         let ctx = JSContext::new();
@@ -1105,28 +1094,6 @@ mod tests {
         object.set_prototype(&prototype);
         assert_eq!(object.get_prototype(), prototype.into());
     }
-
-    // #[test]
-    // fn test_object_set_private_data() {
-    //     let ctx = JSContext::new();
-    //     let object = JSObject::new(&ctx);
-    //     let data = Box::new(42);
-
-    //     object.set_private_data(data.clone());
-    //     let private_data: Box<i32> = object.get_private_data().unwrap();
-    //     assert_eq!(*private_data, 42);
-    // }
-
-    // #[test]
-    // fn test_object_get_private_data() {
-    //     let ctx = JSContext::new();
-    //     let object = JSObject::new(&ctx);
-    //     let data = Box::new(42);
-
-    //     object.set_private_data(data.clone());
-    //     let private_data: Box<i32> = object.get_private_data().unwrap();
-    //     assert_eq!(*private_data, 42);
-    // }
 
     #[test]
     fn test_object_is_constructor() {

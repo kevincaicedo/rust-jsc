@@ -79,6 +79,20 @@ impl JSError {
         Ok(Self::from(JSObject::from_ref(result, ctx.inner)))
     }
 
+    pub fn new_typ_raw(ctx: &JSContext, message: impl Into<JSString>) -> JSValueRef {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+
+        let result = unsafe {
+            JSObjectMakeTypeError(ctx.inner, message.into().inner, &mut exception)
+        };
+
+        if !exception.is_null() {
+            return exception;
+        }
+
+        result
+    }
+
     pub fn with_message(ctx: &JSContext, message: impl Into<JSString>) -> JSResult<Self> {
         let args = [JSValue::string(ctx, message)];
         Self::new(ctx, &args)

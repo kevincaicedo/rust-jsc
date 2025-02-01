@@ -236,6 +236,18 @@ make build-jsc
 
 Then set the `RUST_JSC_CUSTOM_BUILD_PATH` environment variable to the path of the static libraries.
 
+in order to archive the static libraries, you can use the following command:
+
+```bash
+# For macOS
+make archive platform=aarch64-apple-darwin
+make archive platform=x86_64-apple-darwin
+
+# For Linux
+make archive platform=aarch64-unknown-linux-gnu
+make archive platform=x86_64-unknown-linux-gnu
+```
+
 > :warning: **Keep in mind this lib use a custom version of [WebKit](https://github.com/kevincaicedo/Kedo-WebKit) to generate the bindings. this version of WebKit is a fork of the original WebKit with some patches to support esmodules and other features.**
 
 ### How do I troubleshoot linking problems?

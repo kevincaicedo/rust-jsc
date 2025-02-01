@@ -214,12 +214,12 @@ impl From<JSObject> for JSFunction {
 
 #[cfg(test)]
 mod tests {
-    use crate::{self as rust_jsc, JSString};
+    use crate::{self as rust_jsc, JSError, JSString};
     use rust_jsc_macros::{callback, constructor};
     use rust_jsc_sys::{JSContextRef, JSObjectRef, JSValueRef};
 
     use crate::{
-        JSClass, JSContext, JSError, JSFunction, JSObject, JSResult, JSValue,
+        JSClass, JSContext, JSFunction, JSObject, JSResult, JSValue,
         PropertyDescriptorBuilder,
     };
 
@@ -228,13 +228,11 @@ mod tests {
         #[callback]
         fn log_info(
             ctx: JSContext,
-            _function: JSObject,
-            _this: JSObject,
-            arguments: &[JSValue],
+            _: JSObject,
+            __: JSObject,
+            message: JSValue,
         ) -> JSResult<JSValue> {
-            let message = arguments.get(0).unwrap().as_string().unwrap();
-            println!("INFO: {}", message);
-
+            println!("INFO: {}", message.as_string().unwrap());
             Ok(JSValue::undefined(&ctx))
         }
 
@@ -259,18 +257,147 @@ mod tests {
     }
 
     #[test]
+    fn test_callback_with_missing_arguments() {
+        #[callback]
+        fn log_info(
+            ctx: JSContext,
+            _: JSObject,
+            __: JSObject,
+            message: JSValue,
+        ) -> JSResult<JSValue> {
+            println!("INFO: {}", message.as_string().unwrap());
+            Ok(JSValue::undefined(&ctx))
+        }
+
+        let ctx = JSContext::new();
+        let global_object = ctx.global_object();
+
+        let function = JSFunction::callback(&ctx, Some("print"), Some(log_info));
+        global_object
+            .set_property("print", &function, Default::default())
+            .unwrap();
+
+        let result = ctx.evaluate_script("print()", None);
+        assert!(result.is_err());
+
+        let error = result.unwrap_err();
+        println!("Error: {:?}", error.message().unwrap());
+        assert_eq!(error.name().unwrap(), "TypeError");
+    }
+
+    #[test]
+    fn test_callback_with_invalid_argument_type() {
+        #[callback]
+        fn log_info(
+            ctx: JSContext,
+            _: JSObject,
+            __: JSObject,
+            _private: JSString,
+        ) -> JSResult<JSValue> {
+            // println!("IS PRIVATE: {}", private);
+            Ok(JSValue::undefined(&ctx))
+        }
+
+        let ctx = JSContext::new();
+        let global_object = ctx.global_object();
+
+        let function = JSFunction::callback(&ctx, Some("print"), Some(log_info));
+        global_object
+            .set_property("print", &function, Default::default())
+            .unwrap();
+
+        let result = ctx.evaluate_script("print(Symbol('foo'))", None);
+        assert!(result.is_err());
+
+        let error = result.unwrap_err();
+        println!("Error: {:?}", error.message().unwrap());
+        assert_eq!(error.name().unwrap(), "TypeError");
+    }
+
+    #[test]
+    fn test_callback_with_invalid_optional_argument_type() {
+        #[callback]
+        fn log_info(
+            ctx: JSContext,
+            _: JSObject,
+            __: JSObject,
+            _private: Option<JSString>,
+        ) -> JSResult<JSValue> {
+            Ok(JSValue::undefined(&ctx))
+        }
+
+        let ctx = JSContext::new();
+        let global_object = ctx.global_object();
+
+        let function = JSFunction::callback(&ctx, Some("print"), Some(log_info));
+        global_object
+            .set_property("print", &function, Default::default())
+            .unwrap();
+
+        let result = ctx.evaluate_script("print(Symbol('foo'))", None);
+        assert!(result.is_err());
+
+        let error = result.unwrap_err();
+        println!("Error: {:?}", error.message().unwrap());
+        assert_eq!(error.name().unwrap(), "TypeError");
+    }
+
+    #[test]
+    fn test_callback_with_multiple_arguments() {
+        #[callback]
+        fn log_info(
+            ctx: JSContext,
+            _: JSObject,
+            __: JSObject,
+            item_1: JSString,
+            item_2: String,
+            item_3: f64,
+            item_4: bool,
+            item_5: JSObject,
+            item_6: JSValue,
+            item_7: Option<JSString>,
+            item_8: Option<bool>,
+        ) -> JSResult<JSValue> {
+            println!("INFO: {}", item_1);
+            println!("INFO: {}", item_2);
+            println!("INFO: {}", item_3);
+            println!("INFO: {}", item_4);
+            println!("INFO: {}", item_5.as_string().unwrap());
+            println!("INFO: {}", item_6.as_string().unwrap());
+            println!("INFO: {:?}", item_7);
+            println!("INFO: {:?}", item_8);
+            Ok(JSValue::undefined(&ctx))
+        }
+
+        let ctx = JSContext::new();
+        let global_object = ctx.global_object();
+
+        let function = JSFunction::callback(&ctx, Some("print"), Some(log_info));
+        global_object
+            .set_property("print", &function, Default::default())
+            .unwrap();
+
+        let result = ctx.evaluate_script(r#"
+            print('Hello, World!', 'Hello, World!', 3.14, true, {}, null, 'Hello, World!');
+        "#.into(), 
+        None);
+        
+        assert!(!result.is_err());
+    }
+
+    #[test]
     fn test_callback_error() {
         #[callback]
         fn log_error(
             ctx: JSContext,
             _function: JSObject,
             _this: JSObject,
-            arguments: &[JSValue],
+            message: JSString,
         ) -> JSResult<JSValue> {
-            let message = arguments.get(0).unwrap().as_string().unwrap();
             println!("ERROR: {}", message);
 
-            let error = JSError::new(&ctx, arguments).unwrap();
+            let arguments = vec![JSValue::string(&ctx, "An error occurred")];
+            let error = JSError::new(&ctx, arguments.as_slice()).unwrap();
             Err(error)
         }
 

@@ -1,16 +1,17 @@
 use rust_jsc_sys::{
-    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueGetType, JSValueIsArray,
-    JSValueIsBoolean, JSValueIsDate, JSValueIsEqual, JSValueIsInstanceOfConstructor,
-    JSValueIsNull, JSValueIsNumber, JSValueIsObject, JSValueIsObjectOfClass,
-    JSValueIsStrictEqual, JSValueIsString, JSValueIsSymbol, JSValueIsUndefined,
-    JSValueMakeBoolean, JSValueMakeFromJSONString, JSValueMakeNull, JSValueMakeNumber,
-    JSValueMakeString, JSValueMakeSymbol, JSValueMakeUndefined, JSValueProtect,
-    JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject, JSValueToStringCopy,
-    JSValueUnprotect,
+    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueGetType,
+    JSValueIsArray, JSValueIsBoolean, JSValueIsDate, JSValueIsEqual,
+    JSValueIsInstanceOfConstructor, JSValueIsNull, JSValueIsNumber, JSValueIsObject,
+    JSValueIsObjectOfClass, JSValueIsStrictEqual, JSValueIsString, JSValueIsSymbol,
+    JSValueIsUndefined, JSValueMakeBoolean, JSValueMakeFromJSONString, JSValueMakeNull,
+    JSValueMakeNumber, JSValueMakeString, JSValueMakeSymbol, JSValueMakeUndefined,
+    JSValueProtect, JSValueRef, JSValueToBoolean, JSValueToNumber, JSValueToObject,
+    JSValueToStringCopy, JSValueUnprotect,
 };
 
 use crate::{
-    JSClass, JSContext, JSError, JSObject, JSResult, JSString, JSValue, JSValueType,
+    JSClass, JSContext, JSError, JSObject, JSResult, JSString, JSStringProctected,
+    JSValue, JSValueType,
 };
 
 impl JSValue {
@@ -115,6 +116,34 @@ impl JSValue {
     /// A JavaScript string value.
     pub fn string(ctx: &JSContext, value: impl Into<JSString>) -> JSValue {
         let inner = unsafe { JSValueMakeString(ctx.inner, value.into().inner) };
+        Self::new(inner, ctx.inner)
+    }
+
+    /// Creates a JavaScript string value from a protected string.
+    /// This is useful when you want to retain a string value.
+    /// The string will not be garbage collected until the protected string is released.
+    /// This is useful when you want to store a string value in a global or on the heap,
+    /// 
+    /// # Arguments
+    /// * `value` - The protected string to use as the value.
+    /// 
+    /// # Examples
+    /// ```
+    /// use rust_jsc::*;
+    /// 
+    /// let ctx = JSContext::new();
+    /// let value = JSValue::string_retain(&ctx, "Hello, World!");
+    /// assert!(value.is_string());
+    /// ```
+    /// 
+    /// # Returns
+    /// A JavaScript string value.
+    pub fn string_retain(
+        ctx: &JSContext,
+        value: impl Into<JSStringProctected>,
+    ) -> JSValue {
+        let inner_string = value.into();
+        let inner = unsafe { JSValueMakeString(ctx.inner, inner_string.0) };
         Self::new(inner, ctx.inner)
     }
 
@@ -590,6 +619,54 @@ impl From<JSValue> for JSValueRef {
 impl From<JSValue> for JSObjectRef {
     fn from(value: JSValue) -> Self {
         value.inner as *mut _
+    }
+}
+
+impl TryInto<JSObject> for &JSValue {
+    type Error = JSError;
+
+    fn try_into(self) -> Result<JSObject, Self::Error> {
+        self.as_object()
+    }
+}
+
+impl TryInto<JSString> for &JSValue {
+    type Error = JSError;
+
+    fn try_into(self) -> Result<JSString, Self::Error> {
+        self.as_string()
+    }
+}
+
+impl TryInto<bool> for &JSValue {
+    type Error = JSError;
+
+    fn try_into(self) -> Result<bool, Self::Error> {
+        Ok(self.as_boolean())
+    }
+}
+
+impl TryInto<f64> for &JSValue {
+    type Error = JSError;
+
+    fn try_into(self) -> Result<f64, Self::Error> {
+        self.as_number()
+    }
+}
+
+impl TryInto<String> for &JSValue {
+    type Error = JSError;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        self.as_string().map(|s| s.to_string())
+    }
+}
+
+impl TryInto<JSValue> for &JSValue {
+    type Error = JSError;
+
+    fn try_into(self) -> Result<JSValue, Self::Error> {
+        Ok(self.clone())
     }
 }
 

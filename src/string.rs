@@ -9,9 +9,9 @@ use rust_jsc_sys::{
     JSStringRelease,
 };
 
-use crate::{JSString, JSStringRetain};
+use crate::{JSString, JSStringProctected};
 
-impl JSStringRetain {
+impl JSStringProctected {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -27,35 +27,35 @@ impl JSStringRetain {
     }
 }
 
-impl From<&str> for JSStringRetain {
+impl From<&str> for JSStringProctected {
     fn from(s: &str) -> Self {
         let c =
-            CString::new(s.as_bytes()).expect("&str to JSStringRetain conversion failed");
+            CString::new(s.as_bytes()).expect("&str to JSStringProctected conversion failed");
         Self(unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) })
     }
 }
 
-impl From<String> for JSStringRetain {
+impl From<String> for JSStringProctected {
     fn from(s: String) -> Self {
         let c = CString::new(s.as_bytes())
-            .expect("String to JSStringRetain conversion failed");
+            .expect("String to JSStringProctected conversion failed");
         Self(unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) })
     }
 }
 
-impl From<JSStringRef> for JSStringRetain {
+impl From<JSStringRef> for JSStringProctected {
     fn from(inner: JSStringRef) -> Self {
         Self(inner)
     }
 }
 
-impl From<JSStringRetain> for JSStringRef {
-    fn from(s: JSStringRetain) -> Self {
+impl From<JSStringProctected> for JSStringRef {
+    fn from(s: JSStringProctected) -> Self {
         s.0
     }
 }
 
-impl std::fmt::Display for JSStringRetain {
+impl std::fmt::Display for JSStringProctected {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.0) };
         let mut buffer = vec![0u8; max_len];
@@ -70,7 +70,7 @@ impl std::fmt::Display for JSStringRetain {
     }
 }
 
-impl Clone for JSStringRetain {
+impl Clone for JSStringProctected {
     fn clone(&self) -> Self {
         self.to_string().into()
     }
@@ -245,7 +245,7 @@ impl Drop for JSString {
 
 #[cfg(test)]
 mod tests {
-    use crate::{JSString, JSStringRetain};
+    use crate::{JSString, JSStringProctected};
 
     #[test]
     fn test_js_string() {
@@ -270,15 +270,15 @@ mod tests {
 
     #[test]
     fn test_js_string_retain_eq_utf8() {
-        let s1 = JSStringRetain::from("Hello, World!");
-        let s2 = JSStringRetain::from("Hello, World!");
-        let s3 = JSStringRetain::from("démonstration.html");
-        let s4 = JSStringRetain::from("こんにちは世界");
-        let s5 = JSStringRetain::from("Привет, мир!");
-        let s6 = JSStringRetain::from("😊👍🏽");
-        let s7 = JSStringRetain::from("");
-        let s8 = JSStringRetain::from("你好，世界！");
-        let s9 = JSStringRetain::from("Bonjour le monde!");
+        let s1 = JSStringProctected::from("Hello, World!");
+        let s2 = JSStringProctected::from("Hello, World!");
+        let s3 = JSStringProctected::from("démonstration.html");
+        let s4 = JSStringProctected::from("こんにちは世界");
+        let s5 = JSStringProctected::from("Привет, мир!");
+        let s6 = JSStringProctected::from("😊👍🏽");
+        let s7 = JSStringProctected::from("");
+        let s8 = JSStringProctected::from("你好，世界！");
+        let s9 = JSStringProctected::from("Bonjour le monde!");
 
         // Test equality with the same content
         assert_eq!(s1.to_string(), s2.to_string());
@@ -388,11 +388,11 @@ mod tests {
 
     #[test]
     fn test_jsstring_retain() {
-        let s = JSStringRetain::from("Hello, World!");
+        let s = JSStringProctected::from("Hello, World!");
         assert_eq!(s.to_string(), "Hello, World!");
 
-        let s1 = JSStringRetain::from("Hello, World!");
-        let s2 = JSStringRetain::from("Hello, World!");
+        let s1 = JSStringProctected::from("Hello, World!");
+        let s2 = JSStringProctected::from("Hello, World!");
         assert_eq!(s1.clone().to_string(), s2.to_string());
         assert_eq!(s1.to_string(), s2.clone().to_string());
     }
