@@ -5,7 +5,7 @@
 
 use rust_jsc::{
     callback, module_evaluate, module_fetch, module_import_meta, module_resolve,
-    JSContext, JSFunction, JSObject, JSResult, JSString, JSStringRetain, JSValue, JSPromise,
+    JSContext, JSFunction, JSObject, JSResult, JSString, JSStringProctected, JSValue, JSPromise,
     PropertyDescriptorBuilder, JSModuleLoader, PropertyDescriptor,
 };
 
@@ -47,14 +47,14 @@ fn moduleLoaderResolve(
     key: JSValue,
     referrer: JSValue,
     script_fetcher: JSValue,
-) -> JSStringRetain {
+) -> JSStringProctected {
     let key_value = key.as_string().unwrap();
     // let referrer_value = referrer.as_string().unwrap();
     // let script = script_fetcher.as_string().unwrap();
 
     // println!("ModuleLoaderResolve, Key: {:?}", key_value);
 
-    JSStringRetain::from("@rust-jsc")
+    JSStringProctected::from("@rust-jsc")
 }
 
 #[module_evaluate]
@@ -92,14 +92,14 @@ fn moduleLoaderFetch(
     key: JSValue,
     attributes_value: JSValue,
     script_fetcher: JSValue,
-) -> JSStringRetain {
+) -> JSStringProctected {
     let key_value = key.as_string().unwrap();
     let script = script_fetcher.as_string().unwrap();
     let attributes = attributes_value.as_string().unwrap();
 
     println!("ModuleLoaderFetch, Key: {:?}", key_value);
 
-    JSStringRetain::from("let name = 'Kevin'; export default name;")
+    JSStringProctected::from("let name = 'Kevin'; export default name;")
 }
 
 #[module_import_meta]
@@ -156,7 +156,7 @@ fn main() {
     ctx.set_module_loader(callbacks);
     
     let keys = &[
-        JSStringRetain::from("@rust-jsc"),
+        JSStringProctected::from("@rust-jsc"),
     ];
     ctx.set_virtual_module_keys(keys);
     
