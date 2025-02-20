@@ -694,9 +694,9 @@ impl Default for JSContext {
 impl From<JSContextRef> for JSContext {
     fn from(context: JSContextRef) -> Self {
         let global_context = unsafe { JSContextGetGlobalContext(context) };
-        unsafe {
-            JSGlobalContextRetain(global_context);
-        }
+        // unsafe {
+        //     JSGlobalContextRetain(global_context);
+        // }
 
         Self {
             inner: global_context,
@@ -706,9 +706,9 @@ impl From<JSContextRef> for JSContext {
 
 impl Drop for JSContext {
     fn drop(&mut self) {
-        unsafe {
-            JSGlobalContextRelease(self.inner);
-        }
+        // unsafe {
+        //     JSGlobalContextRelease(self.inner);
+        // }
 
         // TODO: Set the pointers to the shared data to null
         // unsafe {

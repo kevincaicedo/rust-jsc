@@ -593,7 +593,7 @@ impl JSArrayBuffer {
         let result = unsafe {
             JSObjectIsDetachedBuffer(self.object.ctx, self.object.inner, &mut exception)
         };
-
+        // TODO: Handle exception
         result
     }
 
