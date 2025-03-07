@@ -1,12 +1,12 @@
 use rust_jsc_sys::{
     JSObjectGetArrayBufferByteLength, JSObjectGetArrayBufferBytesPtr,
-    JSObjectGetTypedArrayBuffer, JSObjectGetTypedArrayByteLength,
-    JSObjectGetTypedArrayByteOffset, JSObjectGetTypedArrayBytesPtr,
-    JSObjectGetTypedArrayLength, JSObjectIsDetachedBuffer,
+    JSObjectGetTypedArrayBuffer, JSObjectGetTypedArrayByteLength, JSObjectGetTypedArrayByteOffset,
+    JSObjectGetTypedArrayBytesPtr, JSObjectGetTypedArrayLength, JSObjectIsDetachedBuffer,
     JSObjectMakeArrayBufferWithBytesNoCopy, JSObjectMakeTypedArray,
     JSObjectMakeTypedArrayWithArrayBuffer,
     JSObjectMakeTypedArrayWithArrayBufferAndOffset,
-    JSObjectMakeTypedArrayWithBytesNoCopy, JSValueGetTypedArrayType, JSValueRef,
+    JSObjectMakeTypedArrayWithBytesNoCopy, JSValueGetTypedArrayBytesPtrFromValue,
+    JSValueGetTypedArrayType, JSValueRef,
 };
 
 use crate::{
@@ -350,6 +350,44 @@ impl JSTypedArray {
                 // result as *mut u8,
                 result.offset(byte_offset as isize).cast::<T>(),
                 self.byte_len()?,
+            )
+        };
+
+        Ok(bytes)
+    }
+
+    pub fn bytes_from_value<T>(value: &JSValue) -> JSResult<&mut [T]> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        let mut offset: usize = 0;
+        let mut len: usize = 0;
+
+        let result = unsafe {
+            JSValueGetTypedArrayBytesPtrFromValue(
+                value.ctx,
+                value.inner,
+                &mut exception,
+                &mut offset,
+                &mut len,
+            )
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, value.ctx);
+            return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            let context = JSContext::from(value.ctx);
+            return Err(JSError::with_message(
+                &context,
+                "Typed array bytes pointer is null",
+            )?);
+        }
+
+        let bytes = unsafe {
+            std::slice::from_raw_parts_mut(
+                result.offset(offset as isize).cast::<T>(),
+                len,
             )
         };
 

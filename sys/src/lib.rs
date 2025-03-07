@@ -30825,6 +30825,26 @@ extern "C" {
     ) -> *mut ::std::os::raw::c_void;
 }
 extern "C" {
+    #[doc = "@function\n@abstract         Returns a pointer to the data buffer that serves as the backing store for a JavaScript Array Buffer object.\n@param object     The Array Buffer object whose internal backing store pointer to return.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result           A pointer to the raw data buffer that serves as object's backing store or NULL if object is not an Array Buffer object.\n@discussion       The pointer returned by this function is temporary and is not guaranteed to remain valid across JavaScriptCore API calls."]
+    pub fn JSValueFastUFT8Encoding(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> JSValueRef;
+}
+
+extern "C" {
+    #[doc = "@function\n@abstract         Returns a pointer to the data buffer that serves as the backing store for a JavaScript Array Buffer object.\n@param object     The Array Buffer object whose internal backing store pointer to return.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result           A pointer to the raw data buffer that serves as object's backing store or NULL if object is not an Array Buffer object.\n@discussion       The pointer returned by this function is temporary and is not guaranteed to remain valid across JavaScriptCore API calls."]
+    pub fn JSValueGetTypedArrayBytesPtrFromValue(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+        offset: *mut usize,
+        length: *mut usize,
+    ) -> *mut ::std::os::raw::c_void;
+}
+
+extern "C" {
     #[doc = "@function\n@abstract         Returns the number of bytes in a JavaScript data object.\n@param ctx        The execution context to use.\n@param object     The JS Arary Buffer object whose length in bytes to return.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result           The number of bytes stored in the data object."]
     pub fn JSObjectGetArrayBufferByteLength(
         ctx: JSContextRef,
