@@ -25,7 +25,10 @@ fn static_lib_file() -> String {
         // TODO: Support windows
         // ("windows", "x86_64") => "x86_64-pc-windows-msvc",
         // ("windows", "i686") => "i686-pc-windows-msvc",
-        _ => panic!("Unsupported target OS or architecture: {}-{}", target_os, target_arch),
+        _ => panic!(
+            "Unsupported target OS or architecture: {}-{}",
+            target_os, target_arch
+        ),
     };
     format!("libjsc-{}.a.gz", platform)
 }
@@ -100,7 +103,10 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_BUILD_PATH");
+    println!(
+        "cargo:rerun-if-env-changed={}",
+        "RUST_JSC_CUSTOM_BUILD_PATH"
+    );
     println!("cargo:rerun-if-env-changed={}", "SYSTEM_LIBS_PATH");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_MIRROR");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_ARCHIVE");
@@ -115,7 +121,8 @@ fn main() {
         let static_lib_file = static_lib_file();
 
         // if archive file is not found in outdir, download it
-        if !std::path::Path::new(&format!("{}/{}", output_path, static_lib_file)).exists() {
+        if !std::path::Path::new(&format!("{}/{}", output_path, static_lib_file)).exists()
+        {
             fetch_static_lib();
             extract_static_lib();
         }
@@ -155,11 +162,14 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_BUILD_PATH");
+    println!(
+        "cargo:rerun-if-env-changed={}",
+        "RUST_JSC_CUSTOM_BUILD_PATH"
+    );
     println!("cargo:rerun-if-env-changed={}", "SYSTEM_LIBS_PATH");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_MIRROR");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_ARCHIVE");
-    
+
     // if custom path for the static lib is set use it, otherwise download the static lib
     if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
         println!("cargo:rustc-link-search=native={}", custom_build_path);

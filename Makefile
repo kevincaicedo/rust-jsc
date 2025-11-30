@@ -68,7 +68,7 @@ build-jsc:
 			brew install cmake; \
 		fi; \
 	fi
-	WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-Wno-error=missing-template-arg-list-after-template-kw -Wno-error=constant-conversion'"
+	WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-Wno-error=missing-template-arg-list-after-template-kw -Wno-error=constant-conversion -Wno-unused-variable -Wno-error=unused-variable'"
 
 build-jsc-debug:
 # Check if WebKit submodule is initialized otherwise initialize it

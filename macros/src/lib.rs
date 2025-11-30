@@ -611,3 +611,31 @@ pub fn uncaught_exception_event_loop(
 
     TokenStream::from(expanded)
 }
+
+#[proc_macro_attribute]
+pub fn inspector_callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let generic_params = &generics.params;
+    let where_clause = &generics.where_clause;
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+            message: *const std::os::raw::c_char
+        ) #where_clause {
+            let message_str = std::ffi::CStr::from_ptr(message).to_str().expect("[Inspector] Invalid UTF-8");
+
+            let func: fn(&str) = {
+                #input
+
+                #fn_name ::<#generic_params>
+            };
+
+            func(message_str);
+        }
+    };
+
+    TokenStream::from(expanded)
+}

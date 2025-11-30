@@ -29853,6 +29853,9 @@ pub type JSClassAttributes = ::std::os::raw::c_uint;
 #[doc = "@typedef JSObjectInitializeCallback\n@abstract The callback invoked when an object is first created.\n@param ctx The execution context to use.\n@param object The JSObject being created.\n@discussion If you named your function Initialize, you would declare it like this:\n\nvoid Initialize(JSContextRef ctx, JSObjectRef object);\n\nUnlike the other object callbacks, the initialize callback is called on the least\nderived class (the parent class) first, and the most derived class last."]
 pub type JSObjectInitializeCallback =
     ::std::option::Option<unsafe extern "C" fn(ctx: JSContextRef, object: JSObjectRef)>;
+#[doc = "@typedef InspectorMessageCallback\n@abstract The callback invoked when an inspector message is received.\n@param message The message received from the inspector.\n@discussion If you named your function InspectorMessage, you would declare it like this:\n\nvoid InspectorMessage(const char* message);\n\nThis callback is called when a message is received from the inspector."]
+pub type InspectorMessageCallback =
+    ::std::option::Option<unsafe extern "C" fn(message: *const ::std::os::raw::c_char)>;
 #[doc = "@typedef JSObjectFinalizeCallback\n@abstract The callback invoked when an object is finalized (prepared for garbage collection). An object may be finalized on any thread.\n@param object The JSObject being finalized.\n@discussion If you named your function Finalize, you would declare it like this:\n\nvoid Finalize(JSObjectRef object);\n\nThe finalize callback is called on the most derived class first, and the least\nderived class (the parent class) last.\n\nYou must not call any function that may cause a garbage collection or an allocation\nof a garbage collected object from within a JSObjectFinalizeCallback. This includes\nall functions that have a JSContextRef parameter."]
 pub type JSObjectFinalizeCallback =
     ::std::option::Option<unsafe extern "C" fn(object: JSObjectRef)>;
@@ -30661,6 +30664,43 @@ extern "C" {
 extern "C" {
     #[doc = "@function\n@abstract Sets whether the context is inspectable in Web Inspector. Default value is NO.\n@param ctx The JSGlobalContext that you want to change the inspectability of.\n@param inspectable YES to allow Web Inspector to connect to the context, otherwise NO."]
     pub fn JSGlobalContextSetInspectable(ctx: JSGlobalContextRef, inspectable: bool);
+}
+extern "C" {
+    #[doc = "@function\n@abstract Starts a remote inspector server.\n@param address The address to listen on.\n@param port The port to listen on."]
+    pub fn JSRemoteInspectorServerStart(
+        address: *const ::std::os::raw::c_char,
+        port: u16,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Starts a remote inspector server."]
+    pub fn JSRemoteInspectorStart();
+}
+extern "C" {
+    #[doc = "@function\n@abstract Sets the callback to be called when the context is inspected in Web Inspector."]
+    pub fn JSInspectorSetCallback(
+        ctx: JSGlobalContextRef,
+        callback: InspectorMessageCallback,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Sends a message to the Web Inspector."]
+    pub fn JSInspectorSendMessage(
+        ctx: JSGlobalContextRef,
+        message: *const ::std::os::raw::c_char,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Cleans up inspector resources.\n@deprecated Use JSInspectorDisconnect instead."]
+    pub fn JSInspectorCleanup();
+}
+extern "C" {
+    #[doc = "@function\n@abstract Disconnects the inspector frontend from the given context.\n@param ctx The JavaScript context to disconnect from the inspector."]
+    pub fn JSInspectorDisconnect(ctx: JSGlobalContextRef);
+}
+extern "C" {
+    #[doc = "@function\n@abstract Checks if the inspector is currently connected for the given context.\n@param ctx The JavaScript context to check.\n@return true if an inspector frontend is connected, false otherwise."]
+    pub fn JSInspectorIsConnected(ctx: JSGlobalContextRef) -> bool;
 }
 #[doc = "@typedef JSChar\n@abstract A UTF-16 code unit. One, or a sequence of two, can encode any Unicode\ncharacter. As with all scalar types, endianness depends on the underlying\narchitecture."]
 pub type JSChar = ::std::os::raw::c_ushort;
