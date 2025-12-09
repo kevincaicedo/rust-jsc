@@ -215,9 +215,20 @@ impl JSClass {
     /// The object will have the given data associated with it.
     /// The data will be passed to the initialize callback.
     ///
+    /// # Type Parameters
+    /// - `T`: The type of data to associate with the object. Must be `'static` to ensure
+    ///   the data does not contain borrowed references that could become invalid.
+    ///
     /// # Arguments
     /// - `ctx`: The JavaScript context to create the object in.
     /// - `data`: The data to associate with the object.
+    ///
+    /// # Safety
+    /// The generic type `T` must remain consistent across operations:
+    /// - If you store data of type `Box<T>`, you must retrieve it with the same type `T`.
+    /// - Type mismatches will result in undefined behavior.
+    /// - The data must be properly cleaned up in the finalize callback if provided.
+    /// - If no finalize callback is provided, the data will leak.
     ///
     /// # Example
     /// ```
@@ -234,7 +245,7 @@ impl JSClass {
     ///
     /// # Returns
     /// A new object of the class.
-    pub fn object<T>(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
+    pub fn object<T: 'static>(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
         let data_ptr = if let Some(data) = data {
             Box::into_raw(data) as *mut std::ffi::c_void
         } else {

@@ -640,8 +640,19 @@ impl JSObject {
     /// The default object class does not allocate storage for private data.
     /// Only objects created with a non-NULL JSClass can store private data.
     ///
+    /// # Type Parameters
+    /// * `T` - The type of data to store. Must be `'static` to ensure the data does not
+    ///   contain borrowed references that could become invalid.
+    ///
     /// # Arguments
     /// * `data` - The private data to set on the object.
+    ///
+    /// # Safety
+    /// The generic type `T` must remain consistent across operations:
+    /// - If you store data of type `Box<T>`, you must retrieve it with the same type `T`.
+    /// - Type mismatches will result in undefined behavior.
+    /// - The caller is responsible for ensuring the data is properly cleaned up,
+    ///   typically in a finalize callback for the object's class.
     ///
     /// # Example
     /// ```no_run
@@ -658,12 +669,21 @@ impl JSObject {
     ///
     /// # Returns
     /// Returns true if object can store private data, otherwise false.
-    pub fn set_private_data<T>(&self, data: Box<T>) -> bool {
+    pub fn set_private_data<T: 'static>(&self, data: Box<T>) -> bool {
         let data_ptr = Box::into_raw(data);
         unsafe { JSObjectSetPrivate(self.inner, data_ptr as _) }
     }
 
     /// Gets the private data from an object.
+    ///
+    /// # Type Parameters
+    /// * `T` - The type of data to retrieve. Must match the type used when setting the data.
+    ///
+    /// # Safety
+    /// The generic type `T` must match the type used in `set_private_data`:
+    /// - Type mismatches will result in undefined behavior.
+    /// - After calling this function, the caller owns the data and is responsible for its cleanup.
+    /// - Calling this function multiple times for the same data will result in a double-free.
     ///
     /// # Example
     /// ```no_run
@@ -680,7 +700,7 @@ impl JSObject {
     ///
     /// # Returns
     /// Returns the private data if it exists, otherwise None.
-    pub fn get_private_data<T>(&self) -> Option<Box<T>> {
+    pub fn get_private_data<T: 'static>(&self) -> Option<Box<T>> {
         let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
 
         if data_ptr.is_null() {
