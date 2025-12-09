@@ -216,8 +216,8 @@ impl JSClass {
     /// The data will be passed to the initialize callback.
     ///
     /// # Type Parameters
-    /// - `T`: The type of data to associate with the object. Must be `'static` to ensure
-    ///   the data does not contain borrowed references that could become invalid.
+    /// - `T`: The type of data to associate with the object. Must be `'static`, meaning
+    ///   the type cannot contain any non-`'static` references (borrowed data with limited lifetimes).
     ///
     /// # Arguments
     /// - `ctx`: The JavaScript context to create the object in.

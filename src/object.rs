@@ -641,8 +641,8 @@ impl JSObject {
     /// Only objects created with a non-NULL JSClass can store private data.
     ///
     /// # Type Parameters
-    /// * `T` - The type of data to store. Must be `'static` to ensure the data does not
-    ///   contain borrowed references that could become invalid.
+    /// * `T` - The type of data to store. Must be `'static`, meaning the type cannot
+    ///   contain any non-`'static` references (borrowed data with limited lifetimes).
     ///
     /// # Arguments
     /// * `data` - The private data to set on the object.
