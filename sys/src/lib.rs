@@ -29853,6 +29853,10 @@ pub type JSClassAttributes = ::std::os::raw::c_uint;
 #[doc = "@typedef JSObjectInitializeCallback\n@abstract The callback invoked when an object is first created.\n@param ctx The execution context to use.\n@param object The JSObject being created.\n@discussion If you named your function Initialize, you would declare it like this:\n\nvoid Initialize(JSContextRef ctx, JSObjectRef object);\n\nUnlike the other object callbacks, the initialize callback is called on the least\nderived class (the parent class) first, and the most derived class last."]
 pub type JSObjectInitializeCallback =
     ::std::option::Option<unsafe extern "C" fn(ctx: JSContextRef, object: JSObjectRef)>;
+#[doc = "@typedef InspectorMessageCallback\n@abstract The callback invoked when an inspector message is received.\n@param message The message received from the inspector.\n@discussion If you named your function InspectorMessage, you would declare it like this:\n\nvoid InspectorMessage(const char* message);\n\nThis callback is called when a message is received from the inspector."]
+pub type InspectorMessageCallback =
+    ::std::option::Option<unsafe extern "C" fn(message: *const ::std::os::raw::c_char)>;
+
 #[doc = "@typedef JSObjectFinalizeCallback\n@abstract The callback invoked when an object is finalized (prepared for garbage collection). An object may be finalized on any thread.\n@param object The JSObject being finalized.\n@discussion If you named your function Finalize, you would declare it like this:\n\nvoid Finalize(JSObjectRef object);\n\nThe finalize callback is called on the most derived class first, and the least\nderived class (the parent class) last.\n\nYou must not call any function that may cause a garbage collection or an allocation\nof a garbage collected object from within a JSObjectFinalizeCallback. This includes\nall functions that have a JSContextRef parameter."]
 pub type JSObjectFinalizeCallback =
     ::std::option::Option<unsafe extern "C" fn(object: JSObjectRef)>;
@@ -30662,6 +30666,99 @@ extern "C" {
     #[doc = "@function\n@abstract Sets whether the context is inspectable in Web Inspector. Default value is NO.\n@param ctx The JSGlobalContext that you want to change the inspectability of.\n@param inspectable YES to allow Web Inspector to connect to the context, otherwise NO."]
     pub fn JSGlobalContextSetInspectable(ctx: JSGlobalContextRef, inspectable: bool);
 }
+extern "C" {
+    #[doc = "@function\n@abstract Starts a remote inspector server.\n@param address The address to listen on.\n@param port The port to listen on."]
+    pub fn JSRemoteInspectorServerStart(
+        address: *const ::std::os::raw::c_char,
+        port: u16,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Starts a remote inspector server."]
+    pub fn JSRemoteInspectorStart();
+}
+extern "C" {
+    #[doc = "@function\n@abstract Sets the callback to be called when the context is inspected in Web Inspector."]
+    pub fn JSInspectorSetCallback(
+        ctx: JSGlobalContextRef,
+        callback: InspectorMessageCallback,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Sends a message to the Web Inspector."]
+    pub fn JSInspectorSendMessage(
+        ctx: JSGlobalContextRef,
+        message: *const ::std::os::raw::c_char,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract Cleans up inspector resources.\n@deprecated Use JSInspectorDisconnect instead."]
+    pub fn JSInspectorCleanup();
+}
+extern "C" {
+    #[doc = "@function\n@abstract Disconnects the inspector frontend from the given context.\n@param ctx The JavaScript context to disconnect from the inspector."]
+    pub fn JSInspectorDisconnect(ctx: JSGlobalContextRef);
+}
+extern "C" {
+    #[doc = "@function\n@abstract Checks if the inspector is currently connected for the given context.\n@param ctx The JavaScript context to check.\n@return true if an inspector frontend is connected, false otherwise."]
+    pub fn JSInspectorIsConnected(ctx: JSGlobalContextRef) -> bool;
+}
+extern "C" {
+    #[doc = "@function\n@abstract         Converts a JSValue to a singed 32-bit integer and returns the resulting integer.\n@param ctx        The execution context to use.\n@param value      The JSValue to convert.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. To reliable detect exception, initialize this to null before the call. Pass NULL if you do not care to store an exception.\n@result           An int32_t with the result of conversion, or 0 if an exception is thrown. Since 0 is valid value, `exception` must be checked after the call.\n@discussion       The JSValue is converted to an integer according to the rules specified by the JavaScript language. If the value is a BigInt, then the JSValue is truncated to an int32_t."]
+    pub fn JSValueToInt32(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> i32;
+}
+extern "C" {
+    #[doc = "@function\n@abstract         Converts a JSValue to an unsigned 32-bit integer and returns the resulting integer.\n@param ctx        The execution context to use.\n@param value      The JSValue to convert.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. To reliable detect exception, initialize this to null before the call. Pass NULL if you do not care to store an exception.\n@result           A uint32_t with the result of conversion, or 0 if an exception is thrown. Since 0 is valid value, `exception` must be checked after the call.\n@discussion       The JSValue is converted to an integer according to the rules specified by the JavaScript language. If the value is a BigInt, then the JSValue is truncated to a uint32_t."]
+    pub fn JSValueToUInt32(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> u32;
+}
+extern "C" {
+    #[doc = "@function\n@abstract         Converts a JSValue to a singed 64-bit integer and returns the resulting integer.\n@param ctx        The execution context to use.\n@param value      The JSValue to convert.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. To reliable detect exception, initialize this to null before the call. Pass NULL if you do not care to store an exception.\n@result           An int64_t with the result of conversion, or 0 if an exception is thrown. Since 0 is valid value, `exception` must be checked after the call.\n@discussion       The JSValue is converted to an integer according to the rules specified by the JavaScript language. If the value is a BigInt, then the JSValue is truncated to an int64_t."]
+    pub fn JSValueToInt64(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> i64;
+}
+extern "C" {
+    #[doc = "@function\n@abstract         Converts a JSValue to an unsigned 64-bit integer and returns the resulting integer.\n@param ctx        The execution context to use.\n@param value      The JSValue to convert.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. To reliable detect exception, initialize this to null before the call. Pass NULL if you do not care to store an exception.\n@result           A uint64_t with the result of conversion, or 0 if an exception is thrown. Since 0 is valid value, `exception` must be checked after the call.\n@discussion       The JSValue is converted to an integer according to the rules specified by the JavaScript language. If the value is a BigInt, then the JSValue is truncated to a uint64_t."]
+    pub fn JSValueToUInt64(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> u64;
+}
+
+#[doc = " The debugger has entered paused state (breakpoint hit, debugger statement, etc.)"]
+pub const InspectorPauseEvent_InspectorPauseEventPaused: InspectorPauseEvent = 0;
+#[doc = " The debugger has exited paused state and resumed execution"]
+pub const InspectorPauseEvent_InspectorPauseEventResumed: InspectorPauseEvent = 1;
+#[doc = " Tick event during paused state nested run loop (for processing commands)"]
+pub const InspectorPauseEvent_InspectorPauseEventTick: InspectorPauseEvent = 2;
+#[doc = " Enum representing the type of debugger pause-loop event."]
+pub type InspectorPauseEvent = ::std::os::raw::c_uint;
+#[doc = " Callback function type for debugger pause-loop events (paused/resumed/tick).\n\n @param ctx The JavaScript context (JSContextRef).\n @param event The event type (Paused, Resumed, or Tick)."]
+pub type InspectorPauseEventCallback = ::std::option::Option<
+    unsafe extern "C" fn(ctx: JSContextRef, event: InspectorPauseEvent),
+>;
+extern "C" {
+    #[doc = " Sets the callback for debugger pause-loop events (paused/resumed/tick).\n\n This callback is invoked when:\n - The debugger enters paused state (event = InspectorPauseEventPaused)\n - The debugger exits paused state (event = InspectorPauseEventResumed)\n - During the paused state nested run loop (event = InspectorPauseEventTick)\n\n The context (JSContextRef) is passed directly to the callback.\n\n @param context The JavaScript context to configure.\n @param callback The pause-loop event callback, or NULL to disable."]
+    pub fn JSInspectorSetPauseEventCallback(
+        context: JSGlobalContextRef,
+        callback: InspectorPauseEventCallback,
+    );
+}
+extern "C" {
+    #[doc = "@function\n@abstract       Tests whether a JavaScript value's type is the BigInt type.\n@param ctx      The execution context to use.\n@param value    The JSValue to test.\n@result         true if value's type is the BigInt type, otherwise false."]
+    pub fn JSValueIsBigInt(ctx: JSContextRef, value: JSValueRef) -> bool;
+}
 #[doc = "@typedef JSChar\n@abstract A UTF-16 code unit. One, or a sequence of two, can encode any Unicode\ncharacter. As with all scalar types, endianness depends on the underlying\narchitecture."]
 pub type JSChar = ::std::os::raw::c_ushort;
 extern "C" {
@@ -30824,6 +30921,26 @@ extern "C" {
         exception: *mut JSValueRef,
     ) -> *mut ::std::os::raw::c_void;
 }
+extern "C" {
+    #[doc = "@function\n@abstract         Returns a pointer to the data buffer that serves as the backing store for a JavaScript Array Buffer object.\n@param object     The Array Buffer object whose internal backing store pointer to return.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result           A pointer to the raw data buffer that serves as object's backing store or NULL if object is not an Array Buffer object.\n@discussion       The pointer returned by this function is temporary and is not guaranteed to remain valid across JavaScriptCore API calls."]
+    pub fn JSValueFastUFT8Encoding(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+    ) -> JSValueRef;
+}
+
+extern "C" {
+    #[doc = "@function\n@abstract         Returns a pointer to the data buffer that serves as the backing store for a JavaScript Array Buffer object.\n@param object     The Array Buffer object whose internal backing store pointer to return.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result           A pointer to the raw data buffer that serves as object's backing store or NULL if object is not an Array Buffer object.\n@discussion       The pointer returned by this function is temporary and is not guaranteed to remain valid across JavaScriptCore API calls."]
+    pub fn JSValueGetTypedArrayBytesPtrFromValue(
+        ctx: JSContextRef,
+        value: JSValueRef,
+        exception: *mut JSValueRef,
+        offset: *mut usize,
+        length: *mut usize,
+    ) -> *mut ::std::os::raw::c_void;
+}
+
 extern "C" {
     #[doc = "@function\n@abstract         Returns the number of bytes in a JavaScript data object.\n@param ctx        The execution context to use.\n@param object     The JS Arary Buffer object whose length in bytes to return.\n@param exception  A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception.\n@result           The number of bytes stored in the data object."]
     pub fn JSObjectGetArrayBufferByteLength(

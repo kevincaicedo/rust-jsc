@@ -1,23 +1,25 @@
-use rust_jsc_sys::{
-    JSAPIModuleLoader, JSCheckScriptSyntax, JSContextGetGlobalContext,
-    JSContextGetGlobalObject, JSContextGetGroup, JSContextGetSharedData,
-    JSContextGroupCreate, JSContextGroupRef, JSContextGroupRelease, JSContextRef,
-    JSContextSetSharedData, JSEvaluateScript, JSGarbageCollect,
-    JSGetMemoryUsageStatistics, JSGlobalContextCopyName, JSGlobalContextCreate,
-    JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable, JSGlobalContextRef,
-    JSGlobalContextRelease, JSGlobalContextRetain, JSGlobalContextSetInspectable,
-    JSGlobalContextSetName, JSGlobalContextSetUncaughtExceptionAtEventLoopCallback,
-    JSGlobalContextSetUncaughtExceptionHandler,
-    JSGlobalContextSetUnhandledRejectionCallback, JSLinkAndEvaluateModule,
-    JSLoadAndEvaluateModule, JSLoadAndEvaluateModuleFromSource, JSLoadModule,
-    JSLoadModuleFromSource, JSSetAPIModuleLoader, JSSetSyntheticModuleKeys, JSStringRef,
-    JSUncaughtExceptionAtEventLoop, JSUncaughtExceptionHandler, JSValueRef,
-};
-
 use crate::{
     JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSStringProctected,
     JSValue,
 };
+use rust_jsc_sys::{
+    InspectorMessageCallback, InspectorPauseEventCallback, JSAPIModuleLoader,
+    JSCheckScriptSyntax, JSContextGetGlobalContext, JSContextGetGlobalObject,
+    JSContextGetGroup, JSContextGetSharedData, JSContextGroupCreate, JSContextGroupRef,
+    JSContextGroupRelease, JSContextRef, JSContextSetSharedData, JSEvaluateScript,
+    JSGarbageCollect, JSGetMemoryUsageStatistics, JSGlobalContextCopyName,
+    JSGlobalContextCreate, JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable,
+    JSGlobalContextRef, JSGlobalContextRelease, JSGlobalContextSetInspectable,
+    JSGlobalContextSetName, JSGlobalContextSetUncaughtExceptionAtEventLoopCallback,
+    JSGlobalContextSetUncaughtExceptionHandler,
+    JSGlobalContextSetUnhandledRejectionCallback, JSInspectorDisconnect,
+    JSInspectorIsConnected, JSInspectorSendMessage, JSInspectorSetCallback,
+    JSInspectorSetPauseEventCallback, JSLinkAndEvaluateModule, JSLoadAndEvaluateModule,
+    JSLoadAndEvaluateModuleFromSource, JSLoadModule, JSLoadModuleFromSource,
+    JSSetAPIModuleLoader, JSSetSyntheticModuleKeys, JSStringRef,
+    JSUncaughtExceptionAtEventLoop, JSUncaughtExceptionHandler, JSValueRef,
+};
+use std::ffi::CString;
 
 impl JSContextGroup {
     pub fn new_context(&self) -> JSContext {
@@ -62,6 +64,18 @@ impl std::fmt::Debug for JSContextGroup {
     }
 }
 
+/// Debugger pause-loop events emitted by JavaScriptCore while debugging.
+///
+/// - `Paused`: debugger just entered paused state (breakpoint, `debugger;`, etc.)
+/// - `Resumed`: debugger just resumed execution
+/// - `Tick`: called repeatedly while the debugger is paused (nested run loop)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InspectorPauseEvent {
+    Paused,
+    Resumed,
+    Tick,
+}
+
 impl JSContext {
     /// Creates a new `JSContext` object.
     ///
@@ -78,7 +92,7 @@ impl JSContext {
         Self { inner: ctx }
     }
 
-    pub fn new_with_class(class: &JSClass) -> Self {
+    pub fn new_with(class: &JSClass) -> Self {
         let ctx = unsafe { JSGlobalContextCreate(class.inner) };
         Self { inner: ctx }
     }
@@ -183,7 +197,7 @@ impl JSContext {
     /// - `handler`: A native function
     ///
     /// # Examples
-    /// 
+    ///
     /// ```ignore
     /// use rust_jsc::JSContext;
     ///
@@ -571,6 +585,114 @@ impl JSContext {
         Ok(JSValue::new(result, self.inner))
     }
 
+    /// Sets the callback function for inspector messages.
+    /// This creates a new rust frontend.
+    ///
+    /// # Arguments
+    /// * `callback` - The callback function to be set.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    ///
+    /// #[inspector_callback]
+    /// fn inspector_callback(message: &str) {
+    ///    println!("Inspector message macro: {}", message);
+    /// }
+    ///
+    /// ctx.set_inspector_callback(inspector_callback);
+    /// ```
+    pub fn set_inspector_callback(&self, callback: InspectorMessageCallback) {
+        unsafe {
+            JSInspectorSetCallback(self.inner, callback);
+        }
+    }
+
+    /// Sends a message to the inspector.
+    ///
+    /// # Arguments
+    /// * `message` - The message to be sent.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    ///
+    /// ctx.inspector_send_message("{ method: \"Runtime.evaluate\", params: { expression: \"1 + 1\" } }");
+    /// ```
+    pub fn inspector_send_message(&self, message: &str) {
+        let class_name = CString::new(message).unwrap();
+        unsafe {
+            JSInspectorSendMessage(self.inner, class_name.as_ptr());
+        }
+    }
+
+    /// Disconnects the inspector frontend from this context.
+    /// This should be called before dropping a context that has an active inspector connection.
+    /// After calling this function, no more inspector callbacks will be received for this context.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// // ... set up inspector callback and use it ...
+    /// ctx.inspector_disconnect(); // Clean up before context is dropped
+    /// ```
+    pub fn inspector_disconnect(&self) {
+        unsafe {
+            JSInspectorDisconnect(self.inner);
+        }
+    }
+
+    /// Checks if the inspector is currently connected for this context.
+    ///
+    /// # Returns
+    /// `true` if an inspector frontend is connected, `false` otherwise.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// assert_eq!(ctx.inspector_is_connected(), false);
+    /// ```
+    pub fn inspector_is_connected(&self) -> bool {
+        unsafe { JSInspectorIsConnected(self.inner) }
+    }
+
+    /// Registers a pause-event callback.
+    ///
+    /// # Arguments
+    /// - `callback`: A callback function.
+    pub fn set_inspector_pause_event_callback(
+        &self,
+        callback: InspectorPauseEventCallback,
+    ) {
+        unsafe {
+            JSInspectorSetPauseEventCallback(self.inner, callback);
+        }
+    }
+
+    /// Releases the context.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    ///
+    /// ctx.release();
+    /// ```
+    pub fn release(&self) {
+        unsafe {
+            JSGlobalContextRelease(self.inner);
+        }
+    }
+
     /// Checks if a context is inspectable.
     ///
     /// # Examples
@@ -650,7 +772,7 @@ impl JSContext {
     /// let data = Box::new(10);
     /// ctx.set_shared_data(data);
     /// ```
-    pub fn set_shared_data<T>(&self, data: Box<T>) {
+    pub fn set_shared_data<T: 'static>(&self, data: Box<T>) {
         let data_ptr = Box::into_raw(data);
         unsafe { JSContextSetSharedData(self.inner, data_ptr as _) }
     }
@@ -669,12 +791,13 @@ impl JSContext {
     /// ```
     ///
     /// # Returns
-    pub fn get_shared_data<T>(&self) -> Option<Box<T>> {
+    pub fn get_shared_data<T: 'static>(&self) -> Option<Box<T>> {
         let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
 
         if data_ptr.is_null() {
             return None;
         }
+
         Some(unsafe { Box::from_raw(data_ptr as *mut T) })
     }
 }
@@ -694,9 +817,8 @@ impl Default for JSContext {
 impl From<JSContextRef> for JSContext {
     fn from(context: JSContextRef) -> Self {
         let global_context = unsafe { JSContextGetGlobalContext(context) };
-        unsafe {
-            JSGlobalContextRetain(global_context);
-        }
+        // Retaining the context here would lead to over-retention and potential memory leaks.
+        // unsafe { JSGlobalContextRetain(global_context); }
 
         Self {
             inner: global_context,
@@ -704,18 +826,19 @@ impl From<JSContextRef> for JSContext {
     }
 }
 
-impl Drop for JSContext {
-    fn drop(&mut self) {
-        unsafe {
-            JSGlobalContextRelease(self.inner);
-        }
-
-        // TODO: Set the pointers to the shared data to null
-        // unsafe {
-        //     JSContextSetSharedData(self.global_context, std::ptr::null_mut());
-        // }
-    }
-}
+// impl Drop for JSContext {
+//     fn drop(&mut self) {
+//         /*
+//         TODO: Set pointer to null
+//         unsafe {
+//              if JSInspectorIsConnected(self.inner) {
+//                  JSInspectorDisconnect(self.inner);
+//              }
+//             JSContextSetSharedData(self.inner, std::ptr::null_mut());
+//         }
+//         */
+//     }
+// }
 
 impl From<JSGlobalContextRef> for JSContext {
     fn from(ctx: JSGlobalContextRef) -> Self {
@@ -919,32 +1042,106 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // #[test]
-    // fn test_shared_data() {
-    //     let ctx = JSContext::new();
-    //     let data = Box::new(10);
-    //     ctx.set_shared_data(data.clone());
-
-    //     let mut shared_data = ManuallyDrop::new(ctx.get_shared_data::<i32>().unwrap());
-    //     assert_eq!(*shared_data.as_mut(), 10);
-
-    //     let shared_data = ctx.get_shared_data::<i32>().unwrap();
-    //     assert_eq!(*shared_data, 10);
-    //     // unsafe { ManuallyDrop::drop(&mut shared_data) };
-    // }
-
-    // #[test]
-    // fn test_shared_data_null() {
-    //     let ctx = JSContext::new();
-    //     let shared_data = ctx.get_shared_data::<i32>();
-    //     assert!(shared_data.is_none());
-    // }
+    // =========================================================================
+    // Inspector / Debugger Tests
+    // =========================================================================
 
     #[test]
-    fn test_inspectable() {
+    fn test_inspector_set_inspectable() {
+        let ctx = JSContext::new();
+
+        // Initially not inspectable
+        ctx.set_inspectable(false);
+        assert!(!ctx.is_inspectable());
+
+        // Enable inspectable
+        ctx.set_inspectable(true);
+        assert!(ctx.is_inspectable());
+
+        // Disable inspectable
+        ctx.set_inspectable(false);
+        assert!(!ctx.is_inspectable());
+    }
+
+    #[test]
+    fn test_inspector_connect_disconnect() {
         let ctx = JSContext::new();
         ctx.set_inspectable(true);
-        assert_eq!(ctx.is_inspectable(), true);
+
+        #[inspector_callback]
+        fn callback(_message: &str) {}
+
+        // Connect inspector
+        ctx.set_inspector_callback(Some(callback));
+        assert!(ctx.inspector_is_connected());
+
+        // Disconnect inspector
+        ctx.inspector_disconnect();
+        assert!(!ctx.inspector_is_connected());
+    }
+
+    #[test]
+    fn test_inspector_send_message() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        static RECEIVED: AtomicBool = AtomicBool::new(false);
+
+        let ctx = JSContext::new();
+        ctx.set_inspectable(true);
+
+        #[inspector_callback]
+        fn callback(message: &str) {
+            // Verify we receive a response
+            if message.contains("\"id\":1") {
+                RECEIVED.store(true, Ordering::SeqCst);
+            }
+        }
+
+        ctx.set_inspector_callback(Some(callback));
+
+        // Send a simple Runtime.evaluate command
+        ctx.inspector_send_message(
+            r#"{"id": 1, "method": "Runtime.evaluate", "params": {"expression": "1+1"}}"#,
+        );
+
+        assert!(RECEIVED.load(Ordering::SeqCst), "Should receive response");
+        ctx.inspector_disconnect();
+    }
+
+    #[test]
+    fn test_inspector_debugger_enable_disable() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        static RESPONSE_COUNT: AtomicU32 = AtomicU32::new(0);
+
+        let ctx = JSContext::new();
+        ctx.set_inspectable(true);
+
+        #[inspector_callback]
+        fn callback(message: &str) {
+            if message.contains("\"result\"") {
+                RESPONSE_COUNT.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        ctx.set_inspector_callback(Some(callback));
+
+        // Enable debugger
+        ctx.inspector_send_message(
+            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
+        );
+
+        // Disable debugger
+        ctx.inspector_send_message(
+            r#"{"id": 2, "method": "Debugger.disable", "params": {}}"#,
+        );
+
+        assert!(
+            RESPONSE_COUNT.load(Ordering::SeqCst) >= 2,
+            "Should receive responses for enable and disable"
+        );
+
+        ctx.inspector_disconnect();
     }
 
     #[test]
@@ -1022,6 +1219,7 @@ mod tests {
             "virtual_module.js",
             None,
         );
+
         assert!(result.is_ok());
 
         let result = ctx.evaluate_script("name", None);

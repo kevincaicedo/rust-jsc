@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use rust_jsc_sys::{
     kJSClassAttributeNoAutomaticPrototype, kJSClassAttributeNone,
     kJSPropertyAttributeDontDelete, kJSPropertyAttributeDontEnum,

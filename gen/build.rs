@@ -13,7 +13,11 @@ fn main() {
     let bindings = bindgen::Builder::default()
         // Specify the JavaScriptCore header files
         .header(format!("{}/JavaScriptCore.h", jsc_headers_path))
+        // Include our custom Inspector C API so sys bindings contain the new inspector symbols.
+        // This header lives in the WebKit source tree (not inside the JSC framework headers).
+        // .header("../WebKit/Source/JavaScriptCore/API/InspectorAPI.h")
         .clang_arg(format!("-I{}", jsc_headers_path))
+        .clang_arg("-I../WebKit/Source/JavaScriptCore/API")
         .clang_arg("-DWEBKIT_DIRECTORIES")
         .clang_arg(format!("-F{}", system_frameworks_path))
         .clang_arg(format!("-F{}", framework_dir))

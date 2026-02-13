@@ -17,15 +17,25 @@ fn check_supported_platform() {
 fn static_lib_file() -> String {
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    let platform = match (target_os.as_ref(), target_arch.as_ref()) {
-        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
-        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
-        ("macos", "x86_64") => "x86_64-apple-darwin",
-        ("macos", "aarch64") => "aarch64-apple-darwin",
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let platform = match (
+        target_os.as_ref(),
+        target_arch.as_ref(),
+        target_env.as_ref(),
+    ) {
+        ("linux", "x86_64", "musl") => "x86_64-unknown-linux-musl",
+        ("linux", "aarch64", "musl") => "aarch64-unknown-linux-musl",
+        ("linux", "x86_64", _) => "x86_64-unknown-linux-gnu",
+        ("linux", "aarch64", _) => "aarch64-unknown-linux-gnu",
+        ("macos", "x86_64", _) => "x86_64-apple-darwin",
+        ("macos", "aarch64", _) => "aarch64-apple-darwin",
         // TODO: Support windows
-        // ("windows", "x86_64") => "x86_64-pc-windows-msvc",
-        // ("windows", "i686") => "i686-pc-windows-msvc",
-        _ => panic!("Unsupported target OS or architecture: {}-{}", target_os, target_arch),
+        // ("windows", "x86_64", _) => "x86_64-pc-windows-msvc",
+        // ("windows", "i686", _) => "i686-pc-windows-msvc",
+        _ => panic!(
+            "Unsupported target OS or architecture: {}-{}",
+            target_os, target_arch
+        ),
     };
     format!("libjsc-{}.a.gz", platform)
 }
@@ -100,7 +110,10 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_BUILD_PATH");
+    println!(
+        "cargo:rerun-if-env-changed={}",
+        "RUST_JSC_CUSTOM_BUILD_PATH"
+    );
     println!("cargo:rerun-if-env-changed={}", "SYSTEM_LIBS_PATH");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_MIRROR");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_ARCHIVE");
@@ -115,7 +128,8 @@ fn main() {
         let static_lib_file = static_lib_file();
 
         // if archive file is not found in outdir, download it
-        if !std::path::Path::new(&format!("{}/{}", output_path, static_lib_file)).exists() {
+        if !std::path::Path::new(&format!("{}/{}", output_path, static_lib_file)).exists()
+        {
             fetch_static_lib();
             extract_static_lib();
         }
@@ -155,11 +169,14 @@ fn main() {
         return;
     }
 
-    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_BUILD_PATH");
+    println!(
+        "cargo:rerun-if-env-changed={}",
+        "RUST_JSC_CUSTOM_BUILD_PATH"
+    );
     println!("cargo:rerun-if-env-changed={}", "SYSTEM_LIBS_PATH");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_MIRROR");
     println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_ARCHIVE");
-    
+
     // if custom path for the static lib is set use it, otherwise download the static lib
     if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
         println!("cargo:rustc-link-search=native={}", custom_build_path);

@@ -234,7 +234,7 @@ impl JSClass {
     ///
     /// # Returns
     /// A new object of the class.
-    pub fn object<T>(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
+    pub fn object<T: 'static>(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
         let data_ptr = if let Some(data) = data {
             Box::into_raw(data) as *mut std::ffi::c_void
         } else {
@@ -275,15 +275,15 @@ impl JSClass {
     ///     .build()
     ///     .unwrap();
     ///
-    /// class.register(&ctx).unwrap();
+    /// class.register::<()>(&ctx).unwrap();
     /// ```
     ///
     /// # Errors
     /// If an error occurs while registering the class.
-    pub fn register(&self, ctx: &JSContext) -> JSResult<()> {
+    pub fn register<T: 'static>(&self, ctx: &JSContext) -> JSResult<()> {
         ctx.global_object().set_property(
             self.name(),
-            &self.object::<()>(ctx, None),
+            &self.object::<T>(ctx, None),
             Default::default(),
         )
     }
@@ -334,7 +334,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let object = class.object::<i32>(&ctx, Some(Box::new(42)));
+        let object = class.object(&ctx, Some(Box::new(42)));
 
         ctx.global_object()
             .set_property("Test", &object, Default::default())
@@ -385,7 +385,7 @@ mod tests {
             .build()
             .unwrap();
 
-        class.register(&ctx).unwrap();
+        class.register::<()>(&ctx).unwrap();
         let result_object = ctx
             .evaluate_script("const obj = new Test(); obj", None)
             .unwrap();
@@ -413,7 +413,7 @@ mod tests {
             .build()
             .unwrap();
 
-        class.register(&ctx).unwrap();
+        class.register::<()>(&ctx).unwrap();
         let result = ctx.evaluate_script("const obj = new Test(); obj", None);
 
         assert!(result.is_err());
@@ -480,7 +480,7 @@ mod tests {
             .build()
             .unwrap();
 
-        class.register(&ctx).unwrap();
+        class.register::<i32>(&ctx).unwrap();
         let result = ctx
             .evaluate_script(
                 r#"

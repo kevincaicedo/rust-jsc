@@ -13,7 +13,8 @@ use rust_jsc_sys::{
 };
 
 use crate::{
-    JSContext, JSError, JSObject, JSResult, JSString, JSValue, PrivateData, PropertyDescriptor
+    JSContext, JSError, JSObject, JSResult, JSString, JSValue, PrivateData,
+    PropertyDescriptor,
 };
 
 pub struct JSPropertyNameIter {
@@ -658,7 +659,7 @@ impl JSObject {
     ///
     /// # Returns
     /// Returns true if object can store private data, otherwise false.
-    pub fn set_private_data<T>(&self, data: Box<T>) -> bool {
+    pub fn set_private_data<T: 'static>(&self, data: Box<T>) -> bool {
         let data_ptr = Box::into_raw(data);
         unsafe { JSObjectSetPrivate(self.inner, data_ptr as _) }
     }
@@ -680,7 +681,7 @@ impl JSObject {
     ///
     /// # Returns
     /// Returns the private data if it exists, otherwise None.
-    pub fn get_private_data<T>(&self) -> Option<Box<T>> {
+    pub fn get_private_data<T: 'static>(&self) -> Option<Box<T>> {
         let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
 
         if data_ptr.is_null() {

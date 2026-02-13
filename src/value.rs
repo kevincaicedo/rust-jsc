@@ -1,6 +1,6 @@
 use rust_jsc_sys::{
-    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueGetType,
-    JSValueIsArray, JSValueIsBoolean, JSValueIsDate, JSValueIsEqual,
+    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueFastUFT8Encoding,
+    JSValueGetType, JSValueIsArray, JSValueIsBoolean, JSValueIsDate, JSValueIsEqual,
     JSValueIsInstanceOfConstructor, JSValueIsNull, JSValueIsNumber, JSValueIsObject,
     JSValueIsObjectOfClass, JSValueIsStrictEqual, JSValueIsString, JSValueIsSymbol,
     JSValueIsUndefined, JSValueMakeBoolean, JSValueMakeFromJSONString, JSValueMakeNull,
@@ -39,6 +39,19 @@ impl JSValue {
     pub fn boolean(ctx: &JSContext, value: bool) -> JSValue {
         let inner = unsafe { JSValueMakeBoolean(ctx.inner, value) };
         Self::new(inner, ctx.inner)
+    }
+
+    pub fn utf8_encode(ctx: &JSContext, value: JSValue) -> JSResult<JSValue> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        let inner =
+            unsafe { JSValueFastUFT8Encoding(ctx.inner, value.inner, &mut exception) };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, ctx.inner);
+            return Err(JSError::from(value));
+        }
+
+        Ok(Self::new(inner, ctx.inner))
     }
 
     /// Creates a JavaScript undefined value.
@@ -123,19 +136,19 @@ impl JSValue {
     /// This is useful when you want to retain a string value.
     /// The string will not be garbage collected until the protected string is released.
     /// This is useful when you want to store a string value in a global or on the heap,
-    /// 
+    ///
     /// # Arguments
     /// * `value` - The protected string to use as the value.
-    /// 
+    ///
     /// # Examples
     /// ```
     /// use rust_jsc::*;
-    /// 
+    ///
     /// let ctx = JSContext::new();
     /// let value = JSValue::string_retain(&ctx, "Hello, World!");
     /// assert!(value.is_string());
     /// ```
-    /// 
+    ///
     /// # Returns
     /// A JavaScript string value.
     pub fn string_retain(
@@ -825,7 +838,7 @@ mod tests {
     fn test_is_object_of_class() {
         let ctx = crate::JSContext::new();
         let class = crate::JSClass::builder("Test").build().unwrap();
-        let value = class.object::<i32>(&ctx, Some(Box::new(42)));
+        let value = class.object(&ctx, Some(Box::new(42)));
         assert!(value.is_object_of_class(&class).unwrap());
     }
 

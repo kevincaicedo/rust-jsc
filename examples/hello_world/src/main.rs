@@ -5,8 +5,8 @@
 
 use rust_jsc::{
     callback, module_evaluate, module_fetch, module_import_meta, module_resolve,
-    JSContext, JSFunction, JSObject, JSResult, JSString, JSStringProctected, JSValue, JSPromise,
-    PropertyDescriptorBuilder, JSModuleLoader, PropertyDescriptor,
+    JSContext, JSFunction, JSModuleLoader, JSObject, JSPromise, JSResult, JSString,
+    JSStringProctected, JSValue, PropertyDescriptor, PropertyDescriptorBuilder,
 };
 
 #[callback]
@@ -24,10 +24,10 @@ fn log_info(
 
 #[callback]
 fn set_timeout(
-ctx: JSContext,
-_function: JSObject,
-_this: JSObject,
-arguments: &[JSValue],
+    ctx: JSContext,
+    _function: JSObject,
+    _this: JSObject,
+    arguments: &[JSValue],
 ) -> JSResult<JSValue> {
     println!("Set Timeout");
     let callback = arguments.get(0).unwrap().as_object().unwrap();
@@ -58,10 +58,7 @@ fn moduleLoaderResolve(
 }
 
 #[module_evaluate]
-fn moduleLoaderEvaluate(
-    ctx: JSContext,
-    key: JSValue,
-) -> JSValue {
+fn moduleLoaderEvaluate(ctx: JSContext, key: JSValue) -> JSValue {
     // let key = key.as_string().unwrap();
 
     println!("ModuleLoaderEvaluate, Key: {:?}", key.as_string().unwrap());
@@ -80,8 +77,12 @@ fn moduleLoaderEvaluate(
     }
 
     let default = JSObject::new(&ctx);
-    default.set_property("default", &object.into(), PropertyDescriptor::default()).unwrap();
-    default.set_property("name", &value, PropertyDescriptor::default()).unwrap();
+    default
+        .set_property("default", &object.into(), PropertyDescriptor::default())
+        .unwrap();
+    default
+        .set_property("name", &value, PropertyDescriptor::default())
+        .unwrap();
 
     default.into()
 }
@@ -114,7 +115,9 @@ fn moduleLoaderCreateImportMetaProperties(
     // println!("ImportMeta, Key: {:?}", key_value);
 
     let object = JSObject::new(&ctx);
-    object.set_property("url", &key, Default::default()).unwrap();
+    object
+        .set_property("url", &key, Default::default())
+        .unwrap();
     object
 }
 
@@ -132,7 +135,8 @@ fn main() {
     object
         .set_property("log", &function.into(), attributes)
         .unwrap();
-    let timeout_function = JSFunction::callback(&ctx, Some("setTimeout"), Some(set_timeout));
+    let timeout_function =
+        JSFunction::callback(&ctx, Some("setTimeout"), Some(set_timeout));
     object
         .set_property("setTimeout", &timeout_function.into(), attributes)
         .unwrap();
@@ -140,7 +144,7 @@ fn main() {
     global_object
         .set_property("console", &object.into(), attributes)
         .unwrap();
-    
+
     ctx.set_inspectable(true);
 
     let callbacks = JSModuleLoader {
@@ -154,12 +158,10 @@ fn main() {
     };
 
     ctx.set_module_loader(callbacks);
-    
-    let keys = &[
-        JSStringProctected::from("@rust-jsc"),
-    ];
+
+    let keys = &[JSStringProctected::from("@rust-jsc")];
     ctx.set_virtual_module_keys(keys);
-    
+
     // let result = ctx.evaluate_script("console.log('Hello, World!')", None);
     let result = ctx.evaluate_module("../scripts/test.js");
     // let result = ctx.evaluate_module("../scripts/jsc-test.mjs");
@@ -175,10 +177,17 @@ fn main() {
     // println!("Result: {:?}", result.is_undefined());
     match result {
         Ok(value) => {
-            println!("Result: {:?}", ctx.check_syntax("console.log('Kevin')", 0).unwrap());
+            println!(
+                "Result: {:?}",
+                ctx.check_syntax("console.log('Kevin')", 0).unwrap()
+            );
         }
         Err(error) => {
-            eprintln!("Error M: {:?}, {:?}", error.message().unwrap(), ctx.check_syntax("console.log('Kevin')", 0).unwrap());
+            eprintln!(
+                "Error M: {:?}, {:?}",
+                error.message().unwrap(),
+                ctx.check_syntax("console.log('Kevin')", 0).unwrap()
+            );
         }
     }
     // assert!(result.is_ok());

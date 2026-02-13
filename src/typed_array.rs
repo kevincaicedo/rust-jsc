@@ -6,7 +6,8 @@ use rust_jsc_sys::{
     JSObjectMakeArrayBufferWithBytesNoCopy, JSObjectMakeTypedArray,
     JSObjectMakeTypedArrayWithArrayBuffer,
     JSObjectMakeTypedArrayWithArrayBufferAndOffset,
-    JSObjectMakeTypedArrayWithBytesNoCopy, JSValueGetTypedArrayType, JSValueRef,
+    JSObjectMakeTypedArrayWithBytesNoCopy, JSValueGetTypedArrayBytesPtrFromValue,
+    JSValueGetTypedArrayType, JSValueRef,
 };
 
 use crate::{
@@ -356,6 +357,44 @@ impl JSTypedArray {
         Ok(bytes)
     }
 
+    pub fn bytes_from_value<T>(value: &JSValue) -> JSResult<&mut [T]> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        let mut offset: usize = 0;
+        let mut len: usize = 0;
+
+        let result = unsafe {
+            JSValueGetTypedArrayBytesPtrFromValue(
+                value.ctx,
+                value.inner,
+                &mut exception,
+                &mut offset,
+                &mut len,
+            )
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, value.ctx);
+            return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            let context = JSContext::from(value.ctx);
+            return Err(JSError::with_message(
+                &context,
+                "Typed array bytes pointer is null",
+            )?);
+        }
+
+        let bytes = unsafe {
+            std::slice::from_raw_parts_mut(
+                result.offset(offset as isize).cast::<T>(),
+                len,
+            )
+        };
+
+        Ok(bytes)
+    }
+
     /// Gets the bytes of the Typed Array as a Vec.
     ///
     /// # Example
@@ -593,7 +632,7 @@ impl JSArrayBuffer {
         let result = unsafe {
             JSObjectIsDetachedBuffer(self.object.ctx, self.object.inner, &mut exception)
         };
-
+        // TODO: Handle exception
         result
     }
 

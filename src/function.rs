@@ -379,9 +379,9 @@ mod tests {
 
         let result = ctx.evaluate_script(r#"
             print('Hello, World!', 'Hello, World!', 3.14, true, {}, null, 'Hello, World!');
-        "#.into(), 
+        "#.into(),
         None);
-        
+
         assert!(!result.is_err());
     }
 
