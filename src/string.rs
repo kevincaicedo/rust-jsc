@@ -29,8 +29,8 @@ impl JSStringProctected {
 
 impl From<&str> for JSStringProctected {
     fn from(s: &str) -> Self {
-        let c =
-            CString::new(s.as_bytes()).expect("&str to JSStringProctected conversion failed");
+        let c = CString::new(s.as_bytes())
+            .expect("&str to JSStringProctected conversion failed");
         Self(unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) })
     }
 }

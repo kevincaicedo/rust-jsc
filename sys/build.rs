@@ -17,14 +17,21 @@ fn check_supported_platform() {
 fn static_lib_file() -> String {
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    let platform = match (target_os.as_ref(), target_arch.as_ref()) {
-        ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
-        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
-        ("macos", "x86_64") => "x86_64-apple-darwin",
-        ("macos", "aarch64") => "aarch64-apple-darwin",
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let platform = match (
+        target_os.as_ref(),
+        target_arch.as_ref(),
+        target_env.as_ref(),
+    ) {
+        ("linux", "x86_64", "musl") => "x86_64-unknown-linux-musl",
+        ("linux", "aarch64", "musl") => "aarch64-unknown-linux-musl",
+        ("linux", "x86_64", _) => "x86_64-unknown-linux-gnu",
+        ("linux", "aarch64", _) => "aarch64-unknown-linux-gnu",
+        ("macos", "x86_64", _) => "x86_64-apple-darwin",
+        ("macos", "aarch64", _) => "aarch64-apple-darwin",
         // TODO: Support windows
-        // ("windows", "x86_64") => "x86_64-pc-windows-msvc",
-        // ("windows", "i686") => "i686-pc-windows-msvc",
+        // ("windows", "x86_64", _) => "x86_64-pc-windows-msvc",
+        // ("windows", "i686", _) => "i686-pc-windows-msvc",
         _ => panic!(
             "Unsupported target OS or architecture: {}-{}",
             target_os, target_arch

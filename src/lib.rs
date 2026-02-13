@@ -56,11 +56,10 @@ pub struct JSContextGroup {
 }
 
 /// A JavaScript class.
-pub struct JSClass<T> {
+pub struct JSClass {
     // pub(crate) ctx: JSContextRef,
     pub(crate) inner: JSClassRef,
     pub(crate) name: String,
-    pub(crate) _phantom: PhantomData<T>,
 }
 
 /// A JavaScript object.

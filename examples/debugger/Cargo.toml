@@ -1,0 +1,18 @@
+[package]
+name = "debugger-example"
+version = "0.1.0"
+edition = "2021"
+description = "Rust JSC Inspector/Debugger Examples"
+
+[dependencies]
+rust_jsc = { path = "../.." }
+rust_jsc_macros = { path = "../../macros" }
+serde_json = "1.0"
+
+[[bin]]
+name = "simple_debugger"
+path = "src/bin/simple_debugger.rs"
+
+[[bin]]
+name = "breakpoint_debugger"
+path = "src/bin/breakpoint_debugger.rs"

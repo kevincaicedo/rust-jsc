@@ -41,7 +41,7 @@ impl JSValue {
         Self::new(inner, ctx.inner)
     }
 
-    pub fn uft8_encode(ctx: &JSContext, value: JSValue) -> JSResult<JSValue> {
+    pub fn utf8_encode(ctx: &JSContext, value: JSValue) -> JSResult<JSValue> {
         let mut exception: JSValueRef = std::ptr::null_mut();
         let inner =
             unsafe { JSValueFastUFT8Encoding(ctx.inner, value.inner, &mut exception) };
@@ -516,14 +516,14 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let class = JSClass::<i32>::builder("Test").build().unwrap();
-    /// let value = class.object(&ctx, Some(Box::new(42)));
+    /// let class = JSClass::builder("Test").build().unwrap();
+    /// let value = class.object::<i32>(&ctx, Some(Box::new(42)));
     /// assert!(value.is_object_of_class(&class).unwrap());
     /// ```
     ///
     /// # Returns
     /// true if the object is an instance of class, otherwise false.
-    pub fn is_object_of_class<T>(&self, class: &JSClass<T>) -> JSResult<bool> {
+    pub fn is_object_of_class(&self, class: &JSClass) -> JSResult<bool> {
         return Ok(unsafe { JSValueIsObjectOfClass(self.ctx, self.inner, class.inner) });
     }
 
@@ -837,7 +837,7 @@ mod tests {
     #[test]
     fn test_is_object_of_class() {
         let ctx = crate::JSContext::new();
-        let class = crate::JSClass::<i32>::builder("Test").build().unwrap();
+        let class = crate::JSClass::builder("Test").build().unwrap();
         let value = class.object(&ctx, Some(Box::new(42)));
         assert!(value.is_object_of_class(&class).unwrap());
     }

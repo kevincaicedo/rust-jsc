@@ -1,7 +1,8 @@
 use rust_jsc_sys::{
     JSObjectGetArrayBufferByteLength, JSObjectGetArrayBufferBytesPtr,
-    JSObjectGetTypedArrayBuffer, JSObjectGetTypedArrayByteLength, JSObjectGetTypedArrayByteOffset,
-    JSObjectGetTypedArrayBytesPtr, JSObjectGetTypedArrayLength, JSObjectIsDetachedBuffer,
+    JSObjectGetTypedArrayBuffer, JSObjectGetTypedArrayByteLength,
+    JSObjectGetTypedArrayByteOffset, JSObjectGetTypedArrayBytesPtr,
+    JSObjectGetTypedArrayLength, JSObjectIsDetachedBuffer,
     JSObjectMakeArrayBufferWithBytesNoCopy, JSObjectMakeTypedArray,
     JSObjectMakeTypedArrayWithArrayBuffer,
     JSObjectMakeTypedArrayWithArrayBufferAndOffset,

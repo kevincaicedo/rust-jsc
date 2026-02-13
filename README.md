@@ -212,9 +212,9 @@ Table below shows the supported platforms:
 | macOS    | x86_64 | x86_64-apple-darwin | ✅ |
 | macOS    | aarch64 | aarch64-apple-darwin | ✅ |
 | Linux    | x86_64 | x86_64-unknown-linux-gnu | ✅ |
-| Linux    | aarch64 | aarch64-unknown-linux-gnu | Soon.. |
-| Linux    | x86_64 | x86_64-unknown-linux-musl | Soon.. |
-| Linux    | aarch64 | aarch64-unknown-linux-musl | Soon.. |
+| Linux    | aarch64 | aarch64-unknown-linux-gnu | ✅ |
+| Linux    | x86_64 | x86_64-unknown-linux-musl | ✅ |
+| Linux    | aarch64 | aarch64-unknown-linux-musl | ✅ |
 | Windows  | x86_64 | x86_64-pc-windows-msvc | ❌ |
 
 

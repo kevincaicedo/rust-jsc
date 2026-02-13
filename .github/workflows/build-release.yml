@@ -1,0 +1,423 @@
+name: Build and Release JSC Static Libraries
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_cache:
+        description: "Skip Docker layer cache"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: javascriptcore
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Prepare: extract version from Cargo.toml
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 Detected version: $VERSION"
+
+  # ===========================================================================
+  # macOS Builds (native)
+  # ===========================================================================
+
+  build-macos-x86_64:
+    name: macOS x86_64
+    runs-on: macos-13
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake ninja
+
+      - name: Build JavaScriptCore
+        run: make build-jsc
+
+      - name: Archive static libraries
+        run: make archive platform=x86_64-apple-darwin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjsc-x86_64-apple-darwin
+          path: libjsc-x86_64-apple-darwin.a.gz
+          retention-days: 7
+
+  build-macos-aarch64:
+    name: macOS aarch64
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake ninja
+
+      - name: Build JavaScriptCore
+        run: make build-jsc
+
+      - name: Archive static libraries
+        run: make archive platform=aarch64-apple-darwin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjsc-aarch64-apple-darwin
+          path: libjsc-aarch64-apple-darwin.a.gz
+          retention-days: 7
+
+  # ===========================================================================
+  # Linux glibc Builds (Docker)
+  # ===========================================================================
+
+  build-linux-x86_64:
+    name: Linux x86_64 (glibc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-linux-x86_64
+          key: buildx-linux-x86_64-${{ hashFiles('Dockerfile') }}
+          restore-keys: buildx-linux-x86_64-
+
+      - name: Build JavaScriptCore
+        run: |
+          mkdir -p .libs
+          docker buildx build \
+            --output type=local,dest=./.libs \
+            --cache-from type=local,src=/tmp/.buildx-cache-linux-x86_64 \
+            --cache-to type=local,dest=/tmp/.buildx-cache-linux-x86_64-new,mode=max \
+            -f Dockerfile .
+
+      # Rotate cache to avoid unbounded growth
+      - name: Rotate cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache-linux-x86_64
+          mv /tmp/.buildx-cache-linux-x86_64-new /tmp/.buildx-cache-linux-x86_64 2>/dev/null || true
+
+      - name: Archive static libraries
+        run: |
+          cd .libs
+          tar -czf libjsc-x86_64-unknown-linux-gnu.a.gz *.a
+          mv libjsc-x86_64-unknown-linux-gnu.a.gz ../
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjsc-x86_64-unknown-linux-gnu
+          path: libjsc-x86_64-unknown-linux-gnu.a.gz
+          retention-days: 7
+
+  build-linux-aarch64:
+    name: Linux aarch64 (glibc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-linux-aarch64
+          key: buildx-linux-aarch64-${{ hashFiles('Dockerfile.arm') }}
+          restore-keys: buildx-linux-aarch64-
+
+      - name: Build JavaScriptCore (cross-compile)
+        run: |
+          mkdir -p .libs-arm
+          docker buildx build \
+            --output type=local,dest=./.libs-arm \
+            --cache-from type=local,src=/tmp/.buildx-cache-linux-aarch64 \
+            --cache-to type=local,dest=/tmp/.buildx-cache-linux-aarch64-new,mode=max \
+            -f Dockerfile.arm .
+
+      - name: Rotate cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache-linux-aarch64
+          mv /tmp/.buildx-cache-linux-aarch64-new /tmp/.buildx-cache-linux-aarch64 2>/dev/null || true
+
+      - name: Archive static libraries
+        run: |
+          cd .libs-arm
+          tar -czf libjsc-aarch64-unknown-linux-gnu.a.gz *.a
+          mv libjsc-aarch64-unknown-linux-gnu.a.gz ../
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjsc-aarch64-unknown-linux-gnu
+          path: libjsc-aarch64-unknown-linux-gnu.a.gz
+          retention-days: 7
+
+  # ===========================================================================
+  # Linux musl Builds (Docker)
+  # ===========================================================================
+
+  build-linux-x86_64-musl:
+    name: Linux x86_64 (musl)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-linux-musl-x86_64
+          key: buildx-linux-musl-x86_64-${{ hashFiles('Dockerfile.musl') }}
+          restore-keys: buildx-linux-musl-x86_64-
+
+      - name: Build JavaScriptCore
+        run: |
+          mkdir -p .libs-musl
+          docker buildx build \
+            --output type=local,dest=./.libs-musl \
+            --cache-from type=local,src=/tmp/.buildx-cache-linux-musl-x86_64 \
+            --cache-to type=local,dest=/tmp/.buildx-cache-linux-musl-x86_64-new,mode=max \
+            -f Dockerfile.musl .
+
+      - name: Rotate cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache-linux-musl-x86_64
+          mv /tmp/.buildx-cache-linux-musl-x86_64-new /tmp/.buildx-cache-linux-musl-x86_64 2>/dev/null || true
+
+      - name: Archive static libraries
+        run: |
+          cd .libs-musl
+          tar -czf libjsc-x86_64-unknown-linux-musl.a.gz *.a
+          mv libjsc-x86_64-unknown-linux-musl.a.gz ../
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjsc-x86_64-unknown-linux-musl
+          path: libjsc-x86_64-unknown-linux-musl.a.gz
+          retention-days: 7
+
+  build-linux-aarch64-musl:
+    name: Linux aarch64 (musl)
+    runs-on: ubuntu-latest
+    # NOTE: This build uses QEMU to emulate ARM64 on x86_64 and can be slow.
+    # If build times are too long, consider:
+    #   1. Using a self-hosted ARM64 runner
+    #   2. Using GitHub's native ARM64 runners (e.g., ubuntu-24.04-arm64)
+    #   3. Creating a cross-compilation Dockerfile
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Set up QEMU (for ARM64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-linux-musl-aarch64
+          key: buildx-linux-musl-aarch64-${{ hashFiles('Dockerfile.musl') }}
+          restore-keys: buildx-linux-musl-aarch64-
+
+      - name: Build JavaScriptCore (QEMU ARM64)
+        run: |
+          mkdir -p .libs-arm-musl
+          docker buildx build \
+            --platform linux/arm64 \
+            --output type=local,dest=./.libs-arm-musl \
+            --cache-from type=local,src=/tmp/.buildx-cache-linux-musl-aarch64 \
+            --cache-to type=local,dest=/tmp/.buildx-cache-linux-musl-aarch64-new,mode=max \
+            -f Dockerfile.musl .
+
+      - name: Rotate cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache-linux-musl-aarch64
+          mv /tmp/.buildx-cache-linux-musl-aarch64-new /tmp/.buildx-cache-linux-musl-aarch64 2>/dev/null || true
+
+      - name: Archive static libraries
+        run: |
+          cd .libs-arm-musl
+          tar -czf libjsc-aarch64-unknown-linux-musl.a.gz *.a
+          mv libjsc-aarch64-unknown-linux-musl.a.gz ../
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjsc-aarch64-unknown-linux-musl
+          path: libjsc-aarch64-unknown-linux-musl.a.gz
+          retention-days: 7
+
+  # ===========================================================================
+  # Tests
+  # ===========================================================================
+
+  test:
+    name: Tests
+    runs-on: macos-14
+    needs: [build-macos-aarch64]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS aarch64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libjsc-aarch64-apple-darwin
+          path: .
+
+      - name: Extract static libraries
+        run: |
+          mkdir -p .jsc-libs
+          tar -xzf libjsc-aarch64-apple-darwin.a.gz -C .jsc-libs
+          ls -la .jsc-libs/
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: rust-test-${{ runner.os }}-
+
+      - name: Run tests
+        env:
+          RUST_JSC_CUSTOM_BUILD_PATH: ${{ github.workspace }}/.jsc-libs
+          RUST_BACKTRACE: 1
+        run: cargo test --lib
+
+  # ===========================================================================
+  # Release
+  # ===========================================================================
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - build-macos-x86_64
+      - build-macos-aarch64
+      - build-linux-x86_64
+      - build-linux-aarch64
+      - build-linux-x86_64-musl
+      - build-linux-aarch64-musl
+      - test
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release files
+        run: |
+          mkdir -p release-files
+          find artifacts -name '*.a.gz' -exec cp {} release-files/ \;
+          echo "📦 Release files:"
+          ls -lh release-files/
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.prepare.outputs.version }}"
+
+          echo "🏷️  Release tag: $TAG"
+
+          # Delete existing release if present (to allow re-upload of assets)
+          gh release delete "$TAG" --yes 2>/dev/null || true
+
+          # Delete the remote tag so it points to the latest commit
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+
+          # Create new release with all platform archives
+          gh release create "$TAG" \
+            --title "Rust-JSC $TAG" \
+            --generate-notes \
+            --latest \
+            release-files/*.a.gz
+
+          echo "✅ Release $TAG created successfully"

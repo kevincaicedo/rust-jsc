@@ -1,6 +1,5 @@
-use std::{ffi::CString, marker::PhantomData};
+use std::ffi::CString;
 
-use rust_jsc_macros::finalize;
 use rust_jsc_sys::{
     kJSClassDefinitionEmpty, JSClassCreate, JSClassDefinition, JSClassRelease,
     JSClassRetain, JSObjectCallAsConstructorCallback, JSObjectCallAsFunctionCallback,
@@ -11,7 +10,7 @@ use rust_jsc_sys::{
     JSObjectSetPropertyCallback,
 };
 
-use crate::{self as rust_jsc, JSClass, JSContext, JSObject, JSResult, PrivateData};
+use crate::{JSClass, JSContext, JSObject, JSResult};
 
 #[derive(Debug)]
 pub enum ClassError {
@@ -19,13 +18,12 @@ pub enum ClassError {
     RetainFailed,
 }
 
-pub struct JSClassBuilder<T> {
+pub struct JSClassBuilder {
     definition: JSClassDefinition,
     name: String,
-    _phathom: PhantomData<T>,
 }
 
-impl<T> JSClassBuilder<T> {
+impl JSClassBuilder {
     pub fn new(name: &str) -> Self {
         let mut definition = unsafe { kJSClassDefinitionEmpty };
 
@@ -34,7 +32,6 @@ impl<T> JSClassBuilder<T> {
         Self {
             definition,
             name: name.to_string(),
-            _phathom: PhantomData,
         }
     }
 
@@ -48,7 +45,7 @@ impl<T> JSClassBuilder<T> {
         self
     }
 
-    pub fn parent_class(mut self, parent_class: &JSClass<T>) -> Self {
+    pub fn parent_class(mut self, parent_class: &JSClass) -> Self {
         self.definition.parentClass = parent_class.inner;
         self
     }
@@ -126,23 +123,7 @@ impl<T> JSClassBuilder<T> {
         self
     }
 
-    #[finalize]
-    fn finalize_private_data<B>(data_ptr: PrivateData) {
-        if data_ptr.is_null() {
-            return;
-        }
-
-        unsafe {
-            let value = Box::from_raw(data_ptr as *mut B);
-            drop(value);
-        };
-    }
-
-    pub fn build(mut self) -> Result<JSClass<T>, ClassError> {
-        if self.definition.finalize.is_none() {
-            self = self.set_finalize(Some(Self::finalize_private_data::<T>));
-        }
-
+    pub fn build(self) -> Result<JSClass, ClassError> {
         let class = unsafe { JSClassCreate(&self.definition) };
         if class.is_null() {
             return Err(ClassError::CreateFailed);
@@ -156,12 +137,11 @@ impl<T> JSClassBuilder<T> {
         Ok(JSClass {
             inner: class,
             name: self.name,
-            _phantom: PhantomData,
         })
     }
 }
 
-impl<T> JSClass<T> {
+impl JSClass {
     /// Creates a new class builder.
     ///
     /// # Arguments
@@ -222,7 +202,7 @@ impl<T> JSClass<T> {
     ///
     /// # Returns
     /// A new class builder.
-    pub fn builder(name: &str) -> JSClassBuilder<T> {
+    pub fn builder(name: &str) -> JSClassBuilder {
         JSClassBuilder::new(name)
     }
 
@@ -244,17 +224,17 @@ impl<T> JSClass<T> {
     /// use rust_jsc::{JSClass, JSContext};
     ///
     /// let ctx = JSContext::default();
-    /// let class = JSClass::<i32>::builder("Test")
+    /// let class = JSClass::builder("Test")
     ///    .set_version(1)
     ///     .build()
     ///    .unwrap();
     ///
-    /// let object = class.object(&ctx, Some(Box::new(42)));
+    /// let object = class.object::<i32>(&ctx, Some(Box::new(42)));
     /// ```
     ///
     /// # Returns
     /// A new object of the class.
-    pub fn object(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
+    pub fn object<T: 'static>(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
         let data_ptr = if let Some(data) = data {
             Box::into_raw(data) as *mut std::ffi::c_void
         } else {
@@ -278,7 +258,7 @@ impl<T> JSClass<T> {
     /// use rust_jsc::{JSClass, JSContext, JSClassAttribute};
     ///
     /// let ctx = JSContext::default();
-    /// let class = JSClass::<()>::builder("Test")
+    /// let class = JSClass::builder("Test")
     ///     .set_version(1)
     ///     .set_attributes(JSClassAttribute::None.into())
     ///     .set_initialize(None)
@@ -295,21 +275,21 @@ impl<T> JSClass<T> {
     ///     .build()
     ///     .unwrap();
     ///
-    /// class.register(&ctx).unwrap();
+    /// class.register::<()>(&ctx).unwrap();
     /// ```
     ///
     /// # Errors
     /// If an error occurs while registering the class.
-    pub fn register(&self, ctx: &JSContext) -> JSResult<()> {
+    pub fn register<T: 'static>(&self, ctx: &JSContext) -> JSResult<()> {
         ctx.global_object().set_property(
             self.name(),
-            &self.object(ctx, None),
+            &self.object::<T>(ctx, None),
             Default::default(),
         )
     }
 }
 
-impl<T> Drop for JSClass<T> {
+impl Drop for JSClass {
     fn drop(&mut self) {
         unsafe { JSClassRelease(self.inner) };
     }
@@ -337,7 +317,7 @@ mod tests {
         }
 
         let ctx = JSContext::default();
-        let class = JSClass::<i32>::builder("Test")
+        let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
             .set_initialize(None)
@@ -388,7 +368,7 @@ mod tests {
         }
 
         let ctx = JSContext::default();
-        let class = JSClass::<()>::builder("Test")
+        let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
             .set_initialize(None)
@@ -405,7 +385,7 @@ mod tests {
             .build()
             .unwrap();
 
-        class.register(&ctx).unwrap();
+        class.register::<()>(&ctx).unwrap();
         let result_object = ctx
             .evaluate_script("const obj = new Test(); obj", None)
             .unwrap();
@@ -416,7 +396,7 @@ mod tests {
     #[test]
     fn test_class_without_constructor() {
         let ctx = JSContext::default();
-        let class = JSClass::<()>::builder("Test")
+        let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
             .set_initialize(None)
@@ -433,7 +413,7 @@ mod tests {
             .build()
             .unwrap();
 
-        class.register(&ctx).unwrap();
+        class.register::<()>(&ctx).unwrap();
         let result = ctx.evaluate_script("const obj = new Test(); obj", None);
 
         assert!(result.is_err());
@@ -489,7 +469,7 @@ mod tests {
         }
 
         let ctx = JSContext::default();
-        let class = JSClass::<()>::builder("Test")
+        let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
             .set_initialize(Some(initialize))
@@ -500,7 +480,7 @@ mod tests {
             .build()
             .unwrap();
 
-        class.register(&ctx).unwrap();
+        class.register::<i32>(&ctx).unwrap();
         let result = ctx
             .evaluate_script(
                 r#"

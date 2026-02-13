@@ -173,9 +173,9 @@ impl JSFunction {
     ///
     /// # Returns
     /// A new function with the specified name and callback.
-    pub fn contructor<T>(
+    pub fn contructor(
         ctx: &JSContext,
-        js_class: &JSClass<T>,
+        js_class: &JSClass,
         callback: JSObjectCallAsConstructorCallback,
     ) -> Self {
         let result =
@@ -518,7 +518,7 @@ mod tests {
             .configurable(true)
             .enumerable(true)
             .build();
-        let class = JSClass::<()>::builder("Person").build().unwrap();
+        let class = JSClass::builder("Person").build().unwrap();
         let function = JSFunction::contructor(&ctx, &class, Some(new_object));
         global_object
             .set_property("Person", &function.into(), attributes)

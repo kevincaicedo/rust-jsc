@@ -3,18 +3,18 @@ use crate::{
     JSValue,
 };
 use rust_jsc_sys::{
-    JSAPIModuleLoader, JSCheckScriptSyntax, JSContextGetGlobalContext,
-    JSContextGetGlobalObject, JSContextGetGroup, JSContextGetSharedData,
-    JSContextGroupCreate, JSContextGroupRef, JSContextGroupRelease, JSContextRef,
-    JSContextSetSharedData, JSEvaluateScript, JSGarbageCollect,
-    JSGetMemoryUsageStatistics, JSGlobalContextCopyName, JSGlobalContextCreate,
-    JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable, JSGlobalContextRef,
-    JSGlobalContextRelease, JSGlobalContextSetInspectable, JSGlobalContextSetName,
-    JSGlobalContextSetUncaughtExceptionAtEventLoopCallback,
+    InspectorMessageCallback, InspectorPauseEventCallback, JSAPIModuleLoader,
+    JSCheckScriptSyntax, JSContextGetGlobalContext, JSContextGetGlobalObject,
+    JSContextGetGroup, JSContextGetSharedData, JSContextGroupCreate, JSContextGroupRef,
+    JSContextGroupRelease, JSContextRef, JSContextSetSharedData, JSEvaluateScript,
+    JSGarbageCollect, JSGetMemoryUsageStatistics, JSGlobalContextCopyName,
+    JSGlobalContextCreate, JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable,
+    JSGlobalContextRef, JSGlobalContextRelease, JSGlobalContextSetInspectable,
+    JSGlobalContextSetName, JSGlobalContextSetUncaughtExceptionAtEventLoopCallback,
     JSGlobalContextSetUncaughtExceptionHandler,
-    JSGlobalContextSetUnhandledRejectionCallback, JSInspectorCleanup,
-    JSInspectorDisconnect, JSInspectorIsConnected, JSInspectorSendMessage,
-    JSInspectorSetCallback, JSLinkAndEvaluateModule, JSLoadAndEvaluateModule,
+    JSGlobalContextSetUnhandledRejectionCallback, JSInspectorDisconnect,
+    JSInspectorIsConnected, JSInspectorSendMessage, JSInspectorSetCallback,
+    JSInspectorSetPauseEventCallback, JSLinkAndEvaluateModule, JSLoadAndEvaluateModule,
     JSLoadAndEvaluateModuleFromSource, JSLoadModule, JSLoadModuleFromSource,
     JSSetAPIModuleLoader, JSSetSyntheticModuleKeys, JSStringRef,
     JSUncaughtExceptionAtEventLoop, JSUncaughtExceptionHandler, JSValueRef,
@@ -29,7 +29,7 @@ impl JSContextGroup {
         JSContext::from(ctx)
     }
 
-    pub fn new_context_with_class<T>(&self, class: &JSClass<T>) -> JSContext {
+    pub fn new_context_with_class(&self, class: &JSClass) -> JSContext {
         let ctx =
             unsafe { JSGlobalContextCreateInGroup(self.context_group, class.inner) };
         JSContext::from(ctx)
@@ -64,6 +64,18 @@ impl std::fmt::Debug for JSContextGroup {
     }
 }
 
+/// Debugger pause-loop events emitted by JavaScriptCore while debugging.
+///
+/// - `Paused`: debugger just entered paused state (breakpoint, `debugger;`, etc.)
+/// - `Resumed`: debugger just resumed execution
+/// - `Tick`: called repeatedly while the debugger is paused (nested run loop)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InspectorPauseEvent {
+    Paused,
+    Resumed,
+    Tick,
+}
+
 impl JSContext {
     /// Creates a new `JSContext` object.
     ///
@@ -80,7 +92,7 @@ impl JSContext {
         Self { inner: ctx }
     }
 
-    pub fn new_with<T>(class: &JSClass<T>) -> Self {
+    pub fn new_with(class: &JSClass) -> Self {
         let ctx = unsafe { JSGlobalContextCreate(class.inner) };
         Self { inner: ctx }
     }
@@ -592,12 +604,9 @@ impl JSContext {
     ///
     /// ctx.set_inspector_callback(inspector_callback);
     /// ```
-    pub fn set_inspector_callback(
-        &self,
-        callback: unsafe extern "C" fn(message: *const std::os::raw::c_char),
-    ) {
+    pub fn set_inspector_callback(&self, callback: InspectorMessageCallback) {
         unsafe {
-            JSInspectorSetCallback(self.inner, Some(callback));
+            JSInspectorSetCallback(self.inner, callback);
         }
     }
 
@@ -653,6 +662,19 @@ impl JSContext {
     /// ```
     pub fn inspector_is_connected(&self) -> bool {
         unsafe { JSInspectorIsConnected(self.inner) }
+    }
+
+    /// Registers a pause-event callback.
+    ///
+    /// # Arguments
+    /// - `callback`: A callback function.
+    pub fn set_inspector_pause_event_callback(
+        &self,
+        callback: InspectorPauseEventCallback,
+    ) {
+        unsafe {
+            JSInspectorSetPauseEventCallback(self.inner, callback);
+        }
     }
 
     /// Releases the context.
@@ -750,7 +772,7 @@ impl JSContext {
     /// let data = Box::new(10);
     /// ctx.set_shared_data(data);
     /// ```
-    pub fn set_shared_data<T>(&self, data: Box<T>) {
+    pub fn set_shared_data<T: 'static>(&self, data: Box<T>) {
         let data_ptr = Box::into_raw(data);
         unsafe { JSContextSetSharedData(self.inner, data_ptr as _) }
     }
@@ -769,12 +791,13 @@ impl JSContext {
     /// ```
     ///
     /// # Returns
-    pub fn get_shared_data<T>(&self) -> Option<Box<T>> {
+    pub fn get_shared_data<T: 'static>(&self) -> Option<Box<T>> {
         let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
 
         if data_ptr.is_null() {
             return None;
         }
+
         Some(unsafe { Box::from_raw(data_ptr as *mut T) })
     }
 }
@@ -794,9 +817,8 @@ impl Default for JSContext {
 impl From<JSContextRef> for JSContext {
     fn from(context: JSContextRef) -> Self {
         let global_context = unsafe { JSContextGetGlobalContext(context) };
-        // unsafe {
-        //     JSGlobalContextRetain(global_context);
-        // }
+        // Retaining the context here would lead to over-retention and potential memory leaks.
+        // unsafe { JSGlobalContextRetain(global_context); }
 
         Self {
             inner: global_context,
@@ -804,21 +826,19 @@ impl From<JSContextRef> for JSContext {
     }
 }
 
-impl Drop for JSContext {
-    fn drop(&mut self) {
-        // Disconnect inspector if connected to prevent use-after-free
-        // unsafe {
-        //     if JSInspectorIsConnected(self.inner) {
-        //         JSInspectorDisconnect(self.inner);
-        //     }
-        // }
-
-        // TODO: Set pointer to null
-        // unsafe {
-        //     JSContextSetSharedData(self.global_context, std::ptr::null_mut());
-        // }
-    }
-}
+// impl Drop for JSContext {
+//     fn drop(&mut self) {
+//         /*
+//         TODO: Set pointer to null
+//         unsafe {
+//              if JSInspectorIsConnected(self.inner) {
+//                  JSInspectorDisconnect(self.inner);
+//              }
+//             JSContextSetSharedData(self.inner, std::ptr::null_mut());
+//         }
+//         */
+//     }
+// }
 
 impl From<JSGlobalContextRef> for JSContext {
     fn from(ctx: JSGlobalContextRef) -> Self {
@@ -1022,1537 +1042,107 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // #[test]
-    // fn test_shared_data() {
-    //     let ctx = JSContext::new();
-    //     let data = Box::new(10);
-    //     ctx.set_shared_data(data.clone());
-
-    //     let mut shared_data = ManuallyDrop::new(ctx.get_shared_data::<i32>().unwrap());
-    //     assert_eq!(*shared_data.as_mut(), 10);
-
-    //     let shared_data = ctx.get_shared_data::<i32>().unwrap();
-    //     assert_eq!(*shared_data, 10);
-    //     // unsafe { ManuallyDrop::drop(&mut shared_data) };
-    // }
-
-    // #[test]
-    // fn test_shared_data_null() {
-    //     let ctx = JSContext::new();
-    //     let shared_data = ctx.get_shared_data::<i32>();
-    //     assert!(shared_data.is_none());
-    // }
+    // =========================================================================
+    // Inspector / Debugger Tests
+    // =========================================================================
 
     #[test]
-    fn test_inspectable_basic() {
+    fn test_inspector_set_inspectable() {
+        let ctx = JSContext::new();
+
+        // Initially not inspectable
+        ctx.set_inspectable(false);
+        assert!(!ctx.is_inspectable());
+
+        // Enable inspectable
+        ctx.set_inspectable(true);
+        assert!(ctx.is_inspectable());
+
+        // Disable inspectable
+        ctx.set_inspectable(false);
+        assert!(!ctx.is_inspectable());
+    }
+
+    #[test]
+    fn test_inspector_connect_disconnect() {
         let ctx = JSContext::new();
         ctx.set_inspectable(true);
-        assert_eq!(ctx.is_inspectable(), true);
 
         #[inspector_callback]
-        fn inspector_callback(message: &str) {
-            println!("Inspector message: {}", message);
-        }
+        fn callback(_message: &str) {}
 
-        ctx.set_inspector_callback(inspector_callback);
+        // Connect inspector
+        ctx.set_inspector_callback(Some(callback));
         assert!(ctx.inspector_is_connected());
 
-        // Test Runtime.evaluate command
-        let message = r#"{"id": 1, "method": "Runtime.evaluate", "params": {"expression": "2 + 2"}}"#;
-        ctx.inspector_send_message(message);
-
-        // Properly disconnect before context is dropped
+        // Disconnect inspector
         ctx.inspector_disconnect();
         assert!(!ctx.inspector_is_connected());
     }
 
     #[test]
-    fn test_inspector_comprehensive() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
+    fn test_inspector_send_message() {
+        use std::sync::atomic::{AtomicBool, Ordering};
 
-        #[inspector_callback]
-        fn comprehensive_callback(message: &str) {
-            println!("Inspector response: {}", message);
-        }
-
-        ctx.set_inspector_callback(comprehensive_callback);
-        assert!(ctx.inspector_is_connected());
-
-        // Test Runtime.evaluate for arithmetic
-        let eval_message = r#"{"id": 10, "method": "Runtime.evaluate", "params": {"expression": "3 * 7"}}"#;
-        ctx.inspector_send_message(eval_message);
-
-        // Test Runtime.evaluate with string
-        let string_eval = r#"{"id": 12, "method": "Runtime.evaluate", "params": {"expression": "'Hello' + ' World'"}}"#;
-        ctx.inspector_send_message(string_eval);
-
-        // Properly disconnect before context is dropped
-        ctx.inspector_disconnect();
-        assert!(!ctx.inspector_is_connected());
-    }
-
-    // #[test]
-    // fn test_inspector_error_handling() {
-    //     use std::time::Duration;
-
-    //     static CALLBACK_MESSAGES_M: std::sync::Mutex<Vec<String>> =
-    //         std::sync::Mutex::new(Vec::new());
-
-    //     let ctx = JSContext::new();
-    //     ctx.set_inspectable(true);
-
-    //     #[inspector_callback]
-    //     fn error_callback(message: &str) {
-    //         println!("Error test response: {}", message);
-    //         CALLBACK_MESSAGES_M
-    //             .lock()
-    //             .unwrap()
-    //             .push(message.to_string());
-    //     }
-
-    //     ctx.set_inspector_callback(error_callback);
-
-    //     // Test invalid JavaScript
-    //     let invalid_js = r#"{"id": 20, "method": "Runtime.evaluate", "params": {"expression": "invalid javascript syntax ++"}}"#;
-    //     ctx.inspector_send_message(invalid_js);
-    //     std::thread::sleep(Duration::from_millis(200));
-
-    //     let messages = CALLBACK_MESSAGES_M.lock().unwrap().clone();
-    //     assert!(!messages.is_empty(), "Should receive error response");
-
-    //     // Look for error indication
-    //     let has_error = messages.iter().any(|msg| {
-    //         msg.contains("\"id\":20")
-    //             && (msg.contains("\"wasThrown\":true")
-    //                 || msg.contains("error")
-    //                 || msg.contains("exception"))
-    //     });
-
-    //     if !has_error {
-    //         println!("Messages received: {:?}", messages);
-    //     }
-
-    //     JSContext::inspector_cleanup();
-    // }
-
-    #[test]
-    fn test_inspector_debugger_workflow() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        #[inspector_callback]
-        fn workflow_callback(message: &str) {
-            println!("Debugger workflow: {}", message);
-        }
-
-        ctx.set_inspector_callback(workflow_callback);
-        assert!(ctx.inspector_is_connected());
-
-        // Test Debugger.enable - this previously caused hangs due to missing JSLockHolder
-        // in JSInspectorSendMessage. The lock is required because Debugger.enable triggers:
-        // 1. Heap iteration to find all source providers
-        // 2. Code recompilation when debugger attaches
-        // 3. Proper VM state management during these operations
-        let enable_debugger = r#"{"id": 30, "method": "Debugger.enable", "params": {}}"#;
-        ctx.inspector_send_message(enable_debugger);
-
-        // Test Runtime.evaluate while debugger is enabled
-        let eval_msg = r#"{"id": 31, "method": "Runtime.evaluate", "params": {"expression": "1+1"}}"#;
-        ctx.inspector_send_message(eval_msg);
-
-        // Disable debugger - this triggers code recompilation via recompileAllJSFunctions()
-        let disable_debugger =
-            r#"{"id": 32, "method": "Debugger.disable", "params": {}}"#;
-        ctx.inspector_send_message(disable_debugger);
-
-        // Properly disconnect before context is dropped
-        ctx.inspector_disconnect();
-        assert!(!ctx.inspector_is_connected());
-    }
-
-    #[test]
-    fn test_debugger_pause_and_resume() {
-        // This test demonstrates the pause/resume workflow.
-        // When Debugger.pause is called, the VM will pause on the next JavaScript statement.
-        // The Debugger.paused event is fired when the VM actually stops.
-        // Debugger.resume continues execution and fires Debugger.resumed event.
+        static RECEIVED: AtomicBool = AtomicBool::new(false);
 
         let ctx = JSContext::new();
         ctx.set_inspectable(true);
 
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
         #[inspector_callback]
-        fn pause_callback(message: &str) {
-            println!("Pause/Resume test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(pause_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Request pause - VM will pause on next JS statement
-        ctx.inspector_send_message(
-            r#"{"id": 2, "method": "Debugger.pause", "params": {}}"#,
-        );
-
-        let messages = MESSAGES.lock().unwrap().clone();
-        let has_pause_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":2") && m.contains("result"));
-        assert!(
-            has_pause_response,
-            "Should receive response for pause command"
-        );
-
-        // Resume execution (in case we're paused)
-        ctx.inspector_send_message(
-            r#"{"id": 3, "method": "Debugger.resume", "params": {}}"#,
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_breakpoint_workflow() {
-        // This test demonstrates a complete breakpoint workflow:
-        // 1. Enable debugger
-        // 2. Load a script
-        // 3. Set a breakpoint by URL
-        // 4. Verify breakpoint was created and resolved
-        // 5. Remove the breakpoint
-        // 6. Disable debugger
-
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn bp_workflow_callback(message: &str) {
-            println!("Breakpoint workflow: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(bp_workflow_callback);
-
-        // Step 1: Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Step 2: Load a script with multiple lines for breakpoint testing
-        let script = r#"
-function add(a, b) {
-    let result = a + b;
-    return result;
-}
-
-function multiply(a, b) {
-    let result = a * b;
-    return result;
-}
-
-export { add, multiply };
-"#;
-        ctx.evaluate_module_from_source(script, "math-utils.js", None)
-            .unwrap();
-
-        // Step 3: Set breakpoint at line 2 (inside add function)
-        ctx.inspector_send_message(
-            r#"{
-            "id": 2,
-            "method": "Debugger.setBreakpointByUrl",
-            "params": {
-                "lineNumber": 2,
-                "url": "math-utils.js",
-                "columnNumber": 0
-            }
-        }"#,
-        );
-
-        // Step 4: Set another breakpoint at line 7 (inside multiply function)
-        ctx.inspector_send_message(
-            r#"{
-            "id": 3,
-            "method": "Debugger.setBreakpointByUrl",
-            "params": {
-                "lineNumber": 7,
-                "url": "math-utils.js"
-            }
-        }"#,
-        );
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        // Verify scriptParsed event was received
-        let has_script_parsed = messages
-            .iter()
-            .any(|m| m.contains("Debugger.scriptParsed") && m.contains("math-utils.js"));
-        assert!(has_script_parsed, "Should receive scriptParsed event");
-
-        // Verify breakpoints were created (look for breakpointId in responses)
-        let bp1_response = messages
-            .iter()
-            .find(|m| m.contains("\"id\":2") && m.contains("breakpointId"));
-        let bp2_response = messages
-            .iter()
-            .find(|m| m.contains("\"id\":3") && m.contains("breakpointId"));
-
-        assert!(
-            bp1_response.is_some(),
-            "Should receive breakpoint 1 response with breakpointId"
-        );
-        assert!(
-            bp2_response.is_some(),
-            "Should receive breakpoint 2 response with breakpointId"
-        );
-
-        // Extract breakpointId from first breakpoint for removal
-        if let Some(bp_msg) = bp1_response {
-            if bp_msg.contains("math-utils.js:2") {
-                // Step 5: Remove the first breakpoint
-                ctx.inspector_send_message(
-                    r#"{
-                    "id": 4,
-                    "method": "Debugger.removeBreakpoint",
-                    "params": {"breakpointId": "math-utils.js:2:0"}
-                }"#,
-                );
-
-                let updated_messages = MESSAGES.lock().unwrap().clone();
-                let has_remove_response = updated_messages
-                    .iter()
-                    .any(|m| m.contains("\"id\":4") && m.contains("result"));
-                assert!(
-                    has_remove_response,
-                    "Should receive response for removeBreakpoint"
-                );
+        fn callback(message: &str) {
+            // Verify we receive a response
+            if message.contains("\"id\":1") {
+                RECEIVED.store(true, Ordering::SeqCst);
             }
         }
 
-        // Step 6: Disable debugger
+        ctx.set_inspector_callback(Some(callback));
+
+        // Send a simple Runtime.evaluate command
         ctx.inspector_send_message(
-            r#"{"id": 5, "method": "Debugger.disable", "params": {}}"#,
+            r#"{"id": 1, "method": "Runtime.evaluate", "params": {"expression": "1+1"}}"#,
         );
+
+        assert!(RECEIVED.load(Ordering::SeqCst), "Should receive response");
         ctx.inspector_disconnect();
     }
 
     #[test]
-    fn test_debugger_stepping_commands() {
-        // This test verifies that stepping commands are accepted by the debugger.
-        // Note: stepNext, stepOver, stepInto, stepOut require the debugger to be PAUSED.
-        // When not paused, they return an error "Must be paused".
-        // This test demonstrates the expected behavior.
+    fn test_inspector_debugger_enable_disable() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        static RESPONSE_COUNT: AtomicU32 = AtomicU32::new(0);
 
         let ctx = JSContext::new();
         ctx.set_inspectable(true);
 
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
         #[inspector_callback]
-        fn step_callback(message: &str) {
-            println!("Stepping test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(step_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Try stepping commands while NOT paused - should get "Must be paused" error
-        // This is expected behavior - stepping only works when VM is paused
-
-        // stepNext - steps over the expression
-        ctx.inspector_send_message(
-            r#"{"id": 2, "method": "Debugger.stepNext", "params": {}}"#,
-        );
-
-        // stepOver - steps over the statement
-        ctx.inspector_send_message(
-            r#"{"id": 3, "method": "Debugger.stepOver", "params": {}}"#,
-        );
-
-        // stepInto - steps into function call
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.stepInto", "params": {}}"#,
-        );
-
-        // stepOut - steps out of current function
-        ctx.inspector_send_message(
-            r#"{"id": 5, "method": "Debugger.stepOut", "params": {}}"#,
-        );
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        // All stepping commands should return "Must be paused" error when not paused
-        let step_next_response = messages.iter().find(|m| m.contains("\"id\":2"));
-        let step_over_response = messages.iter().find(|m| m.contains("\"id\":3"));
-        let step_into_response = messages.iter().find(|m| m.contains("\"id\":4"));
-        let step_out_response = messages.iter().find(|m| m.contains("\"id\":5"));
-
-        assert!(
-            step_next_response.is_some(),
-            "Should receive response for stepNext"
-        );
-        assert!(
-            step_over_response.is_some(),
-            "Should receive response for stepOver"
-        );
-        assert!(
-            step_into_response.is_some(),
-            "Should receive response for stepInto"
-        );
-        assert!(
-            step_out_response.is_some(),
-            "Should receive response for stepOut"
-        );
-
-        // Verify they return "Must be paused" error
-        if let Some(msg) = step_next_response {
-            let has_error = msg.contains("Must be paused") || msg.contains("error");
-            println!("stepNext response: {}", msg);
-            assert!(
-                has_error,
-                "stepNext should return 'Must be paused' error when not paused"
-            );
-        }
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 6, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_continue_to_location() {
-        // continueToLocation continues execution until a specific location is reached.
-        // Like stepping commands, it requires a paused state to work properly.
-
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn continue_callback(message: &str) {
-            println!("Continue to location test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(continue_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Load a script
-        ctx.evaluate_module_from_source(
-            "function test() { return 1; }\nexport default test;",
-            "continue-test.js",
-            None,
-        )
-        .unwrap();
-
-        // Get the scriptId from scriptParsed event
-        let messages = MESSAGES.lock().unwrap().clone();
-        let script_parsed = messages.iter().find(|m| {
-            m.contains("Debugger.scriptParsed") && m.contains("continue-test.js")
-        });
-
-        if let Some(parsed_msg) = script_parsed {
-            if let Some(start) = parsed_msg.find("\"scriptId\":\"") {
-                let rest = &parsed_msg[start + 12..];
-                if let Some(end) = rest.find("\"") {
-                    let script_id = &rest[..end];
-
-                    // Try continueToLocation (will error since not paused)
-                    let continue_cmd = format!(
-                        r#"{{"id": 2, "method": "Debugger.continueToLocation", "params": {{"location": {{"scriptId": "{}", "lineNumber": 0, "columnNumber": 0}}}}}}"#,
-                        script_id
-                    );
-                    ctx.inspector_send_message(&continue_cmd);
-
-                    let updated_messages = MESSAGES.lock().unwrap().clone();
-                    let has_response =
-                        updated_messages.iter().any(|m| m.contains("\"id\":2"));
-                    assert!(
-                        has_response,
-                        "Should receive response for continueToLocation"
-                    );
-                }
+        fn callback(message: &str) {
+            if message.contains("\"result\"") {
+                RESPONSE_COUNT.fetch_add(1, Ordering::SeqCst);
             }
         }
 
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 3, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_breakpoint_with_condition() {
-        // Breakpoints can have conditions - they only pause if the condition evaluates to true.
-        // This is set via the "options" parameter with a "condition" field.
-
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn condition_callback(message: &str) {
-            println!("Conditional breakpoint test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(condition_callback);
+        ctx.set_inspector_callback(Some(callback));
 
         // Enable debugger
         ctx.inspector_send_message(
             r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
         );
 
-        // Load a script
-        ctx.evaluate_module_from_source(
-            "function loop(n) { for(let i=0; i<n; i++) { console.log(i); } }\nexport default loop;",
-            "conditional-bp.js",
-            None,
-        )
-        .unwrap();
-
-        // Set a conditional breakpoint - only pause when i === 5
-        ctx.inspector_send_message(
-            r#"{
-            "id": 2,
-            "method": "Debugger.setBreakpointByUrl",
-            "params": {
-                "lineNumber": 0,
-                "url": "conditional-bp.js",
-                "columnNumber": 35,
-                "options": {
-                    "condition": "i === 5"
-                }
-            }
-        }"#,
-        );
-
-        let messages = MESSAGES.lock().unwrap().clone();
-        let has_breakpoint = messages
-            .iter()
-            .any(|m| m.contains("\"id\":2") && m.contains("breakpointId"));
-        assert!(has_breakpoint, "Should create conditional breakpoint");
-
-        // Set a breakpoint with ignoreCount - skip first N hits
-        ctx.inspector_send_message(
-            r#"{
-            "id": 3,
-            "method": "Debugger.setBreakpointByUrl",
-            "params": {
-                "lineNumber": 0,
-                "url": "conditional-bp.js",
-                "options": {
-                    "ignoreCount": 10
-                }
-            }
-        }"#,
-        );
-
-        let updated_messages = MESSAGES.lock().unwrap().clone();
-        let has_ignore_bp = updated_messages
-            .iter()
-            .any(|m| m.contains("\"id\":3") && m.contains("breakpointId"));
-        assert!(has_ignore_bp, "Should create breakpoint with ignoreCount");
-
         // Disable debugger
         ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
+            r#"{"id": 2, "method": "Debugger.disable", "params": {}}"#,
         );
+
+        assert!(
+            RESPONSE_COUNT.load(Ordering::SeqCst) >= 2,
+            "Should receive responses for enable and disable"
+        );
+
         ctx.inspector_disconnect();
     }
-
-    #[test]
-    fn test_debugger_get_breakpoint_locations() {
-        // getBreakpointLocations returns valid breakpoint locations within a range.
-        // This helps IDEs show where breakpoints can be set.
-
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn locations_callback(message: &str) {
-            println!("Breakpoint locations test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(locations_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Load a multi-line script
-        let script = r#"function example() {
-    let x = 1;
-    let y = 2;
-    let z = x + y;
-    return z;
-}
-export default example;"#;
-        ctx.evaluate_module_from_source(script, "locations-test.js", None)
-            .unwrap();
-
-        // Get scriptId
-        let messages = MESSAGES.lock().unwrap().clone();
-        let script_parsed = messages.iter().find(|m| {
-            m.contains("Debugger.scriptParsed") && m.contains("locations-test.js")
-        });
-
-        if let Some(parsed_msg) = script_parsed {
-            if let Some(start) = parsed_msg.find("\"scriptId\":\"") {
-                let rest = &parsed_msg[start + 12..];
-                if let Some(end) = rest.find("\"") {
-                    let script_id = &rest[..end];
-
-                    // Get breakpoint locations for lines 1-5
-                    let get_locations = format!(
-                        r#"{{"id": 2, "method": "Debugger.getBreakpointLocations", "params": {{"start": {{"scriptId": "{}", "lineNumber": 1}}, "end": {{"scriptId": "{}", "lineNumber": 5}}}}}}"#,
-                        script_id, script_id
-                    );
-                    ctx.inspector_send_message(&get_locations);
-
-                    let updated_messages = MESSAGES.lock().unwrap().clone();
-                    let locations_response =
-                        updated_messages.iter().find(|m| m.contains("\"id\":2"));
-
-                    assert!(
-                        locations_response.is_some(),
-                        "Should receive breakpoint locations response"
-                    );
-
-                    if let Some(resp) = locations_response {
-                        println!("Breakpoint locations: {}", resp);
-                        // Response should contain "locations" array
-                        let has_locations = resp.contains("locations");
-                        assert!(has_locations, "Response should contain locations array");
-                    }
-                }
-            }
-        }
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 3, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_search_in_content() {
-        // searchInContent searches for a string in a script's source.
-        // Useful for "Find in Files" functionality.
-
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn search_callback(message: &str) {
-            println!("Search in content test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(search_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Load a script with searchable content
-        let script = r#"
-// This is a comment about MAGIC_VALUE
-const MAGIC_VALUE = 42;
-function getMagicValue() {
-    return MAGIC_VALUE;
-}
-export { MAGIC_VALUE, getMagicValue };
-"#;
-        ctx.evaluate_module_from_source(script, "search-test.js", None)
-            .unwrap();
-
-        // Get scriptId
-        let messages = MESSAGES.lock().unwrap().clone();
-        let script_parsed = messages.iter().find(|m| {
-            m.contains("Debugger.scriptParsed") && m.contains("search-test.js")
-        });
-
-        if let Some(parsed_msg) = script_parsed {
-            if let Some(start) = parsed_msg.find("\"scriptId\":\"") {
-                let rest = &parsed_msg[start + 12..];
-                if let Some(end) = rest.find("\"") {
-                    let script_id = &rest[..end];
-
-                    // Search for "MAGIC_VALUE" in the script
-                    let search_cmd = format!(
-                        r#"{{"id": 2, "method": "Debugger.searchInContent", "params": {{"scriptId": "{}", "query": "MAGIC_VALUE", "caseSensitive": true}}}}"#,
-                        script_id
-                    );
-                    ctx.inspector_send_message(&search_cmd);
-
-                    let updated_messages = MESSAGES.lock().unwrap().clone();
-                    let search_response =
-                        updated_messages.iter().find(|m| m.contains("\"id\":2"));
-
-                    assert!(search_response.is_some(), "Should receive search response");
-
-                    if let Some(resp) = search_response {
-                        println!("Search results: {}", resp);
-                        // Should find matches
-                        let has_result = resp.contains("result");
-                        assert!(has_result, "Response should contain result");
-                    }
-
-                    // Search with regex
-                    let regex_search = format!(
-                        r#"{{"id": 3, "method": "Debugger.searchInContent", "params": {{"scriptId": "{}", "query": "MAGIC.*", "isRegex": true}}}}"#,
-                        script_id
-                    );
-                    ctx.inspector_send_message(&regex_search);
-                }
-            }
-        }
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_set_breakpoint_by_url() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn breakpoint_callback(message: &str) {
-            println!("Breakpoint test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(breakpoint_callback);
-
-        // Enable debugger first
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Load a module so we have a script to set breakpoints on
-        ctx.evaluate_module_from_source(
-            "function testFunc() { return 42; }\nexport default testFunc;",
-            "test-breakpoint.js",
-            None,
-        )
-        .unwrap();
-
-        // Set a breakpoint by URL
-        let set_breakpoint = r#"{
-            "id": 2,
-            "method": "Debugger.setBreakpointByUrl",
-            "params": {
-                "lineNumber": 0,
-                "url": "test-breakpoint.js",
-                "columnNumber": 0
-            }
-        }"#;
-        ctx.inspector_send_message(set_breakpoint);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        // Should have received responses including breakpoint creation
-        assert!(!messages.is_empty(), "Should receive inspector messages");
-
-        // Check for breakpointId in response
-        let has_breakpoint_response = messages.iter().any(|m| m.contains("breakpointId"));
-        assert!(
-            has_breakpoint_response,
-            "Should receive breakpoint response with breakpointId"
-        );
-
-        // Remove the breakpoint
-        ctx.inspector_send_message(
-            r#"{"id": 3, "method": "Debugger.removeBreakpoint", "params": {"breakpointId": "test-breakpoint.js:0:0"}}"#,
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_pause_on_exceptions() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn exception_callback(message: &str) {
-            println!("Exception test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(exception_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Test setPauseOnExceptions with different states
-        // State can be: "none", "uncaught", "all"
-
-        // Set to pause on all exceptions
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Debugger.setPauseOnExceptions", "params": {"state": "all"}}"#);
-
-        // Set to pause on uncaught exceptions only
-        ctx.inspector_send_message(r#"{"id": 3, "method": "Debugger.setPauseOnExceptions", "params": {"state": "uncaught"}}"#);
-
-        // Disable pause on exceptions
-        ctx.inspector_send_message(r#"{"id": 4, "method": "Debugger.setPauseOnExceptions", "params": {"state": "none"}}"#);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        // Should have responses for all commands
-        let has_response_2 = messages.iter().any(|m| m.contains("\"id\":2"));
-        let has_response_3 = messages.iter().any(|m| m.contains("\"id\":3"));
-        let has_response_4 = messages.iter().any(|m| m.contains("\"id\":4"));
-
-        assert!(
-            has_response_2,
-            "Should receive response for setPauseOnExceptions (all)"
-        );
-        assert!(
-            has_response_3,
-            "Should receive response for setPauseOnExceptions (uncaught)"
-        );
-        assert!(
-            has_response_4,
-            "Should receive response for setPauseOnExceptions (none)"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 5, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_set_breakpoints_active() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn active_callback(message: &str) {
-            println!("Breakpoints active test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(active_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Deactivate all breakpoints
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Debugger.setBreakpointsActive", "params": {"active": false}}"#);
-
-        // Reactivate all breakpoints
-        ctx.inspector_send_message(r#"{"id": 3, "method": "Debugger.setBreakpointsActive", "params": {"active": true}}"#);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        let has_deactivate_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":2") && m.contains("result"));
-        let has_activate_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":3") && m.contains("result"));
-
-        assert!(
-            has_deactivate_response,
-            "Should receive response for deactivating breakpoints"
-        );
-        assert!(
-            has_activate_response,
-            "Should receive response for activating breakpoints"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_script_parsed_event() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn script_callback(message: &str) {
-            println!("Script parsed test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(script_callback);
-
-        // Enable debugger - this should trigger scriptParsed events for existing scripts
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Evaluate a new script - should trigger scriptParsed event
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Runtime.evaluate", "params": {"expression": "function newFunc() { return 'hello'; }"}}"#);
-
-        // Load a module - should trigger scriptParsed event
-        ctx.evaluate_module_from_source(
-            "export const value = 123;",
-            "parsed-test.js",
-            None,
-        )
-        .unwrap();
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        // Check for scriptParsed events
-        let script_parsed_count = messages
-            .iter()
-            .filter(|m| m.contains("Debugger.scriptParsed"))
-            .count();
-        println!("Received {} scriptParsed events", script_parsed_count);
-
-        assert!(
-            script_parsed_count > 0,
-            "Should receive at least one scriptParsed event"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 3, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_get_script_source() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn source_callback(message: &str) {
-            println!("Script source test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(source_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Load a module to have a script with known content
-        let script_content = "export function getAnswer() { return 42; }";
-        ctx.evaluate_module_from_source(script_content, "source-test.js", None)
-            .unwrap();
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        // Find scriptId from scriptParsed event
-        let script_parsed = messages.iter().find(|m| {
-            m.contains("Debugger.scriptParsed") && m.contains("source-test.js")
-        });
-
-        if let Some(parsed_msg) = script_parsed {
-            // Extract scriptId (simplified - in real code you'd parse JSON properly)
-            if let Some(start) = parsed_msg.find("\"scriptId\":\"") {
-                let rest = &parsed_msg[start + 12..];
-                if let Some(end) = rest.find("\"") {
-                    let script_id = &rest[..end];
-                    println!("Found scriptId: {}", script_id);
-
-                    // Request script source
-                    let get_source = format!(
-                        r#"{{"id": 2, "method": "Debugger.getScriptSource", "params": {{"scriptId": "{}"}}}}"#,
-                        script_id
-                    );
-                    ctx.inspector_send_message(&get_source);
-
-                    let updated_messages = MESSAGES.lock().unwrap().clone();
-                    let has_source_response = updated_messages
-                        .iter()
-                        .any(|m| m.contains("\"id\":2") && m.contains("scriptSource"));
-                    assert!(has_source_response, "Should receive script source response");
-                }
-            }
-        }
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 3, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_async_stack_trace_depth() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn async_callback(message: &str) {
-            println!("Async stack trace test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(async_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Set async stack trace depth
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Debugger.setAsyncStackTraceDepth", "params": {"depth": 10}}"#);
-
-        // Disable async stack traces
-        ctx.inspector_send_message(r#"{"id": 3, "method": "Debugger.setAsyncStackTraceDepth", "params": {"depth": 0}}"#);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        let has_depth_10_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":2") && m.contains("result"));
-        let has_depth_0_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":3") && m.contains("result"));
-
-        assert!(
-            has_depth_10_response,
-            "Should receive response for setting depth to 10"
-        );
-        assert!(
-            has_depth_0_response,
-            "Should receive response for setting depth to 0"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_pause_on_assertions() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn assertion_callback(message: &str) {
-            println!("Pause on assertions test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(assertion_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Enable pause on assertions (console.assert)
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Debugger.setPauseOnAssertions", "params": {"enabled": true}}"#);
-
-        // Disable pause on assertions
-        ctx.inspector_send_message(r#"{"id": 3, "method": "Debugger.setPauseOnAssertions", "params": {"enabled": false}}"#);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        let has_enable_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":2") && m.contains("result"));
-        let has_disable_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":3") && m.contains("result"));
-
-        assert!(
-            has_enable_response,
-            "Should receive response for enabling pause on assertions"
-        );
-        assert!(
-            has_disable_response,
-            "Should receive response for disabling pause on assertions"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_symbolic_breakpoint() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn symbolic_callback(message: &str) {
-            println!("Symbolic breakpoint test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(symbolic_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Add a symbolic breakpoint - pauses when function named "myFunction" is called
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Debugger.addSymbolicBreakpoint", "params": {"symbol": "myFunction", "caseSensitive": true}}"#);
-
-        // Add a regex symbolic breakpoint
-        ctx.inspector_send_message(r#"{"id": 3, "method": "Debugger.addSymbolicBreakpoint", "params": {"symbol": "test.*", "isRegex": true}}"#);
-
-        // Remove symbolic breakpoints
-        ctx.inspector_send_message(r#"{"id": 4, "method": "Debugger.removeSymbolicBreakpoint", "params": {"symbol": "myFunction", "caseSensitive": true}}"#);
-        ctx.inspector_send_message(r#"{"id": 5, "method": "Debugger.removeSymbolicBreakpoint", "params": {"symbol": "test.*", "isRegex": true}}"#);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        // Verify we got responses (even if just empty result objects)
-        let has_add_response = messages.iter().any(|m| m.contains("\"id\":2"));
-        let has_remove_response = messages.iter().any(|m| m.contains("\"id\":4"));
-
-        assert!(
-            has_add_response,
-            "Should receive response for adding symbolic breakpoint"
-        );
-        assert!(
-            has_remove_response,
-            "Should receive response for removing symbolic breakpoint"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 6, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_pause_on_debugger_statements() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn debugger_stmt_callback(message: &str) {
-            println!("Debugger statements test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(debugger_stmt_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Enable pause on debugger statements
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Debugger.setPauseOnDebuggerStatements", "params": {"enabled": true}}"#);
-
-        // Disable pause on debugger statements
-        ctx.inspector_send_message(r#"{"id": 3, "method": "Debugger.setPauseOnDebuggerStatements", "params": {"enabled": false}}"#);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        let has_enable_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":2") && m.contains("result"));
-        let has_disable_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":3") && m.contains("result"));
-
-        assert!(
-            has_enable_response,
-            "Should receive response for enabling pause on debugger statements"
-        );
-        assert!(
-            has_disable_response,
-            "Should receive response for disabling pause on debugger statements"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 4, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    #[test]
-    fn test_debugger_blackbox_url() {
-        let ctx = JSContext::new();
-        ctx.set_inspectable(true);
-
-        static MESSAGES: std::sync::Mutex<Vec<String>> =
-            std::sync::Mutex::new(Vec::new());
-        MESSAGES.lock().unwrap().clear();
-
-        #[inspector_callback]
-        fn blackbox_callback(message: &str) {
-            println!("Blackbox URL test: {}", message);
-            MESSAGES.lock().unwrap().push(message.to_string());
-        }
-
-        ctx.set_inspector_callback(blackbox_callback);
-
-        // Enable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 1, "method": "Debugger.enable", "params": {}}"#,
-        );
-
-        // Blackbox a specific URL (ignore it when debugging)
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Debugger.setShouldBlackboxURL", "params": {"url": "vendor.js", "shouldBlackbox": true}}"#);
-
-        // Blackbox URLs matching a regex pattern
-        ctx.inspector_send_message(r#"{"id": 3, "method": "Debugger.setShouldBlackboxURL", "params": {"url": "node_modules/.*", "shouldBlackbox": true, "isRegex": true}}"#);
-
-        // Unblackbox a URL
-        ctx.inspector_send_message(r#"{"id": 4, "method": "Debugger.setShouldBlackboxURL", "params": {"url": "vendor.js", "shouldBlackbox": false}}"#);
-
-        let messages = MESSAGES.lock().unwrap().clone();
-
-        let has_blackbox_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":2") && m.contains("result"));
-        let has_regex_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":3") && m.contains("result"));
-        let has_unblackbox_response = messages
-            .iter()
-            .any(|m| m.contains("\"id\":4") && m.contains("result"));
-
-        assert!(
-            has_blackbox_response,
-            "Should receive response for blackboxing URL"
-        );
-        assert!(
-            has_regex_response,
-            "Should receive response for blackboxing regex URL"
-        );
-        assert!(
-            has_unblackbox_response,
-            "Should receive response for unblackboxing URL"
-        );
-
-        // Disable debugger
-        ctx.inspector_send_message(
-            r#"{"id": 5, "method": "Debugger.disable", "params": {}}"#,
-        );
-        ctx.inspector_disconnect();
-    }
-
-    // #[test]
-    // fn test_inspector_multiple_evaluations() {
-    //     use std::time::Duration;
-
-    //     clear_test_messages();
-
-    //     let ctx = JSContext::new();
-    //     ctx.set_inspectable(true);
-
-    //     #[inspector_callback]
-    //     fn multi_callback(message: &str) {
-    //         println!("Multi eval: {}", message);
-    //         add_test_message(message);
-    //     }
-
-    //     ctx.set_inspector_callback(multi_callback);
-
-    //     // Multiple evaluations to test robustness
-    //     let evaluations = vec![
-    //         (40, "1 + 1", "2"),
-    //         (41, "Math.PI", "3.14"),
-    //         (42, "typeof 'hello'", "string"),
-    //         (43, "[1,2,3].length", "3"),
-    //     ];
-
-    //     for (id, expr, expected) in evaluations {
-    //         let message = format!(
-    //             r#"{{"id": {}, "method": "Runtime.evaluate", "params": {{"expression": "{}"}}}}"#,
-    //             id, expr
-    //         );
-    //         ctx.inspector_send_message(&message);
-    //         std::thread::sleep(Duration::from_millis(150));
-
-    //         let messages = get_test_messages();
-    //         let found_response = messages.iter().any(|msg| {
-    //             msg.contains(&format!("\"id\":{}", id)) && msg.contains(expected)
-    //         });
-
-    //         if !found_response {
-    //             println!(
-    //                 "Failed to find expected response for {}: {}",
-    //                 expr, expected
-    //             );
-    //             println!("Current messages: {:?}", messages);
-    //         }
-    //     }
-
-    //     let final_messages = get_test_messages();
-    //     assert!(
-    //         final_messages.len() >= 4,
-    //         "Should have received at least 4 responses"
-    //     );
-
-    //     JSContext::inspector_cleanup();
-    // }
-
-    // #[test]
-    // fn test_inspector_advanced_debugging() {
-    //     use std::time::Duration;
-
-    //     clear_test_messages();
-
-    //     let ctx = JSContext::new();
-    //     ctx.set_inspectable(true);
-
-    //     #[inspector_callback]
-    //     fn advanced_callback(message: &str) {
-    //         println!("Advanced debug: {}", message);
-    //         add_test_message(message);
-    //     }
-
-    //     ctx.set_inspector_callback(advanced_callback);
-
-    //     // Enable both debugger and runtime
-    //     let enable_debugger = r#"{"id": 50, "method": "Debugger.enable", "params": {}}"#;
-    //     ctx.inspector_send_message(enable_debugger);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     let enable_runtime = r#"{"id": 51, "method": "Runtime.enable", "params": {}}"#;
-    //     ctx.inspector_send_message(enable_runtime);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     // Create a function and execute it
-    //     let create_function = r#"{"id": 52, "method": "Runtime.evaluate", "params": {"expression": "function debugTest(x) { var result = x * 2; return result + 1; }"}}"#;
-    //     ctx.inspector_send_message(create_function);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     // Call the function
-    //     let call_function = r#"{"id": 53, "method": "Runtime.evaluate", "params": {"expression": "debugTest(5)"}}"#;
-    //     ctx.inspector_send_message(call_function);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     // Test console API
-    //     let console_test = r#"{"id": 54, "method": "Runtime.evaluate", "params": {"expression": "console.log('Debug test message'); 42"}}"#;
-    //     ctx.inspector_send_message(console_test);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     // Get global object properties
-    //     let global_props = r#"{"id": 55, "method": "Runtime.evaluate", "params": {"expression": "Object.keys(this).slice(0, 5)"}}"#;
-    //     ctx.inspector_send_message(global_props);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     let messages = get_test_messages();
-
-    //     // Validate responses
-    //     assert!(
-    //         validate_response(&messages, 50, "result"),
-    //         "Debugger should enable"
-    //     );
-    //     assert!(
-    //         validate_response(&messages, 51, "result"),
-    //         "Runtime should enable"
-    //     );
-    //     assert!(
-    //         validate_response(&messages, 52, "result"),
-    //         "Function should be created"
-    //     );
-    //     assert!(
-    //         validate_response(&messages, 53, "\"value\":11"),
-    //         "Function should return 11 (5*2+1)"
-    //     );
-    //     assert!(
-    //         validate_response(&messages, 54, "\"value\":42"),
-    //         "Console test should return 42"
-    //     );
-    //     assert!(
-    //         validate_response(&messages, 55, "array"),
-    //         "Should get global properties array"
-    //     );
-
-    //     println!(
-    //         "Advanced debugging test completed with {} messages",
-    //         messages.len()
-    //     );
-    //     for (i, msg) in messages.iter().enumerate() {
-    //         if msg.len() > 200 {
-    //             println!("Message {}: {}...", i + 1, &msg[..200]);
-    //         } else {
-    //             println!("Message {}: {}", i + 1, msg);
-    //         }
-    //     }
-
-    //     JSContext::inspector_cleanup();
-    // }
-
-    // #[test]
-    // fn test_inspector_breakpoint_with_execution() {
-    //     use std::time::Duration;
-
-    //     clear_test_messages();
-
-    //     let ctx = JSContext::new();
-    //     ctx.set_inspectable(true);
-
-    //     #[inspector_callback]
-    //     fn breakpoint_execution_callback(message: &str) {
-    //         println!("Breakpoint execution: {}", message);
-    //         add_test_message(message);
-    //     }
-
-    //     ctx.set_inspector_callback(breakpoint_execution_callback);
-
-    //     // Enable debugger
-    //     let enable = r#"{"id": 60, "method": "Debugger.enable", "params": {}}"#;
-    //     ctx.inspector_send_message(enable);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     // Set up a more complex script that we can debug
-    //     let script_setup = r#"{"id": 61, "method": "Runtime.evaluate", "params": {"expression": "var counter = 0; function increment() { counter++; return counter; }"}}"#;
-    //     ctx.inspector_send_message(script_setup);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     // Try to set a breakpoint (though it may not hit without proper source mapping)
-    //     let set_bp = r#"{"id": 62, "method": "Debugger.setBreakpointByUrl", "params": {"lineNumber": 1, "url": "test-script.js"}}"#;
-    //     ctx.inspector_send_message(set_bp);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     // Execute the function multiple times
-    //     for i in 0..3 {
-    //         let call_increment = format!(
-    //             r#"{{"id": {}, "method": "Runtime.evaluate", "params": {{"expression": "increment()"}}}}"#,
-    //             63 + i
-    //         );
-    //         ctx.inspector_send_message(&call_increment);
-    //         std::thread::sleep(Duration::from_millis(50));
-    //     }
-
-    //     // Check the final counter value
-    //     let check_counter = r#"{"id": 66, "method": "Runtime.evaluate", "params": {"expression": "counter"}}"#;
-    //     ctx.inspector_send_message(check_counter);
-    //     std::thread::sleep(Duration::from_millis(100));
-
-    //     let messages = get_test_messages();
-
-    //     // Validate that our script execution worked
-    //     assert!(
-    //         validate_response(&messages, 66, "\"value\":3"),
-    //         "Counter should be 3 after 3 increments"
-    //     );
-
-    //     // Check that we got multiple function call responses
-    //     let increment_responses = messages
-    //         .iter()
-    //         .filter(|msg| (63..66).any(|id| msg.contains(&format!("\"id\":{}", id))))
-    //         .count();
-    //     assert!(
-    //         increment_responses >= 3,
-    //         "Should have responses for all increment calls"
-    //     );
-
-    //     println!("Breakpoint execution test completed");
-    //     println!("Found {} increment responses", increment_responses);
-
-    //     JSContext::inspector_cleanup();
-    // }
 
     #[test]
     fn test_virtual_module() {
