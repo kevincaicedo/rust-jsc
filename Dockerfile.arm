@@ -1,13 +1,19 @@
 # Use an Ubuntu base image
-FROM ubuntu:22.04 as builder
+FROM ubuntu:22.04 AS builder
 
 # Set the working directory
 WORKDIR /usr/src/app
 
 # Install required packages and add multiarch support
+# arm64 packages are served from ports.ubuntu.com, not archive.ubuntu.com
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     && dpkg --add-architecture arm64 \
+    && echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list \
+    && echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-updates main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list \
+    && echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-security main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list \
+    && echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports jammy-backports main restricted universe multiverse" >> /etc/apt/sources.list.d/arm64.list \
+    && sed -i 's/^deb /deb [arch=amd64] /' /etc/apt/sources.list \
     && apt-get update
 
 # Install cross-compilation tools and libraries for ARM

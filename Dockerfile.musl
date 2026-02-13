@@ -1,5 +1,5 @@
 # Use an Alpine base image for musl support
-FROM alpine:3.18 as builder
+FROM alpine:3.18 AS builder
 
 # Set the working directory
 WORKDIR /usr/src/app
@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     python3 \
     libatomic \
     libc-dev \
+    linux-headers \
     ruby \
     bison \
     flex \
@@ -21,7 +22,7 @@ RUN apk add --no-cache \
     file
 
 # Set environment variable for C++ compiler
-ENV CXX /usr/bin/g++
+ENV CXX=/usr/bin/g++
 
 # Clone the WebKit repository
 COPY ./WebKit ./WebKit
@@ -43,7 +44,7 @@ RUN mkdir libs && \
     cp /usr/src/app/WebKit/WebKitBuild/JSCOnly/Release/lib/*.a libs/
 
 
-FROM builder as build_icu
+FROM builder AS build_icu
 
 RUN apk add --no-cache cpio curl icu-dev tar
 

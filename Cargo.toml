@@ -28,5 +28,5 @@ repository = "https://github.com/kevincaicedo/rust-jsc"
 readme = "README.md"
 
 [dependencies]
-rust_jsc_sys = { path = "sys", features = ["patches"], version = "0.2.2" }
-rust_jsc_macros = { path = "macros", version = "0.1.9" }
+rust_jsc_sys = { path = "sys", features = ["patches"], version = "0.4.0" }
+rust_jsc_macros = { path = "macros", version = "0.2.0" }
