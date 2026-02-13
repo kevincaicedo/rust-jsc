@@ -50,12 +50,27 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install dependencies
-        run: brew install cmake ninja
-
-      - name: Build JavaScriptCore (cross-compile x86_64)
+      - name: Install universal build tools
         run: |
-          WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_CXX_FLAGS='-Wno-error=missing-template-arg-list-after-template-kw -Wno-error=constant-conversion -Wno-unused-variable -Wno-error=unused-variable'"
+          # Download CMake universal binary — MUST be universal so it runs as x86_64
+          # under Rosetta and correctly detects the host architecture.
+          # Homebrew cmake is ARM64-only and would detect ARM64 even under arch -x86_64.
+          CMAKE_VERSION="3.28.3"
+          curl -L "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-macos-universal.tar.gz" -o cmake.tar.gz
+          tar xzf cmake.tar.gz
+          echo "$PWD/cmake-${CMAKE_VERSION}-macos-universal/CMake.app/Contents/bin" >> $GITHUB_PATH
+
+          # Ninja: brew version is fine (ARM64-only but doesn't affect architecture detection;
+          # cmake is what determines target arch, ninja just runs the commands cmake configured)
+          brew install ninja
+
+      - name: Build JavaScriptCore (x86_64 via Rosetta 2)
+        run: |
+          # Run entire build under Rosetta 2 so cmake detects x86_64 as host architecture.
+          # Universal cmake/ninja binaries pick x86_64 slice, Apple Clang is always universal.
+          arch -x86_64 bash -c '
+            WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='"'"'-Wno-unused-variable -Wno-error=unused-variable -Wno-error=constant-conversion'"'"'"
+          '
 
       - name: Archive static libraries
         run: make archive platform=x86_64-apple-darwin
