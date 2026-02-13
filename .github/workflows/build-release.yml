@@ -38,12 +38,12 @@ jobs:
           echo "📦 Detected version: $VERSION"
 
   # ===========================================================================
-  # macOS Builds (native)
+  # macOS Builds (native on Apple Silicon, cross-compile x86_64)
   # ===========================================================================
 
   build-macos-x86_64:
     name: macOS x86_64
-    runs-on: macos-13
+    runs-on: macos-14
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
@@ -53,8 +53,9 @@ jobs:
       - name: Install dependencies
         run: brew install cmake ninja
 
-      - name: Build JavaScriptCore
-        run: make build-jsc
+      - name: Build JavaScriptCore (cross-compile x86_64)
+        run: |
+          WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_CXX_FLAGS='-Wno-error=missing-template-arg-list-after-template-kw -Wno-error=constant-conversion -Wno-unused-variable -Wno-error=unused-variable'"
 
       - name: Archive static libraries
         run: make archive platform=x86_64-apple-darwin
@@ -92,7 +93,7 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
-  # Linux glibc Builds (Docker)
+  # Linux x86_64 Builds (Docker on x86_64 runners)
   # ===========================================================================
 
   build-linux-x86_64:
@@ -129,7 +130,6 @@ jobs:
             --cache-to type=local,dest=/tmp/.buildx-cache-linux-x86_64-new,mode=max \
             -f Dockerfile .
 
-      # Rotate cache to avoid unbounded growth
       - name: Rotate cache
         if: always()
         run: |
@@ -148,63 +148,6 @@ jobs:
           name: libjsc-x86_64-unknown-linux-gnu
           path: libjsc-x86_64-unknown-linux-gnu.a.gz
           retention-days: 7
-
-  build-linux-aarch64:
-    name: Linux aarch64 (glibc)
-    runs-on: ubuntu-latest
-    timeout-minutes: 240
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
-          sudo docker image prune --all --force
-          df -h
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache-linux-aarch64
-          key: buildx-linux-aarch64-${{ hashFiles('Dockerfile.arm') }}
-          restore-keys: buildx-linux-aarch64-
-
-      - name: Build JavaScriptCore (cross-compile)
-        run: |
-          mkdir -p .libs-arm
-          docker buildx build \
-            --output type=local,dest=./.libs-arm \
-            --cache-from type=local,src=/tmp/.buildx-cache-linux-aarch64 \
-            --cache-to type=local,dest=/tmp/.buildx-cache-linux-aarch64-new,mode=max \
-            -f Dockerfile.arm .
-
-      - name: Rotate cache
-        if: always()
-        run: |
-          rm -rf /tmp/.buildx-cache-linux-aarch64
-          mv /tmp/.buildx-cache-linux-aarch64-new /tmp/.buildx-cache-linux-aarch64 2>/dev/null || true
-
-      - name: Archive static libraries
-        run: |
-          cd .libs-arm
-          tar -czf libjsc-aarch64-unknown-linux-gnu.a.gz *.a
-          mv libjsc-aarch64-unknown-linux-gnu.a.gz ../
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libjsc-aarch64-unknown-linux-gnu
-          path: libjsc-aarch64-unknown-linux-gnu.a.gz
-          retention-days: 7
-
-  # ===========================================================================
-  # Linux musl Builds (Docker)
-  # ===========================================================================
 
   build-linux-x86_64-musl:
     name: Linux x86_64 (musl)
@@ -259,15 +202,14 @@ jobs:
           path: libjsc-x86_64-unknown-linux-musl.a.gz
           retention-days: 7
 
-  build-linux-aarch64-musl:
-    name: Linux aarch64 (musl)
-    runs-on: ubuntu-latest
-    # NOTE: This build uses QEMU to emulate ARM64 on x86_64 and can be slow.
-    # If build times are too long, consider:
-    #   1. Using a self-hosted ARM64 runner
-    #   2. Using GitHub's native ARM64 runners (e.g., ubuntu-24.04-arm64)
-    #   3. Creating a cross-compilation Dockerfile
-    timeout-minutes: 360
+  # ===========================================================================
+  # Linux aarch64 Builds (Docker on native ARM64 runners — no QEMU)
+  # ===========================================================================
+
+  build-linux-aarch64:
+    name: Linux aarch64 (glibc)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -279,10 +221,59 @@ jobs:
           sudo docker image prune --all --force
           df -h
 
-      - name: Set up QEMU (for ARM64 emulation)
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
         with:
-          platforms: arm64
+          path: /tmp/.buildx-cache-linux-aarch64
+          key: buildx-linux-aarch64-${{ hashFiles('Dockerfile') }}
+          restore-keys: buildx-linux-aarch64-
+
+      # Native ARM64 runner: use the standard Dockerfile (same as x86_64 glibc)
+      - name: Build JavaScriptCore
+        run: |
+          mkdir -p .libs-arm
+          docker buildx build \
+            --output type=local,dest=./.libs-arm \
+            --cache-from type=local,src=/tmp/.buildx-cache-linux-aarch64 \
+            --cache-to type=local,dest=/tmp/.buildx-cache-linux-aarch64-new,mode=max \
+            -f Dockerfile .
+
+      - name: Rotate cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache-linux-aarch64
+          mv /tmp/.buildx-cache-linux-aarch64-new /tmp/.buildx-cache-linux-aarch64 2>/dev/null || true
+
+      - name: Archive static libraries
+        run: |
+          cd .libs-arm
+          tar -czf libjsc-aarch64-unknown-linux-gnu.a.gz *.a
+          mv libjsc-aarch64-unknown-linux-gnu.a.gz ../
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjsc-aarch64-unknown-linux-gnu
+          path: libjsc-aarch64-unknown-linux-gnu.a.gz
+          retention-days: 7
+
+  build-linux-aarch64-musl:
+    name: Linux aarch64 (musl)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -294,11 +285,11 @@ jobs:
           key: buildx-linux-musl-aarch64-${{ hashFiles('Dockerfile.musl') }}
           restore-keys: buildx-linux-musl-aarch64-
 
-      - name: Build JavaScriptCore (QEMU ARM64)
+      # Native ARM64 runner: use Dockerfile.musl directly (no QEMU)
+      - name: Build JavaScriptCore
         run: |
           mkdir -p .libs-arm-musl
           docker buildx build \
-            --platform linux/arm64 \
             --output type=local,dest=./.libs-arm-musl \
             --cache-from type=local,src=/tmp/.buildx-cache-linux-musl-aarch64 \
             --cache-to type=local,dest=/tmp/.buildx-cache-linux-musl-aarch64-new,mode=max \
