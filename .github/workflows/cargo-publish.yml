@@ -1,0 +1,181 @@
+name: Cargo Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'sys-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g., v0.4.0 for rust_jsc/macros, sys-v0.4.0 for sys)'
+        required: true
+        type: string
+
+concurrency:
+  group: cargo-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Prepare: detect tag type, extract version, and validate
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.tag.outputs.tag }}
+      is_sys: ${{ steps.tag_type.outputs.is_sys }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Determine Tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag: $TAG"
+
+      - name: Detect tag type
+        id: tag_type
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if [[ "$TAG" == sys-v* ]]; then
+            echo "is_sys=true" >> "$GITHUB_OUTPUT"
+            echo "Tag type: sys crate"
+          else
+            echo "is_sys=false" >> "$GITHUB_OUTPUT"
+            echo "Tag type: rust_jsc / macros"
+          fi
+
+      - name: Extract version and validate
+        id: version
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          IS_SYS="${{ steps.tag_type.outputs.is_sys }}"
+
+          if [ "$IS_SYS" = "true" ]; then
+            # Extract version from sys/Cargo.toml
+            VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+            TAG_VERSION=${TAG#sys-v}
+          else
+            # Extract version from root Cargo.toml
+            VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+            TAG_VERSION=${TAG#v}
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match Cargo.toml version ($VERSION)"
+            exit 1
+          fi
+
+  # ===========================================================================
+  # Test Matrix: Run unit tests for each supported platform
+  # ===========================================================================
+
+  test:
+    name: Test ${{ matrix.target }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-14
+          - target: aarch64-apple-darwin
+            os: macos-14
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 tar
+          if [[ "${{ matrix.target }}" == *"musl"* ]]; then
+            sudo apt-get install -y musl-tools
+          fi
+
+      - name: Run tests
+        env:
+          RUST_BACKTRACE: 1
+        run: |
+          # The sys crate (rust_jsc_sys) will automatically download the required
+          # static libraries from the GitHub Release mirror using its build.rs.
+          cargo test --lib --target ${{ matrix.target }}
+
+  # ===========================================================================
+  # Publish sys crate (only for sys-v* tags)
+  # ===========================================================================
+
+  publish-sys:
+    name: Publish rust_jsc_sys
+    if: needs.prepare.outputs.is_sys == 'true'
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish rust_jsc_sys
+        working-directory: sys
+        run: |
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --no-verify || echo "Already published"
+
+  # ===========================================================================
+  # Publish rust_jsc and macros (only for v* tags)
+  # ===========================================================================
+
+  publish-crates:
+    name: Publish rust_jsc & macros
+    if: needs.prepare.outputs.is_sys == 'false'
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish rust_jsc_macros
+        working-directory: macros
+        run: |
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} || echo "Already published"
+
+      - name: Publish rust_jsc (root)
+        run: |
+          # Wait for crates.io to index the new macros version if published
+          sleep 10
+          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --no-verify

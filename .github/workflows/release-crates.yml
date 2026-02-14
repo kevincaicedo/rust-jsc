@@ -1,0 +1,63 @@
+name: Release Rust-JSC Crates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'macros/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: release-crates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Prepare: extract version from root Cargo.toml
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from Cargo.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+  # ===========================================================================
+  # Release
+  # ===========================================================================
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [prepare]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.prepare.outputs.version }}"
+
+          echo "Release tag: $TAG"
+
+          # Create new release
+          # Fails if the tag already exists, forcing a version bump
+          gh release create "$TAG" \
+            --title "Rust-JSC $TAG" \
+            --generate-notes
+
+          echo "Release $TAG created successfully"

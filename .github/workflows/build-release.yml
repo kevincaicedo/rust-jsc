@@ -3,6 +3,13 @@ name: Build and Release JSC Static Libraries
 on:
   push:
     branches: [main]
+    paths:
+      - 'sys/**'
+      - 'WebKit/**'
+      - '.gitmodules'
+      - 'Dockerfile'
+      - 'Dockerfile.arm'
+      - 'Dockerfile.musl'
   workflow_dispatch:
     inputs:
       skip_cache:
@@ -20,7 +27,7 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Prepare: extract version from Cargo.toml
+  # Prepare: extract version from sys/Cargo.toml
   # ---------------------------------------------------------------------------
   prepare:
     name: Prepare
@@ -30,12 +37,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from Cargo.toml
+      - name: Extract version from sys/Cargo.toml
         id: version
         run: |
-          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "📦 Detected version: $VERSION"
+          echo "Detected sys version: $VERSION"
 
   # ===========================================================================
   # macOS Builds (native on Apple Silicon, cross-compile x86_64)
@@ -405,25 +412,19 @@ jobs:
           echo "📦 Release files:"
           ls -lh release-files/
 
-      - name: Create or update GitHub Release
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v${{ needs.prepare.outputs.version }}"
+          TAG="sys-v${{ needs.prepare.outputs.version }}"
 
-          echo "🏷️  Release tag: $TAG"
-
-          # Delete existing release if present (to allow re-upload of assets)
-          gh release delete "$TAG" --yes 2>/dev/null || true
-
-          # Delete the remote tag so it points to the latest commit
-          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          echo "Release tag: $TAG"
 
           # Create new release with all platform archives
+          # Fails if the tag already exists, forcing a version bump
           gh release create "$TAG" \
-            --title "Rust-JSC $TAG" \
+            --title "Rust-JSC-Sys $TAG" \
             --generate-notes \
-            --latest \
             release-files/*.a.gz
 
-          echo "✅ Release $TAG created successfully"
+          echo "Release $TAG created successfully"

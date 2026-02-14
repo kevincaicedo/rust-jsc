@@ -3,12 +3,6 @@
 version = 4
 
 [[package]]
-name = "pkg-config"
-version = "0.3.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -28,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rust_jsc_macros",
  "rust_jsc_sys",
@@ -45,10 +39,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc_sys"
-version = "0.4.0"
-dependencies = [
- "pkg-config",
-]
+version = "0.4.1"
 
 [[package]]
 name = "syn"

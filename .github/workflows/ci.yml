@@ -25,9 +25,9 @@ jobs:
         run: cargo fmt -- --check
 
   build-check:
-    name: Build Check (macOS)
-    runs-on: macos-14
-    timeout-minutes: 15
+    name: Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +44,5 @@ jobs:
           key: rust-check-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: rust-check-${{ runner.os }}-
 
-      # Build check using the system JavaScriptCore framework (no patches feature)
-      # This validates Rust code compiles without needing the custom static libs
-      - name: Cargo check (system JSC)
-        run: cargo check --no-default-features
+      - name: Cargo check (macros)
+        run: cargo check -p rust_jsc_macros
