@@ -14,19 +14,22 @@ exclude = [
     "examples",
     "tests",
     ".gitmodules",
+    ".github",
     "gen",
     "Dockerfile",
+    "Dockerfile.arm",
+    "Dockerfile.musl",
     "WebKit"
 ]
 description = "High-level bindings to JavaScriptCore"
 keywords = [ "javascriptcore", "javascript" ]
 authors = [ "Kevin Caicedo <ing.sys.kevincaicedo@gmail.com>" ]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/kevincaicedo/rust-jsc"
 readme = "README.md"
 
 [dependencies]
-rust_jsc_sys = { path = "sys", features = ["patches"], version = "0.4.0" }
+rust_jsc_sys = { path = "sys", version = "0.4.1" }
 rust_jsc_macros = { path = "macros", version = "0.2.0" }

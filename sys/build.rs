@@ -1,5 +1,4 @@
 use std::env;
-extern crate pkg_config;
 
 fn check_supported_platform() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
@@ -52,7 +51,7 @@ fn static_lib_url() -> String {
     let version = env::var("CARGO_PKG_VERSION").unwrap();
 
     let platform_file = static_lib_file();
-    format!("{}/v{}/{}", base, version, platform_file)
+    format!("{}/sys-v{}/{}", base, version, platform_file)
 }
 
 // use a python script that receives the URL and downloads the file also passing the output path
@@ -101,15 +100,7 @@ fn extract_static_lib() {
     }
 }
 
-#[cfg(target_os = "macos")]
-#[cfg(feature = "patches")]
-fn main() {
-    let is_cargo_doc = env::var_os("DOCS_RS").is_some();
-    // if building docs, don't download the static lib
-    if is_cargo_doc {
-        return;
-    }
-
+fn setup_static_libs() {
     println!(
         "cargo:rerun-if-env-changed={}",
         "RUST_JSC_CUSTOM_BUILD_PATH"
@@ -137,6 +128,17 @@ fn main() {
         // set search native path to the output directory
         println!("cargo:rustc-link-search=native={}", output_path);
     }
+}
+
+#[cfg(target_os = "macos")]
+fn main() {
+    let is_cargo_doc = env::var_os("DOCS_RS").is_some();
+    // if building docs, don't download the static lib
+    if is_cargo_doc {
+        return;
+    }
+
+    setup_static_libs();
 
     let lib_dir = env::var("SYSTEM_LIBS_PATH").unwrap_or_else(|_| "/usr/lib".into());
     println!("cargo:rustc-link-search={}", lib_dir);
@@ -153,15 +155,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=bmalloc");
 }
 
-// is macOS and not using custom JavaScriptCore framework
-#[cfg(target_os = "macos")]
-#[cfg(not(feature = "patches"))]
-fn main() {
-    println!("cargo:rustc-link-lib=framework=JavaScriptCore");
-}
-
 #[cfg(target_os = "linux")]
-#[cfg(feature = "patches")]
 fn main() {
     let is_cargo_doc = env::var_os("DOCS_RS").is_some();
     // if building docs, don't download the static lib
@@ -169,33 +163,7 @@ fn main() {
         return;
     }
 
-    println!(
-        "cargo:rerun-if-env-changed={}",
-        "RUST_JSC_CUSTOM_BUILD_PATH"
-    );
-    println!("cargo:rerun-if-env-changed={}", "SYSTEM_LIBS_PATH");
-    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_MIRROR");
-    println!("cargo:rerun-if-env-changed={}", "RUST_JSC_CUSTOM_ARCHIVE");
-
-    // if custom path for the static lib is set use it, otherwise download the static lib
-    if let Ok(custom_build_path) = env::var("RUST_JSC_CUSTOM_BUILD_PATH") {
-        println!("cargo:rustc-link-search=native={}", custom_build_path);
-    } else {
-        let output_path = env::var("OUT_DIR").unwrap();
-        let version = env::var("CARGO_PKG_VERSION").unwrap();
-        let output_path = format!("{}/{}", output_path, version);
-        let static_lib_file = static_lib_file();
-
-        // if archive file is not found in outdir, download it
-        if !std::path::Path::new(&format!("{}/{}", output_path, static_lib_file)).exists()
-        {
-            fetch_static_lib();
-            extract_static_lib();
-        }
-
-        // set search native path to the output directory
-        println!("cargo:rustc-link-search=native={}", output_path);
-    }
+    setup_static_libs();
 
     // static libs
     println!("cargo:rustc-link-lib=static=stdc++");
@@ -207,10 +175,4 @@ fn main() {
     println!("cargo:rustc-link-lib=static=JavaScriptCore");
     println!("cargo:rustc-link-lib=static=WTF");
     println!("cargo:rustc-link-lib=static=bmalloc");
-}
-
-#[cfg(target_os = "linux")]
-#[cfg(not(feature = "patches"))]
-fn main() {
-    pkg_config::probe_library("javascriptcoregtk-6.0").unwrap();
 }

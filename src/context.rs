@@ -427,8 +427,7 @@ impl JSContext {
     /// let result = ctx.load_module_from_source("console.log('Hello, World!')", "test.js", 0);
     /// assert!(result.is_ok());
     /// ```
-    #[allow(dead_code)]
-    fn load_module_from_source(
+    pub fn load_module_from_source(
         &self,
         source: &str,
         source_url: &str,
