@@ -172,6 +172,14 @@ fn main() {
     println!("cargo:rustc-link-lib=static=icudata");
     println!("cargo:rustc-link-lib=static=atomic");
 
+    // On aarch64 musl, __clear_cache (used by JSC's JIT) lives in libgcc
+    // and is not linked by default unlike glibc targets.
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    if target_env == "musl" && target_arch == "aarch64" {
+        println!("cargo:rustc-link-lib=gcc");
+    }
+
     println!("cargo:rustc-link-lib=static=JavaScriptCore");
     println!("cargo:rustc-link-lib=static=WTF");
     println!("cargo:rustc-link-lib=static=bmalloc");
