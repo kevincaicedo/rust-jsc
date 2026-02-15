@@ -1,6 +1,7 @@
 use std::{
     ffi::{CString, NulError},
     fmt::Debug,
+    os::raw::c_char,
 };
 
 use rust_jsc_sys::{
@@ -60,7 +61,7 @@ impl std::fmt::Display for JSStringProctected {
         let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.0) };
         let mut buffer = vec![0u8; max_len];
         let new_size = unsafe {
-            JSStringGetUTF8CString(self.0, buffer.as_mut_ptr() as *mut i8, max_len)
+            JSStringGetUTF8CString(self.0, buffer.as_mut_ptr() as *mut c_char, max_len)
         };
         unsafe {
             buffer.set_len(new_size - 1);
@@ -144,7 +145,11 @@ impl<'a> Into<Vec<u8>> for JSString {
         let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
         let mut buffer = vec![0u8; max_len];
         let new_size = unsafe {
-            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
+            JSStringGetUTF8CString(
+                self.inner,
+                buffer.as_mut_ptr() as *mut c_char,
+                max_len,
+            )
         };
         unsafe {
             buffer.set_len(new_size - 1);
@@ -210,7 +215,11 @@ impl Debug for JSString {
         let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
         let mut buffer = vec![0u8; max_len];
         let new_size = unsafe {
-            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
+            JSStringGetUTF8CString(
+                self.inner,
+                buffer.as_mut_ptr() as *mut c_char,
+                max_len,
+            )
         };
         unsafe {
             buffer.set_len(new_size - 1);
@@ -225,7 +234,11 @@ impl std::fmt::Display for JSString {
         let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
         let mut buffer = vec![0u8; max_len];
         let new_size = unsafe {
-            JSStringGetUTF8CString(self.inner, buffer.as_mut_ptr() as *mut i8, max_len)
+            JSStringGetUTF8CString(
+                self.inner,
+                buffer.as_mut_ptr() as *mut c_char,
+                max_len,
+            )
         };
         unsafe {
             buffer.set_len(new_size - 1);

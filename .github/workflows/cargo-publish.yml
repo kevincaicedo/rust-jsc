@@ -128,7 +128,8 @@ jobs:
         run: |
           # The sys crate (rust_jsc_sys) will automatically download the required
           # static libraries from the GitHub Release mirror using its build.rs.
-          cargo test --lib --target ${{ matrix.target }}
+          # Use --test-threads=1 to avoid SIGSEGV from parallel access to JSC global state.
+          cargo test --lib --target ${{ matrix.target }} -- --test-threads=1
 
   # ===========================================================================
   # Publish sys crate (only for sys-v* tags)
