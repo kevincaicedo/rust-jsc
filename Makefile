@@ -13,7 +13,7 @@ help:
 	@echo "  archive: Archive the build artifacts with the platform parameter"
 
 test:
-	RUST_BACKTRACE=1 cargo test --lib
+	RUST_BACKTRACE=1 cargo test --lib -- --test-threads=1
 
 all-tests:
 	cargo test

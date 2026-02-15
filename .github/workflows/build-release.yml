@@ -377,7 +377,7 @@ jobs:
         env:
           RUST_JSC_CUSTOM_BUILD_PATH: ${{ github.workspace }}/.jsc-libs
           RUST_BACKTRACE: 1
-        run: cargo test --lib
+        run: cargo test --lib -- --test-threads=1
 
   # ===========================================================================
   # Release
