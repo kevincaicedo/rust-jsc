@@ -516,8 +516,8 @@ impl JSValue {
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
-    /// let class = JSClass::builder("Test").build().unwrap();
-    /// let value = class.object::<i32>(&ctx, Some(Box::new(42)));
+    /// let class = JSClass::builder("Test").build::<i32>().unwrap();
+    /// let value = class.object::<i32>(&ctx, Some(42));
     /// assert!(value.is_object_of_class(&class).unwrap());
     /// ```
     ///
@@ -837,8 +837,8 @@ mod tests {
     #[test]
     fn test_is_object_of_class() {
         let ctx = crate::JSContext::new();
-        let class = crate::JSClass::builder("Test").build().unwrap();
-        let value = class.object(&ctx, Some(Box::new(42)));
+        let class = crate::JSClass::builder("Test").build::<isize>().unwrap();
+        let value = class.object::<isize>(&ctx, Some(42));
         assert!(value.is_object_of_class(&class).unwrap());
     }
 

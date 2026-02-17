@@ -61,13 +61,12 @@ fn log_info(
 /// This uses the new C API and macro-generated extern "C" callback.
 #[inspector_pause_event_callback]
 fn on_pause_event(ctx: JSContext, event: InspectorPauseEvent) {
-    // Recover our state from the global object.
-    // NOTE: this assumes you stored a valid `*mut DebuggerState` via `set_shared_data`.
-    let state = ctx.get_shared_data::<DebuggerState>();
+    // Recover our state from the context with type-safe downcasting.
+    let state = unsafe { ctx.get_shared_data_mut::<DebuggerState>() };
     if state.is_none() {
         return;
     }
-    let mut state = state.unwrap();
+    let state = state.unwrap();
 
     match event {
         InspectorPauseEvent::Paused => {
@@ -98,9 +97,6 @@ fn on_pause_event(ctx: JSContext, event: InspectorPauseEvent) {
             state.paused = false;
         }
     }
-
-    // Important: release ownership back to the context so it isn't freed
-    let _ = Box::into_raw(state);
 }
 
 fn main() {
@@ -144,15 +140,15 @@ fn main() {
             .unwrap();
 
         // Setup state
-        let state = Box::new(DebuggerState {
+        let state = DebuggerState {
             ctx: ctx.clone(), // JSContext is a wrapper around a pointer, clone is cheap (ref count)
             paused: false,
             sync: pair_clone,
-        });
+        };
 
-        // Store the state pointer on the JSContext so the unified callback can access it.
-        // NOTE: This intentionally leaks for the lifetime of the JS thread in this example.
-        ctx.set_shared_data::<DebuggerState>(state);
+        // Store the state on the JSContext so the unified callback can access it.
+        // The data is type-safe: retrieving with the wrong type returns None.
+        ctx.set_shared_data(state);
 
         // Register unified pause-loop callback (Paused/Resumed/Tick)
         ctx.set_inspector_pause_event_callback(Some(on_pause_event));
