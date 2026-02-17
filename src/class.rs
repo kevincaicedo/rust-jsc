@@ -1,5 +1,10 @@
+use std::any::TypeId;
 use std::ffi::CString;
 
+use crate::{
+    self as rust_jsc, finalize, JSClass, JSContext, JSObject, JSResult, PrivateData,
+    PrivateDataWrapper,
+};
 use rust_jsc_sys::{
     kJSClassDefinitionEmpty, JSClassCreate, JSClassDefinition, JSClassRelease,
     JSClassRetain, JSObjectCallAsConstructorCallback, JSObjectCallAsFunctionCallback,
@@ -9,8 +14,6 @@ use rust_jsc_sys::{
     JSObjectHasPropertyCallback, JSObjectInitializeCallback, JSObjectMake,
     JSObjectSetPropertyCallback,
 };
-
-use crate::{JSClass, JSContext, JSObject, JSResult};
 
 #[derive(Debug)]
 pub enum ClassError {
@@ -123,7 +126,16 @@ impl JSClassBuilder {
         self
     }
 
-    pub fn build(self) -> Result<JSClass, ClassError> {
+    #[finalize]
+    fn finalize_callback<T: 'static>(data_ptr: PrivateData) {
+        let _ = unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+    }
+
+    pub fn build<T: 'static>(mut self) -> Result<JSClass, ClassError> {
+        if self.definition.finalize.is_none() && TypeId::of::<T>() != TypeId::of::<()>() {
+            self.definition.finalize = Some(Self::finalize_callback::<T>);
+        }
+
         let class = unsafe { JSClassCreate(&self.definition) };
         if class.is_null() {
             return Err(ClassError::CreateFailed);
@@ -137,6 +149,7 @@ impl JSClassBuilder {
         Ok(JSClass {
             inner: class,
             name: self.name,
+            type_id: TypeId::of::<T>(),
         })
     }
 }
@@ -226,22 +239,32 @@ impl JSClass {
     /// let ctx = JSContext::default();
     /// let class = JSClass::builder("Test")
     ///    .set_version(1)
-    ///     .build()
+    ///    .build::<i32>()
     ///    .unwrap();
     ///
-    /// let object = class.object::<i32>(&ctx, Some(Box::new(42)));
+    /// let object = class.object::<i32>(&ctx, Some(42));
     /// ```
     ///
     /// # Returns
     /// A new object of the class.
-    pub fn object<T: 'static>(&self, ctx: &JSContext, data: Option<Box<T>>) -> JSObject {
+    pub fn object<T: 'static>(&self, ctx: &JSContext, data: Option<T>) -> JSObject {
+        assert!(
+            self.type_id == TypeId::of::<T>(),
+            "Data type does not match class type"
+        );
+
         let data_ptr = if let Some(data) = data {
-            Box::into_raw(data) as *mut std::ffi::c_void
+            PrivateDataWrapper::into_raw(data)
         } else {
             std::ptr::null_mut()
         };
 
         let inner = unsafe { JSObjectMake(ctx.inner, self.inner, data_ptr) };
+        JSObject::from_ref(inner, ctx.inner)
+    }
+
+    fn object_empty(&self, ctx: &JSContext) -> JSObject {
+        let inner = unsafe { JSObjectMake(ctx.inner, self.inner, std::ptr::null_mut()) };
         JSObject::from_ref(inner, ctx.inner)
     }
 
@@ -272,18 +295,18 @@ impl JSClass {
     ///     .call_as_constructor(None)
     ///     .has_instance(None)
     ///     .convert_to_type(None)
-    ///     .build()
+    ///     .build::<()>()
     ///     .unwrap();
     ///
-    /// class.register::<()>(&ctx).unwrap();
+    /// class.register(&ctx).unwrap();
     /// ```
     ///
     /// # Errors
     /// If an error occurs while registering the class.
-    pub fn register<T: 'static>(&self, ctx: &JSContext) -> JSResult<()> {
+    pub fn register(&self, ctx: &JSContext) -> JSResult<()> {
         ctx.global_object().set_property(
             self.name(),
-            &self.object::<T>(ctx, None),
+            &self.object_empty(ctx),
             Default::default(),
         )
     }
@@ -331,10 +354,10 @@ mod tests {
             .call_as_constructor(Some(constructor))
             .has_instance(None)
             .convert_to_type(None)
-            .build()
+            .build::<isize>()
             .unwrap();
 
-        let object = class.object(&ctx, Some(Box::new(42)));
+        let object = class.object::<isize>(&ctx, Some(42));
 
         ctx.global_object()
             .set_property("Test", &object, Default::default())
@@ -382,10 +405,10 @@ mod tests {
             .call_as_constructor(Some(constructor))
             .has_instance(None)
             .convert_to_type(None)
-            .build()
+            .build::<()>()
             .unwrap();
 
-        class.register::<()>(&ctx).unwrap();
+        class.register(&ctx).unwrap();
         let result_object = ctx
             .evaluate_script("const obj = new Test(); obj", None)
             .unwrap();
@@ -410,10 +433,10 @@ mod tests {
             .call_as_constructor(None)
             .has_instance(None)
             .convert_to_type(None)
-            .build()
+            .build::<()>()
             .unwrap();
 
-        class.register::<()>(&ctx).unwrap();
+        class.register(&ctx).unwrap();
         let result = ctx.evaluate_script("const obj = new Test(); obj", None);
 
         assert!(result.is_err());
@@ -477,10 +500,10 @@ mod tests {
             .call_as_function(None)
             .call_as_constructor(Some(constructor))
             .has_instance(Some(has_instance))
-            .build()
+            .build::<i32>()
             .unwrap();
 
-        class.register::<i32>(&ctx).unwrap();
+        class.register(&ctx).unwrap();
         let result = ctx
             .evaluate_script(
                 r#"
@@ -498,9 +521,161 @@ mod tests {
         assert!(object.is_object_of_class(&class).unwrap());
 
         let object = object.as_object().unwrap();
-        let object_data = Box::new(42);
-        let result = object.set_private_data(object_data);
+        let result = unsafe { object.set_private_data(42) };
         assert!(result);
         assert_eq!(*object.get_private_data::<i32>().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_class_object_private_data_type_safe() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("TypeSafeTest").build::<String>().unwrap();
+
+        let object = class.object::<String>(&ctx, Some(String::from("hello")));
+        let object = object.as_object().unwrap();
+
+        // Correct type returns data
+        assert_eq!(object.get_private_data::<String>().unwrap(), "hello");
+
+        // Wrong type returns None
+        assert!(object.get_private_data::<i32>().is_none());
+        assert!(object.get_private_data::<Vec<u8>>().is_none());
+    }
+
+    #[test]
+    fn test_class_object_no_data() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("NoDataTest").build::<()>().unwrap();
+
+        let object = class.object::<()>(&ctx, None);
+        let object = object.as_object().unwrap();
+
+        // No data was set
+        assert!(object.get_private_data::<i32>().is_none());
+        assert!(object.get_private_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_class_object_take_private_data() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("TakeDataTest").build::<String>().unwrap();
+
+        let object = class.object::<String>(&ctx, Some(String::from("take me")));
+        let object = object.as_object().unwrap();
+
+        // Take ownership
+        let taken = object.take_private_data::<String>().unwrap();
+        assert_eq!(taken, "take me");
+
+        // Data is gone
+        assert!(object.get_private_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_class_object_take_wrong_type_preserves_data() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("TakeWrongTest").build::<i32>().unwrap();
+
+        let object = class.object::<i32>(&ctx, Some(42));
+        let object = object.as_object().unwrap();
+
+        // Take with wrong type — should return None and preserve data
+        assert!(object.take_private_data::<String>().is_none());
+
+        // Data still accessible with correct type
+        assert_eq!(*object.get_private_data::<i32>().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_class_object_mut_data() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("MutDataTest").build::<i32>().unwrap();
+
+        let object = class.object::<i32>(&ctx, Some(10));
+        let object = object.as_object().unwrap();
+
+        // SAFETY: no other references to this private data exist
+        let data = unsafe { object.get_private_data_mut::<i32>() }.unwrap();
+        *data = 99;
+
+        assert_eq!(*object.get_private_data::<i32>().unwrap(), 99);
+    }
+
+    #[test]
+    fn test_class_object_multiple_reads() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("MultiReadTest").build::<String>().unwrap();
+
+        let object = class.object::<String>(&ctx, Some(String::from("persistent")));
+        let object = object.as_object().unwrap();
+
+        // Multiple immutable reads are fine
+        assert_eq!(object.get_private_data::<String>().unwrap(), "persistent");
+        assert_eq!(object.get_private_data::<String>().unwrap(), "persistent");
+        assert_eq!(object.get_private_data::<String>().unwrap(), "persistent");
+    }
+
+    #[test]
+    #[should_panic(expected = "Data type does not match class type")]
+    fn test_class_object_type_mismatch_panics() {
+        let ctx = JSContext::default();
+        let class = JSClass::builder("MismatchTest").build::<i32>().unwrap();
+
+        // Attempting to create an object with a different type should panic
+        let _object = class.object::<String>(&ctx, Some(String::from("wrong")));
+    }
+
+    #[test]
+    fn test_class_object_struct_data() {
+        #[derive(Debug, PartialEq)]
+        struct Config {
+            width: u32,
+            height: u32,
+            title: String,
+        }
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("ConfigClass").build::<Config>().unwrap();
+
+        let object = class.object::<Config>(
+            &ctx,
+            Some(Config {
+                width: 800,
+                height: 600,
+                title: "Window".to_string(),
+            }),
+        );
+        let object = object.as_object().unwrap();
+
+        let config = object.get_private_data::<Config>().unwrap();
+        assert_eq!(config.width, 800);
+        assert_eq!(config.height, 600);
+        assert_eq!(config.title, "Window");
+    }
+
+    #[test]
+    fn test_class_refcell_safe_mutation() {
+        use std::cell::RefCell;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("RefCellTest")
+            .build::<RefCell<Vec<String>>>()
+            .unwrap();
+
+        let object = class.object::<RefCell<Vec<String>>>(
+            &ctx,
+            Some(RefCell::new(vec!["first".to_string()])),
+        );
+        let object = object.as_object().unwrap();
+
+        // Safe mutation via RefCell — no unsafe needed
+        let cell = object.get_private_data::<RefCell<Vec<String>>>().unwrap();
+        cell.borrow_mut().push("second".to_string());
+
+        let cell = object.get_private_data::<RefCell<Vec<String>>>().unwrap();
+        assert_eq!(
+            &*cell.borrow(),
+            &["first".to_string(), "second".to_string()]
+        );
     }
 }
