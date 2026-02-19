@@ -310,12 +310,15 @@ pub fn finalize(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
-    let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+
+    let (impl_generics, type_generics, where_clause) =
+        input.sig.generics.split_for_impl();
+
+    // Convert <T> to ::<T> so the Rust parser knows it's a type argument in an expression
+    let turbofish = type_generics.as_turbofish();
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __object: rust_jsc::internal::JSObjectRef,
         )
         #where_clause {
@@ -326,7 +329,8 @@ pub fn finalize(_attr: TokenStream, item: TokenStream) -> TokenStream {
             ) = {
                 #input
 
-                #fn_name ::<#generic_params>
+                // Apply the turbofish here!
+                #fn_name #turbofish
             };
 
             func(data_ptr);

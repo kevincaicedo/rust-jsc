@@ -1,6 +1,6 @@
 use crate::{
     JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSStringProctected,
-    JSValue,
+    JSValue, PrivateDataWrapper,
 };
 use rust_jsc_sys::{
     InspectorMessageCallback, InspectorPauseEventCallback, JSAPIModuleLoader,
@@ -686,7 +686,7 @@ impl JSContext {
     ///
     /// ctx.release();
     /// ```
-    pub fn release(&self) {
+    pub fn release(self) {
         unsafe {
             JSGlobalContextRelease(self.inner);
         }
@@ -760,44 +760,170 @@ impl JSContext {
 
     /// Sets shared data for a context.
     ///
+    /// The data is wrapped in a type-safe container that tracks the original type,
+    /// preventing type confusion when retrieved with [`get_shared_data`].
+    ///
     /// # Arguments
-    /// - `data`: A shared data.
+    /// - `data`: The data to store. Accepts any `'static` type.
     ///
     /// # Examples
     /// ```no_run
     /// use rust_jsc::JSContext;
     ///
     /// let ctx = JSContext::new();
-    /// let data = Box::new(10);
-    /// ctx.set_shared_data(data);
+    /// ctx.set_shared_data(10i32);
     /// ```
-    pub fn set_shared_data<T: 'static>(&self, data: Box<T>) {
-        let data_ptr = Box::into_raw(data);
-        unsafe { JSContextSetSharedData(self.inner, data_ptr as _) }
+    ///
+    /// # Note
+    /// If shared data was previously set, call [`take_shared_data`] first to
+    /// reclaim it. Otherwise the old data will be leaked.
+    pub fn set_shared_data<T: 'static>(&self, data: T) {
+        let ptr = PrivateDataWrapper::into_raw(data);
+        unsafe { JSContextSetSharedData(self.inner, ptr) }
     }
 
-    /// Gets shared data for a context.
+    /// Gets shared data for a context as an immutable reference.
+    ///
+    /// Returns `None` if no data is set or if `T` does not match the type
+    /// that was originally stored with [`set_shared_data`].
     ///
     /// # Examples
     /// ```
     /// use rust_jsc::JSContext;
     ///
     /// let ctx = JSContext::new();
-    /// let data = Box::new(10);
-    /// ctx.set_shared_data(data);
+    /// ctx.set_shared_data(10i32);
     /// let shared_data = ctx.get_shared_data::<i32>().unwrap();
     /// assert_eq!(*shared_data, 10);
     /// ```
     ///
-    /// # Returns
-    pub fn get_shared_data<T: 'static>(&self) -> Option<Box<T>> {
+    /// # Type Safety
+    /// Unlike raw pointer casts, this method uses `TypeId`-based checking.
+    /// Requesting the wrong type returns `None` instead of causing UB:
+    /// ```
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// ctx.set_shared_data(String::from("hello"));
+    /// assert!(ctx.get_shared_data::<u64>().is_none()); // wrong type → None
+    /// assert!(ctx.get_shared_data::<String>().is_some()); // correct type → Some
+    /// ```
+    pub fn get_shared_data<T: 'static>(&self) -> Option<&T> {
         let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
+        unsafe { PrivateDataWrapper::downcast_ref(data_ptr) }
+    }
 
+    /// Gets shared data for a context as a mutable reference.
+    ///
+    /// Returns `None` if no data is set or if `T` does not match the type
+    /// that was originally stored with [`set_shared_data`].
+    ///
+    /// # Safety
+    ///
+    /// The caller **must** guarantee that:
+    ///
+    /// 1. No other `&T` or `&mut T` references obtained from [`get_shared_data`]
+    ///    or this method are alive at the time of the call.
+    /// 2. The returned `&mut T` is not held simultaneously with any other
+    ///    reference to the same data.
+    ///
+    /// Violating these rules creates **aliased mutable references**, which is
+    /// instant undefined behavior — the compiler may reorder reads/writes,
+    /// cache stale values, or miscompile the program.
+    ///
+    /// # Recommended alternative
+    ///
+    /// For safe interior mutability, store a [`std::cell::RefCell<T>`] and use
+    /// [`get_shared_data`] instead:
+    ///
+    /// ```no_run
+    /// use rust_jsc::JSContext;
+    /// use std::cell::RefCell;
+    ///
+    /// let ctx = JSContext::new();
+    /// ctx.set_shared_data(RefCell::new(10i32));
+    ///
+    /// // Safe runtime borrow checking — panics on double mutable borrow
+    /// let cell = ctx.get_shared_data::<RefCell<i32>>().unwrap();
+    /// *cell.borrow_mut() = 20;
+    /// assert_eq!(*cell.borrow(), 20);
+    /// ```
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// ctx.set_shared_data(10i32);
+    /// // SAFETY: no other references to the shared data exist.
+    /// if let Some(data) = unsafe { ctx.get_shared_data_mut::<i32>() } {
+    ///     *data = 20;
+    /// }
+    /// assert_eq!(*ctx.get_shared_data::<i32>().unwrap(), 20);
+    /// ```
+    pub unsafe fn get_shared_data_mut<T: 'static>(&self) -> Option<&mut T> {
+        let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
+        unsafe { PrivateDataWrapper::downcast_mut(data_ptr) }
+    }
+
+    /// Takes ownership of the shared data, removing it from the context.
+    ///
+    /// Returns `None` if no data is set or if `T` does not match the stored type.
+    /// if T does not match, the data remains in place and is not freed,
+    /// so it can still be retrieved with the correct type.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// ctx.set_shared_data(42i32);
+    /// let data: i32 = ctx.take_shared_data::<i32>().unwrap();
+    /// assert_eq!(data, 42);
+    /// assert!(ctx.get_shared_data::<i32>().is_none()); // data has been removed
+    /// ```
+    ///
+    /// # Safety Note
+    /// The caller must ensure that the type `T` matches the type of the data currently
+    /// stored in the context. If the type does not match, this method will return `None`
+    /// and leave the data in place.
+    pub fn take_shared_data<T: 'static>(&self) -> Option<T> {
+        let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
         if data_ptr.is_null() {
             return None;
         }
+        // Only take ownership (and clear the JSC pointer) if the type matches.
+        // On type mismatch the data stays in place — nothing is freed or lost.
+        let result = unsafe { PrivateDataWrapper::take(data_ptr) };
+        if result.is_some() {
+            unsafe { JSContextSetSharedData(self.inner, std::ptr::null_mut()) };
+        }
+        result
+    }
 
-        Some(unsafe { Box::from_raw(data_ptr as *mut T) })
+    /// Drops the shared data without reclaiming ownership.
+    /// This is useful for cleaning up data when the context is being dropped, without needing to take ownership of it.
+    /// After this call, the context's shared data pointer is cleared.
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use rust_jsc::JSContext;
+    ///
+    /// let ctx = JSContext::new();
+    /// ctx.set_shared_data(String::from("temporary data"));
+    /// unsafe { ctx.drop_shared_data::<String>() }; // Clean up without taking ownership
+    /// assert!(ctx.get_shared_data::<String>().is_none()); // data has been removed
+    /// ```
+    /// # Safety Note
+    /// The caller must ensure that the type `T` matches the type of the data currently
+    /// stored in the context. If the type does not match, this method will not drop the data,
+    /// and set the shared data pointer to null, which could lead to memory leaks. Use with caution.
+    pub unsafe fn drop_shared_data<T: 'static>(&self) {
+        let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
+        if !data_ptr.is_null() {
+            unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+            unsafe { JSContextSetSharedData(self.inner, std::ptr::null_mut()) };
+        }
     }
 }
 
@@ -1347,5 +1473,201 @@ mod tests {
             "Protected global object count: {}",
             protected_global_object_count
         );
+    }
+
+    #[test]
+    fn test_shared_data_type_safe() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(42i32);
+        let data = ctx.get_shared_data::<i32>().unwrap();
+        assert_eq!(*data, 42);
+    }
+
+    #[test]
+    fn test_shared_data_wrong_type_returns_none() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(String::from("hello"));
+        // Requesting the wrong type must return None, not UB
+        assert!(ctx.get_shared_data::<u64>().is_none());
+        assert!(ctx.get_shared_data::<i32>().is_none());
+        assert!(ctx.get_shared_data::<Vec<u8>>().is_none());
+        // Correct type works
+        assert_eq!(ctx.get_shared_data::<String>().unwrap(), "hello");
+    }
+
+    #[test]
+    fn test_shared_data_multiple_reads() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(100u64);
+        // Multiple reads should all succeed (no double-free)
+        assert_eq!(*ctx.get_shared_data::<u64>().unwrap(), 100);
+        assert_eq!(*ctx.get_shared_data::<u64>().unwrap(), 100);
+        assert_eq!(*ctx.get_shared_data::<u64>().unwrap(), 100);
+    }
+
+    #[test]
+    fn test_shared_data_mut() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(10i32);
+        if let Some(data) = unsafe { ctx.get_shared_data_mut::<i32>() } {
+            *data = 20;
+        }
+        assert_eq!(*ctx.get_shared_data::<i32>().unwrap(), 20);
+    }
+
+    #[test]
+    fn test_take_shared_data() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(String::from("take me"));
+        let taken = ctx.take_shared_data::<String>().unwrap();
+        assert_eq!(taken, "take me");
+        // After take, data is gone
+        assert!(ctx.get_shared_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_shared_data_none_when_empty() {
+        let ctx = JSContext::new();
+        assert!(ctx.get_shared_data::<i32>().is_none());
+        assert!(ctx.take_shared_data::<i32>().is_none());
+    }
+
+    #[test]
+    fn test_shared_data_refcell_safe_mutation() {
+        use std::cell::RefCell;
+
+        let ctx = JSContext::new();
+        ctx.set_shared_data(RefCell::new(String::from("original")));
+
+        // Safe interior mutability via RefCell
+        let cell = ctx.get_shared_data::<RefCell<String>>().unwrap();
+        *cell.borrow_mut() = String::from("mutated");
+
+        // Re-read through get_shared_data — no unsafe needed
+        let cell = ctx.get_shared_data::<RefCell<String>>().unwrap();
+        assert_eq!(*cell.borrow(), "mutated");
+    }
+
+    #[test]
+    fn test_shared_data_struct() {
+        #[derive(Debug, PartialEq)]
+        struct AppState {
+            counter: u32,
+            name: String,
+        }
+
+        let ctx = JSContext::new();
+        ctx.set_shared_data(AppState {
+            counter: 0,
+            name: "test".to_string(),
+        });
+
+        let state = ctx.get_shared_data::<AppState>().unwrap();
+        assert_eq!(state.counter, 0);
+        assert_eq!(state.name, "test");
+
+        // Wrong type returns None
+        assert!(ctx.get_shared_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_shared_data_mut_wrong_type_returns_none() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(42i32);
+
+        // SAFETY: no other references exist
+        let result = unsafe { ctx.get_shared_data_mut::<String>() };
+        assert!(result.is_none());
+
+        // Original data is still intact
+        assert_eq!(*ctx.get_shared_data::<i32>().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_take_shared_data_wrong_type_preserves_data() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(String::from("preserve me"));
+
+        // Taking with wrong type should return None and NOT destroy the data
+        assert!(ctx.take_shared_data::<i32>().is_none());
+        assert!(ctx.take_shared_data::<Vec<u8>>().is_none());
+
+        // Data should still be accessible with correct type
+        assert_eq!(ctx.get_shared_data::<String>().unwrap(), "preserve me");
+
+        // Now take with correct type
+        let taken = ctx.take_shared_data::<String>().unwrap();
+        assert_eq!(taken, "preserve me");
+        assert!(ctx.get_shared_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_drop_shared_data() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(String::from("drop me"));
+
+        assert!(ctx.get_shared_data::<String>().is_some());
+        unsafe { ctx.drop_shared_data::<String>() };
+        assert!(ctx.get_shared_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_shared_data_replace() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(42i32);
+        assert_eq!(*ctx.get_shared_data::<i32>().unwrap(), 42);
+
+        // Take old data, then set new data of a different type
+        let old = ctx.take_shared_data::<i32>().unwrap();
+        assert_eq!(old, 42);
+
+        ctx.set_shared_data(String::from("new type"));
+        assert_eq!(ctx.get_shared_data::<String>().unwrap(), "new type");
+        // Old type is gone
+        assert!(ctx.get_shared_data::<i32>().is_none());
+    }
+
+    #[test]
+    fn test_shared_data_vec() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(vec![1u8, 2, 3, 4, 5]);
+
+        let data = ctx.get_shared_data::<Vec<u8>>().unwrap();
+        assert_eq!(data, &[1, 2, 3, 4, 5]);
+
+        // Mutate via unsafe
+        // SAFETY: no other references exist
+        let data = unsafe { ctx.get_shared_data_mut::<Vec<u8>>() }.unwrap();
+        data.push(6);
+
+        let data = ctx.get_shared_data::<Vec<u8>>().unwrap();
+        assert_eq!(data, &[1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn test_shared_data_zero_sized_type() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(());
+
+        assert!(ctx.get_shared_data::<()>().is_some());
+        assert!(ctx.get_shared_data::<i32>().is_none());
+
+        let taken = ctx.take_shared_data::<()>().unwrap();
+        assert_eq!(taken, ());
+    }
+
+    #[test]
+    fn test_shared_data_read_after_mut() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(100i32);
+
+        // Mutate
+        // SAFETY: no other references exist
+        {
+            let data = unsafe { ctx.get_shared_data_mut::<i32>() }.unwrap();
+            *data = 200;
+        }
+        // Reference dropped, now safe to read
+        assert_eq!(*ctx.get_shared_data::<i32>().unwrap(), 200);
     }
 }

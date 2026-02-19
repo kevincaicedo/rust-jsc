@@ -20,6 +20,8 @@ use rust_jsc_sys::{
     JSTypedArrayType_kJSTypedArrayTypeUint8ClampedArray, JSValueRef,
 };
 
+use std::any::TypeId;
+
 pub mod array;
 pub mod class;
 pub mod context;
@@ -48,6 +50,132 @@ pub struct JSContext {
 
 pub type PrivateData = *mut ::std::os::raw::c_void;
 
+/// Header-only view of a `TypedData<T>` allocation.
+///
+/// Because `TypedData<T>` is `#[repr(C)]` with `type_id` as its first field,
+/// casting any `*mut TypedData<T>` to `*const PrivateDataHeader` is valid and
+/// lets us inspect the `TypeId` without knowing `T`.
+#[repr(C)]
+struct PrivateDataHeader {
+    type_id: TypeId,
+}
+
+/// Single-allocation, cache-friendly, type-safe wrapper for `*mut c_void`.
+///
+/// Layout (with `#[repr(C)]`):
+/// ```text
+/// [ TypeId (8 bytes) | T data (sizeof T, aligned) ]
+/// ```
+///
+/// Benefits:
+/// - **One indirection** to reach the data (pointer → contiguous header+data).
+/// - **Cache-friendly**: `TypeId` and small `T` share the same cache line.
+/// - **No vtable dispatch**: type checking is a direct `TypeId` comparison.
+#[repr(C)]
+struct TypedData<T> {
+    type_id: TypeId,
+    data: T,
+}
+
+/// Zero-sized namespace for type-safe `*mut c_void` operations.
+pub(crate) struct PrivateDataWrapper;
+
+impl PrivateDataWrapper {
+    /// Create a new wrapper and return a thin `*mut c_void` pointer to it.
+    ///
+    /// Performs a heap allocation containing `[TypeId | T]`.
+    #[inline]
+    pub fn into_raw<T: 'static>(data: T) -> *mut std::ffi::c_void {
+        let typed = Box::new(TypedData {
+            type_id: TypeId::of::<T>(),
+            data,
+        });
+        Box::into_raw(typed) as *mut std::ffi::c_void
+    }
+
+    /// Recover a shared reference to the stored data, checking the type at runtime.
+    /// Returns `None` if the pointer is null or the type doesn't match.
+    ///
+    /// # Safety
+    /// The pointer must have been created by `PrivateDataWrapper::into_raw` and must
+    /// not have been freed.
+    #[inline]
+    pub unsafe fn downcast_ref<'a, T: 'static>(
+        ptr: *mut std::ffi::c_void,
+    ) -> Option<&'a T> {
+        if ptr.is_null() {
+            return None;
+        }
+        let header = &*(ptr as *const PrivateDataHeader);
+        if header.type_id != TypeId::of::<T>() {
+            return None;
+        }
+        let typed = &*(ptr as *const TypedData<T>);
+        Some(&typed.data)
+    }
+
+    /// Recover a mutable reference to the stored data, checking the type at runtime.
+    /// Returns `None` if the pointer is null or the type doesn't match.
+    ///
+    /// # Safety
+    /// The pointer must have been created by `PrivateDataWrapper::into_raw`, must
+    /// not have been freed, and the caller must ensure exclusive access.
+    #[inline]
+    pub unsafe fn downcast_mut<'a, T: 'static>(
+        ptr: *mut std::ffi::c_void,
+    ) -> Option<&'a mut T> {
+        if ptr.is_null() {
+            return None;
+        }
+        let header = &*(ptr as *const PrivateDataHeader);
+        if header.type_id != TypeId::of::<T>() {
+            return None;
+        }
+        let typed = &mut *(ptr as *mut TypedData<T>);
+        Some(&mut typed.data)
+    }
+
+    /// Take ownership of the stored data, consuming the allocation.
+    /// Returns `None` if the pointer is null or the type doesn't match.
+    ///
+    /// On type mismatch the allocation is **not** freed — the data remains
+    /// valid and can be retrieved later with the correct type.
+    ///
+    /// # Safety
+    /// The pointer must have been created by `PrivateDataWrapper::into_raw` and must
+    /// not have been previously freed. On success the pointer becomes invalid.
+    #[inline]
+    pub unsafe fn take<T: 'static>(ptr: *mut std::ffi::c_void) -> Option<T> {
+        if ptr.is_null() {
+            return None;
+        }
+        let header = &*(ptr as *const PrivateDataHeader);
+        if header.type_id != TypeId::of::<T>() {
+            return None;
+        }
+        let typed = Box::from_raw(ptr as *mut TypedData<T>);
+        Some(typed.data)
+    }
+
+    /// Drop the allocation, freeing both the header and the contained `T`.
+    ///
+    /// The caller must supply the same `T` that was passed to `into_raw`.
+    /// If `T` doesn't match, the call is a no-op (the data is not freed).
+    ///
+    /// # Safety
+    /// The pointer must have been created by `PrivateDataWrapper::into_raw` and must
+    /// not have been previously freed.
+    #[allow(dead_code)]
+    pub unsafe fn drop_raw<T: 'static>(ptr: *mut std::ffi::c_void) {
+        if !ptr.is_null() {
+            let header = &*(ptr as *const PrivateDataHeader);
+            if header.type_id == TypeId::of::<T>() {
+                let _ = Box::from_raw(ptr as *mut TypedData<T>);
+            }
+        }
+    }
+}
+
 /// A JavaScript execution context group.
 pub struct JSContextGroup {
     context_group: JSContextGroupRef,
@@ -58,6 +186,7 @@ pub struct JSClass {
     // pub(crate) ctx: JSContextRef,
     pub(crate) inner: JSClassRef,
     pub(crate) name: String,
+    pub(crate) type_id: TypeId,
 }
 
 /// A JavaScript object.
