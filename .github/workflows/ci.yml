@@ -46,3 +46,77 @@ jobs:
 
       - name: Cargo check (macros)
         run: cargo check -p rust_jsc_macros
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-test-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: rust-test-${{ runner.os }}-
+
+      - name: Check release availability
+        id: check_release
+        run: |
+          VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}/libjsc-x86_64-unknown-linux-gnu.a.gz"
+          if curl --output /dev/null --silent --head --fail "$URL"; then
+            echo "Release for $VERSION exists. sys/build.rs will download it."
+            echo "BUILD_STATIC=false" >> $GITHUB_ENV
+          else
+            echo "Release for $VERSION not found. Will build static lib via Docker."
+            echo "BUILD_STATIC=true" >> $GITHUB_ENV
+          fi
+
+      - name: Free disk space
+        if: env.BUILD_STATIC == 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          df -h
+
+      - name: Set up Docker Buildx
+        if: env.BUILD_STATIC == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        if: env.BUILD_STATIC == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-linux-x86_64
+          key: buildx-linux-x86_64-${{ github.sha }}
+          restore-keys: buildx-linux-x86_64-
+
+      - name: Build JavaScriptCore static
+        if: env.BUILD_STATIC == 'true'
+        run: |
+          mkdir -p .libs
+          DOCKER_BUILDKIT=1 docker build \
+            --cache-from=type=local,src=/tmp/.buildx-cache-linux-x86_64 \
+            --cache-to=type=local,dest=/tmp/.buildx-cache-linux-x86_64-new,mode=max \
+            -o .libs -t javascriptcore -f Dockerfile .
+          echo "RUST_JSC_CUSTOM_BUILD_PATH=${{ github.workspace }}/.libs" >> $GITHUB_ENV
+
+      - name: Rotate cache
+        if: always() && env.BUILD_STATIC == 'true'
+        run: |
+          rm -rf /tmp/.buildx-cache-linux-x86_64
+          mv /tmp/.buildx-cache-linux-x86_64-new /tmp/.buildx-cache-linux-x86_64 2>/dev/null || true
+
+      - name: Run tests
+        env:
+          RUST_BACKTRACE: 1
+        run: cargo test --lib -- --test-threads=1

@@ -450,7 +450,6 @@ mod tests {
             birth_date: "1990-01-01".into(),
         };
 
-        let state = Box::new(state);
         ctx.set_shared_data(state);
 
         unsafe extern "C" fn callback(
@@ -464,13 +463,13 @@ mod tests {
             let ctx = crate::JSContext::from(_ctx);
             let state = ctx.get_shared_data::<CallbackState>().unwrap();
 
-            println!("Name: {}", state.as_ref().name);
-            println!("Age: {}", state.as_ref().age);
-            println!("Birth Date: {}", state.as_ref().birth_date);
+            println!("Name: {}", state.name);
+            println!("Age: {}", state.age);
+            println!("Birth Date: {}", state.birth_date);
 
-            assert!(state.as_ref().name == "John Doe");
-            assert!(state.as_ref().age == 30);
-            assert!(state.as_ref().birth_date == "1990-01-01");
+            assert!(state.name == "John Doe");
+            assert!(state.age == 30);
+            assert!(state.birth_date == "1990-01-01");
             std::ptr::null_mut()
         }
 
@@ -518,7 +517,7 @@ mod tests {
             .configurable(true)
             .enumerable(true)
             .build();
-        let class = JSClass::builder("Person").build().unwrap();
+        let class = JSClass::builder("Person").build::<()>().unwrap();
         let function = JSFunction::contructor(&ctx, &class, Some(new_object));
         global_object
             .set_property("Person", &function.into(), attributes)

@@ -14,7 +14,7 @@ use rust_jsc_sys::{
 
 use crate::{
     JSContext, JSError, JSObject, JSResult, JSString, JSValue, PrivateData,
-    PropertyDescriptor,
+    PrivateDataWrapper, PropertyDescriptor,
 };
 
 pub struct JSPropertyNameIter {
@@ -637,58 +637,160 @@ impl JSObject {
         }
     }
 
-    /// Sets a pointer to private data on an object.
+    /// Sets private data on an object.
     /// The default object class does not allocate storage for private data.
     /// Only objects created with a non-NULL JSClass can store private data.
+    ///
+    /// This method is unsafe because it would overwrite any existing private data on the object,
+    /// leaking memory if the existing private data is not properly cleaned up.
+    /// it could also use a different type than the one originally stored, in the JSClass and finalize callbacks
+    /// use it only if you know what you're doing.
+    ///
     ///
     /// # Arguments
     /// * `data` - The private data to set on the object.
     ///
     /// # Example
-    /// ```no_run
+    /// ```rust,ignore
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
     /// let object = JSObject::new(&ctx);
-    /// let data = Box::new(42);
-    /// object.set_private_data(data);
+    /// unsafe { object.set_private_data(42i32) }.unwrap();
     ///
-    /// let private_data: Box<i32> = object.get_private_data().unwrap();
+    /// let private_data = object.get_private_data::<i32>().unwrap();
     /// assert_eq!(*private_data, 42);
     /// ```
     ///
     /// # Returns
     /// Returns true if object can store private data, otherwise false.
-    pub fn set_private_data<T: 'static>(&self, data: Box<T>) -> bool {
-        let data_ptr = Box::into_raw(data);
-        unsafe { JSObjectSetPrivate(self.inner, data_ptr as _) }
+    pub unsafe fn set_private_data<T: 'static>(&self, data: T) -> bool {
+        let data_ptr = PrivateDataWrapper::into_raw(data);
+        let success = unsafe { JSObjectSetPrivate(self.inner, data_ptr) };
+        if !success {
+            // If the object cannot store private data, we must free the allocation
+            // to prevent a memory leak.
+            unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+        }
+        success
     }
 
-    /// Gets the private data from an object.
+    /// Gets the private data from an object as an immutable reference.
+    ///
+    /// Returns `None` if no private data is set or if `T` does not match
+    /// the type that was originally stored with [`set_private_data`].
     ///
     /// # Example
-    /// ```no_run
+    /// ```rust,ignore
     /// use rust_jsc::*;
     ///
     /// let ctx = JSContext::new();
     /// let object = JSObject::new(&ctx);
-    /// let data = Box::new(42);
-    /// object.set_private_data(data);
+    /// object.set_private_data(42i32);
     ///
-    /// let private_data: Box<i32> = object.get_private_data().unwrap();
+    /// let private_data = object.get_private_data::<i32>().unwrap();
     /// assert_eq!(*private_data, 42);
     /// ```
     ///
+    /// # Type Safety
+    /// Requesting the wrong type returns `None` instead of causing UB:
+    /// ```rust,ignore
+    /// use rust_jsc::*;
+    ///
+    /// let ctx = JSContext::new();
+    /// let object = JSObject::new(&ctx);
+    /// object.set_private_data(String::from("hello"));
+    ///
+    /// assert!(object.get_private_data::<u64>().is_none()); // wrong type → None
+    /// assert!(object.get_private_data::<String>().is_some()); // correct type → Some
+    /// ```
+    ///
     /// # Returns
-    /// Returns the private data if it exists, otherwise None.
-    pub fn get_private_data<T: 'static>(&self) -> Option<Box<T>> {
+    /// Returns a reference to the private data if it exists and type matches, otherwise None.
+    pub fn get_private_data<T: 'static>(&self) -> Option<&T> {
         let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
+        unsafe { PrivateDataWrapper::downcast_ref(data_ptr) }
+    }
 
+    /// Gets the private data from an object and takes ownership of it.
+    /// This will remove the private data from the object, leaving it with no private data.
+    ///
+    /// # Safety
+    /// This function is unsafe because `JSObject` is a handle that can be cloned.
+    /// If other references to the private data exist (e.g. obtained via `get_private_data`
+    /// from a cloned handle), calling this method will free the memory they point to,
+    /// causing Undefined Behavior (Use-After-Free).
+    ///
+    /// The caller must ensure that no other references to the private data are in use.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// use rust_jsc::*;
+    ///
+    /// let ctx = JSContext::new();
+    /// let object = JSObject::new(&ctx);
+    /// unsafe { object.set_private_data(42i32) }.unwrap();
+    ///
+    /// let private_data = unsafe { object.take_private_data::<i32>() }.unwrap();
+    /// assert_eq!(private_data, 42);
+    /// assert!(object.get_private_data::<i32>().is_none()); // private data has been taken, so it should be None
+    /// ```
+    ///
+    /// # Type Safety
+    /// Requesting the wrong type returns `None` instead of causing UB.
+    /// On type mismatch, the data stays in place — nothing is freed or lost.
+    pub unsafe fn take_private_data<T: 'static>(&self) -> Option<T> {
+        let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
         if data_ptr.is_null() {
             return None;
         }
+        let data = unsafe { PrivateDataWrapper::take(data_ptr) };
+        if data.is_some() {
+            unsafe { JSObjectSetPrivate(self.inner, std::ptr::null_mut()) };
+        }
+        data
+    }
 
-        Some(unsafe { Box::from_raw(data_ptr as *mut T) })
+    /// Gets the private data from an object as a mutable reference.
+    ///
+    /// Returns `None` if no private data is set or if `T` does not match
+    /// the type that was originally stored with [`set_private_data`].
+    ///
+    /// # Safety
+    ///
+    /// The caller **must** guarantee that:
+    ///
+    /// 1. No other `&T` or `&mut T` references obtained from [`get_private_data`]
+    ///    or this method are alive at the time of the call.
+    /// 2. The returned `&mut T` is not held simultaneously with any other
+    ///    reference to the same data.
+    ///
+    /// Violating these rules creates **aliased mutable references**, which is
+    /// instant undefined behavior.
+    ///
+    /// # Recommended alternative
+    ///
+    /// For safe interior mutability, store a [`std::cell::RefCell<T>`] and use
+    /// [`get_private_data`] instead.
+    pub unsafe fn get_private_data_mut<T: 'static>(&self) -> Option<&mut T> {
+        let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
+        unsafe { PrivateDataWrapper::downcast_mut(data_ptr) }
+    }
+
+    /// Drops the private data without reclaiming ownership.
+    /// This is useful for cleaning up data when the object is being dropped, without needing to take ownership of it.
+    /// After this call, the object's private data pointer is cleared.
+    ///
+    /// # Safety Note
+    /// The caller must ensure that the type `T` matches the type of the data currently
+    /// stored in the object. If the type does not match, this method will not drop the data,
+    /// and set the private data pointer to null, which could lead to memory leaks. Use with caution.
+    pub unsafe fn drop_private_data<T: 'static>(&self) {
+        let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
+        if !data_ptr.is_null() {
+            unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+            unsafe { JSObjectSetPrivate(self.inner, std::ptr::null_mut()) };
+        }
     }
 
     pub fn get_private_data_ptr(&self) -> Option<PrivateData> {
@@ -1260,5 +1362,161 @@ mod tests {
         let result = ctx.evaluate_script(evaluate_script, None);
 
         assert_eq!(result.is_ok(), true);
+    }
+
+    // =========================================================================
+    // Private Data Tests
+    // =========================================================================
+
+    #[test]
+    fn test_object_private_data_not_available_on_plain_object() {
+        let ctx = JSContext::new();
+        let object = JSObject::new(&ctx);
+
+        // Plain objects (created without a JSClass) cannot store private data
+        assert!(object.get_private_data::<i32>().is_none());
+    }
+
+    #[test]
+    fn test_object_private_data_wrong_type_returns_none() {
+        use crate::JSClass;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("WrongTypeObj").build::<String>().unwrap();
+
+        let object = class.object::<String>(&ctx, Some(String::from("data")));
+        let object = object.as_object().unwrap();
+
+        assert!(object.get_private_data::<i32>().is_none());
+        assert!(object.get_private_data::<u64>().is_none());
+        assert!(object.get_private_data::<Vec<u8>>().is_none());
+        assert_eq!(object.get_private_data::<String>().unwrap(), "data");
+    }
+
+    #[test]
+    fn test_object_take_private_data_type_safe() {
+        use crate::JSClass;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("TakeObjTest").build::<i32>().unwrap();
+
+        let object = class.object::<i32>(&ctx, Some(99));
+        let object = object.as_object().unwrap();
+
+        // Wrong type — data preserved
+        assert!(unsafe { object.take_private_data::<String>() }.is_none());
+        assert_eq!(*object.get_private_data::<i32>().unwrap(), 99);
+
+        // Correct type — data taken
+        let taken = unsafe { object.take_private_data::<i32>() }.unwrap();
+        assert_eq!(taken, 99);
+        assert!(object.get_private_data::<i32>().is_none());
+    }
+
+    #[test]
+    fn test_object_private_data_mut_type_safe() {
+        use crate::JSClass;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("MutObjTest").build::<i32>().unwrap();
+
+        let object = class.object::<i32>(&ctx, Some(10));
+        let object = object.as_object().unwrap();
+
+        // Wrong type
+        assert!(unsafe { object.get_private_data_mut::<String>() }.is_none());
+
+        // Correct type
+        // SAFETY: no other references to this private data exist
+        let data = unsafe { object.get_private_data_mut::<i32>() }.unwrap();
+        *data = 42;
+
+        assert_eq!(*object.get_private_data::<i32>().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_object_private_data_multiple_immutable_reads() {
+        use crate::JSClass;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("MultiRead").build::<String>().unwrap();
+
+        let object = class.object::<String>(&ctx, Some(String::from("stable")));
+        let object = object.as_object().unwrap();
+
+        // Multiple shared reads are safe
+        let r1 = object.get_private_data::<String>().unwrap();
+        let r2 = object.get_private_data::<String>().unwrap();
+        assert_eq!(r1, "stable");
+        assert_eq!(r2, "stable");
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn test_object_private_data_refcell_pattern() {
+        use crate::JSClass;
+        use std::cell::RefCell;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("RefCellObj")
+            .build::<RefCell<i32>>()
+            .unwrap();
+
+        let object = class.object::<RefCell<i32>>(&ctx, Some(RefCell::new(0)));
+        let object = object.as_object().unwrap();
+
+        // Safe mutation via RefCell
+        let cell = object.get_private_data::<RefCell<i32>>().unwrap();
+        *cell.borrow_mut() = 100;
+
+        let cell = object.get_private_data::<RefCell<i32>>().unwrap();
+        assert_eq!(*cell.borrow(), 100);
+    }
+
+    #[test]
+    fn test_object_private_data_get_ptr() {
+        use crate::JSClass;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("PtrTest").build::<i32>().unwrap();
+
+        let object = class.object::<i32>(&ctx, Some(42));
+        let object = object.as_object().unwrap();
+
+        // Raw pointer access
+        let ptr = object.get_private_data_ptr();
+        assert!(ptr.is_some());
+
+        // Plain object has no private data pointer
+        let plain = JSObject::new(&ctx);
+        assert!(plain.get_private_data_ptr().is_none());
+    }
+
+    #[test]
+    fn test_object_private_data_uaf_scenario() {
+        use crate::JSClass;
+
+        let ctx = JSContext::default();
+        let class = JSClass::builder("UAFTest").build::<String>().unwrap();
+
+        let object = class.object::<String>(&ctx, Some(String::from("alive")));
+        let object = object.as_object().unwrap();
+        let object_alias = object.clone();
+
+        // 1. Get reference from first object handle
+        let data_ref = object.get_private_data::<String>().unwrap();
+        assert_eq!(data_ref, "alive");
+
+        // 2. Take ownership from alias
+        // This frees the memory while data_ref is still active
+        let taken = unsafe { object_alias.take_private_data::<String>() };
+        assert_eq!(taken.unwrap(), "alive");
+
+        // 3. data_ref is now dangling!
+        // Accessing it here would be UAF.
+        // println!("Dangling ref: {}", data_ref); // UNCOMMENTING THIS CAUSES UB/CRASH
+
+        // Verify the data is logically gone
+        assert!(object.get_private_data::<String>().is_none());
     }
 }

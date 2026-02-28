@@ -276,16 +276,13 @@ fn on_resume(state: &mut HostState) {
 
 #[inspector_pause_event_callback]
 fn on_pause_event(ctx: JSContext, event: InspectorPauseEvent) {
-    let mut state_box = ctx.get_shared_data::<HostState>().unwrap();
-    let state = &mut *state_box;
+    let state = unsafe { ctx.get_shared_data_mut::<HostState>() }.unwrap();
 
     match event {
         InspectorPauseEvent::Paused => on_pause(state),
         InspectorPauseEvent::Tick => on_tick(state),
         InspectorPauseEvent::Resumed => on_resume(state),
     }
-
-    let _ = Box::into_raw(state_box);
 }
 
 fn main() {
@@ -335,13 +332,13 @@ fn main() {
         };
 
         // Register pause handlers (host callbacks while paused).
-        let host_state = Box::new(HostState {
+        let host_state = HostState {
             ctx: ctx.clone(),
             sync: sync_for_js.clone(),
             inspector_rx: inspector_rx_shared.clone(),
-        });
+        };
 
-        ctx.set_shared_data::<HostState>(host_state);
+        ctx.set_shared_data(host_state);
         ctx.set_inspector_pause_event_callback(Some(on_pause_event));
 
         // Enable domains.
