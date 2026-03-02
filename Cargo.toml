@@ -33,3 +33,11 @@ readme = "README.md"
 [dependencies]
 rust_jsc_sys = { path = "sys", version = "0.4.2" }
 rust_jsc_macros = { path = "macros", version = "0.2.1" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+serde_json = "1"
+
+[[bench]]
+name = "rust_jsc_bench"
+harness = false

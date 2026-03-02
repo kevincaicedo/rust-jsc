@@ -1,0 +1,15 @@
+[package]
+name = "rust_jsc_profiling"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "profile_heap"
+path = "src/main.rs"
+
+[dependencies]
+rust_jsc = { path = "../.." }
+rust_jsc_sys = { path = "../../sys" }
+rust_jsc_macros = { path = "../../macros" }
+dhat = "0.3"

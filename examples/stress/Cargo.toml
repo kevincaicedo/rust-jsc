@@ -1,0 +1,11 @@
+[package]
+name = "stress-example"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+rust_jsc = { path = "../.." }
+rust_jsc_sys = { path = "../../sys" }
+rust_jsc_macros = { path = "../../macros" }
+serde_json = "1"

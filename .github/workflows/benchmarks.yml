@@ -1,0 +1,295 @@
+name: Benchmarks & Performance Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'sys/**'
+      - 'macros/**'
+      - 'benches/**'
+      - 'examples/**'
+      - 'Cargo.toml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'sys/**'
+      - 'macros/**'
+      - 'benches/**'
+      - 'examples/**'
+      - 'Cargo.toml'
+  workflow_dispatch:
+    inputs:
+      run_flamegraph:
+        description: "Generate flamegraph (slower)"
+        required: false
+        default: "false"
+        type: boolean
+      run_dhat:
+        description: "Run DHAT heap profiling"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Criterion Benchmarks
+  # ===========================================================================
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: bench-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: bench-${{ runner.os }}-
+
+      - name: Download pre-built JSC libraries
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: libjsc-x86_64-unknown-linux-gnu
+          path: .
+
+      - name: Extract JSC libraries (if available)
+        continue-on-error: true
+        run: |
+          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
+            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
+            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
+          fi
+
+      - name: Run benchmarks
+        run: |
+          cargo bench --bench rust_jsc_bench -- --output-format bencher | tee all_benchmarks.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            all_benchmarks.txt
+            target/criterion/
+          retention-days: 30
+
+      # Store benchmark data for historical comparison
+      - name: Store benchmark result
+        if: github.ref == 'refs/heads/main'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Rust-JSC Benchmarks
+          tool: cargo
+          output-file-path: all_benchmarks.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: "120%"
+          comment-on-alert: true
+          fail-on-alert: false
+          alert-comment-cc-users: "@kevincaicedo"
+
+      # On PRs, compare with baseline and comment
+      - name: Compare benchmarks (PR)
+        if: github.event_name == 'pull_request'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Rust-JSC Benchmarks
+          tool: cargo
+          output-file-path: all_benchmarks.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          alert-threshold: "110%"
+          comment-on-alert: true
+          fail-on-alert: true
+          comment-always: true
+          alert-comment-cc-users: "@kevincaicedo"
+
+  # ===========================================================================
+  # Stress Test (Smoke Test)
+  # ===========================================================================
+  stress-test:
+    name: Stress Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: stress-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: stress-${{ runner.os }}-
+
+      - name: Download pre-built JSC libraries
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: libjsc-x86_64-unknown-linux-gnu
+          path: .
+
+      - name: Extract JSC libraries (if available)
+        continue-on-error: true
+        run: |
+          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
+            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
+            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
+          fi
+
+      - name: Build stress example
+        run: cargo build --manifest-path examples/stress/Cargo.toml --release
+
+      - name: Run stress example
+        run: |
+          cargo run --manifest-path examples/stress/Cargo.toml --release 2>&1 | tee stress_output.txt
+
+      - name: Upload stress test output
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-output
+          path: stress_output.txt
+          retention-days: 30
+
+  # ===========================================================================
+  # DHAT Memory Profiling (manual dispatch or main branch)
+  # ===========================================================================
+  memory-profile:
+    name: Memory Profile (DHAT)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.run_dhat == 'true'
+      || github.ref == 'refs/heads/main'
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: dhat-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: dhat-${{ runner.os }}-
+
+      - name: Download pre-built JSC libraries
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: libjsc-x86_64-unknown-linux-gnu
+          path: .
+
+      - name: Extract JSC libraries (if available)
+        continue-on-error: true
+        run: |
+          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
+            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
+            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
+          fi
+
+      - name: Run DHAT profiling
+        run: |
+          cargo run --manifest-path examples/profiling/Cargo.toml --release 2>&1 | tee dhat_output.txt
+
+      - name: Upload DHAT profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: dhat-profile
+          path: |
+            dhat-heap.json
+            dhat_output.txt
+          retention-days: 30
+
+  # ===========================================================================
+  # Flamegraph (manual dispatch only)
+  # ===========================================================================
+  flamegraph:
+    name: Flamegraph
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_flamegraph == 'true'
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install flamegraph
+        run: cargo install flamegraph
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: flame-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: flame-${{ runner.os }}-
+
+      - name: Download pre-built JSC libraries
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: libjsc-x86_64-unknown-linux-gnu
+          path: .
+
+      - name: Extract JSC libraries (if available)
+        continue-on-error: true
+        run: |
+          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
+            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
+            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
+          fi
+
+      - name: Generate flamegraph (stress example)
+        run: |
+          cargo flamegraph --manifest-path examples/stress/Cargo.toml \
+            -o flamegraph_stress.svg \
+            --release || true
+
+      - name: Generate flamegraph (context benchmark)
+        run: |
+          cargo flamegraph --bench rust_jsc_bench \
+            -o flamegraph_context_bench.svg \
+            -- --bench "evaluate_complex_script" || true
+
+      - name: Upload flamegraphs
+        uses: actions/upload-artifact@v4
+        with:
+          name: flamegraphs
+          path: flamegraph_*.svg
+          retention-days: 30

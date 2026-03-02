@@ -14,3 +14,5 @@ public
 .libs-musl
 libjsc*.gz
 __cmake_systeminformation
+dhat-heap.json
+flamegraph.svg
