@@ -48,6 +48,12 @@ pub struct JSContext {
     pub(crate) inner: JSGlobalContextRef,
 }
 
+/// A strictly typed JavaScript context that automatically manages shared data state.
+pub struct TypedJSContext<T: 'static> {
+    pub(crate) inner: JSContext,
+    _marker: std::marker::PhantomData<T>,
+}
+
 pub type PrivateData = *mut ::std::os::raw::c_void;
 
 /// Header-only view of a `TypedData<T>` allocation.

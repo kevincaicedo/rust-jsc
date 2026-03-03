@@ -1,6 +1,6 @@
 use crate::{
     JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSStringProctected,
-    JSValue, PrivateDataWrapper,
+    JSValue, PrivateDataWrapper, TypedJSContext,
 };
 use rust_jsc_sys::{
     InspectorMessageCallback, InspectorPauseEventCallback, JSAPIModuleLoader,
@@ -977,6 +977,93 @@ impl From<JSGlobalContextRef> for JSContext {
     }
 }
 
+impl<T: 'static> TypedJSContext<T> {
+    /// Creates a new `TypedJSContext` with the given shared data.
+    pub fn new(data: T) -> Self {
+        let inner = JSContext::new();
+        inner.set_shared_data(data);
+        Self {
+            inner,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Creates a new `TypedJSContext` with the given class and shared data.
+    pub fn new_with(class: &JSClass, data: T) -> Self {
+        let inner = JSContext::new_with(class);
+        inner.set_shared_data(data);
+        Self {
+            inner,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Creates a new `TypedJSContext` from an existing `JSContextGroup` with shared data.
+    pub fn new_in_group(group: &JSContextGroup, data: T) -> Self {
+        let inner = group.new_context();
+        inner.set_shared_data(data);
+        Self {
+            inner,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Creates a new `TypedJSContext` from an existing `JSContextGroup`, with the given class and shared data.
+    pub fn new_in_group_with_class(
+        group: &JSContextGroup,
+        class: &JSClass,
+        data: T,
+    ) -> Self {
+        let inner = group.new_context_with_class(class);
+        inner.set_shared_data(data);
+        Self {
+            inner,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Gets an immutable reference to the shared data.
+    pub fn get_data(&self) -> Option<&T> {
+        self.inner.get_shared_data::<T>()
+    }
+
+    /// Gets a mutable reference to the shared data.
+    ///
+    /// # Safety
+    /// The caller must ensure that no other references to the shared data exist.
+    pub unsafe fn get_data_mut(&self) -> Option<&mut T> {
+        self.inner.get_shared_data_mut::<T>()
+    }
+
+    /// Takes ownership of the shared data, removing it from the context.
+    /// Returns `None` if no data is set.
+    ///
+    /// # Safety
+    /// The caller must ensure that no other references to the shared data exist.
+    pub unsafe fn take_data(&self) -> Option<T> {
+        self.inner.take_shared_data::<T>()
+    }
+}
+
+impl<T: 'static> std::ops::Deref for TypedJSContext<T> {
+    type Target = JSContext;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: 'static> Drop for TypedJSContext<T> {
+    fn drop(&mut self) {
+        unsafe {
+            // Automatically drop the shared data
+            self.inner.drop_shared_data::<T>();
+            // Release the underlying global context
+            JSGlobalContextRelease(self.inner.inner);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1704,5 +1791,23 @@ mod tests {
 
         // Avoid double-release issues if JSContext implements Drop (currently it doesn't seem to)
         std::mem::forget(ctx_alias);
+    }
+
+    #[test]
+    fn test_typed_js_context() {
+        let typed_ctx = TypedJSContext::new(String::from("typed data"));
+
+        // Deref allows calling JSContext methods
+        let global = typed_ctx.global_object();
+        assert!(global.is_object());
+
+        // Typed access to data
+        let data = typed_ctx.get_data().unwrap();
+        assert_eq!(data, "typed data");
+
+        // Take data
+        let taken = unsafe { typed_ctx.take_data() }.unwrap();
+        assert_eq!(taken, "typed data");
+        assert!(typed_ctx.get_data().is_none());
     }
 }
