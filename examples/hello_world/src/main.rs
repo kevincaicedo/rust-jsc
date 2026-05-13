@@ -5,8 +5,8 @@
 
 use rust_jsc::{
     callback, module_evaluate, module_fetch, module_import_meta, module_resolve,
-    JSContext, JSFunction, JSModuleLoader, JSObject, JSPromise, JSResult, JSString,
-    JSStringProctected, JSValue, PropertyDescriptor, PropertyDescriptorBuilder,
+    JSContext, JSFunction, JSModuleLoader, JSObject, JSResult, JSStringProctected,
+    JSValue, PropertyDescriptor, PropertyDescriptorBuilder,
 };
 
 #[callback]
@@ -30,7 +30,7 @@ fn set_timeout(
     arguments: &[JSValue],
 ) -> JSResult<JSValue> {
     println!("Set Timeout");
-    let callback = arguments.get(0).unwrap().as_object().unwrap();
+    let _callback = arguments.get(0).unwrap().as_object().unwrap();
     let timeout = arguments.get(1).unwrap().as_number().unwrap();
     // wait for timeout and then call the callback and return the result
     // 1. sleep for timeout
@@ -42,15 +42,13 @@ fn set_timeout(
 }
 
 #[module_resolve]
-fn moduleLoaderResolve(
-    ctx: JSContext,
+fn module_loader_resolve(
+    _ctx: JSContext,
     key: JSValue,
-    referrer: JSValue,
-    script_fetcher: JSValue,
+    _referrer: JSValue,
+    _script_fetcher: JSValue,
 ) -> JSStringProctected {
-    let key_value = key.as_string().unwrap();
-    // let referrer_value = referrer.as_string().unwrap();
-    // let script = script_fetcher.as_string().unwrap();
+    let _key_value = key.as_string().unwrap();
 
     // println!("ModuleLoaderResolve, Key: {:?}", key_value);
 
@@ -58,7 +56,7 @@ fn moduleLoaderResolve(
 }
 
 #[module_evaluate]
-fn moduleLoaderEvaluate(ctx: JSContext, key: JSValue) -> JSValue {
+fn module_loader_evaluate(ctx: JSContext, key: JSValue) -> JSValue {
     // let key = key.as_string().unwrap();
 
     println!("ModuleLoaderEvaluate, Key: {:?}", key.as_string().unwrap());
@@ -88,15 +86,13 @@ fn moduleLoaderEvaluate(ctx: JSContext, key: JSValue) -> JSValue {
 }
 
 #[module_fetch]
-fn moduleLoaderFetch(
-    ctx: JSContext,
+fn module_loader_fetch(
+    _ctx: JSContext,
     key: JSValue,
-    attributes_value: JSValue,
-    script_fetcher: JSValue,
+    _attributes_value: JSValue,
+    _script_fetcher: JSValue,
 ) -> JSStringProctected {
     let key_value = key.as_string().unwrap();
-    let script = script_fetcher.as_string().unwrap();
-    let attributes = attributes_value.as_string().unwrap();
 
     println!("ModuleLoaderFetch, Key: {:?}", key_value);
 
@@ -104,12 +100,11 @@ fn moduleLoaderFetch(
 }
 
 #[module_import_meta]
-fn moduleLoaderCreateImportMetaProperties(
+fn module_loader_create_import_meta_properties(
     ctx: JSContext,
     key: JSValue,
-    script_fetcher: JSValue,
+    _script_fetcher: JSValue,
 ) -> JSObject {
-    let script = script_fetcher.as_string().unwrap();
     // let key_value = key.as_string().unwrap();
 
     // println!("ImportMeta, Key: {:?}", key_value);
@@ -149,11 +144,11 @@ fn main() {
 
     let callbacks = JSModuleLoader {
         disableBuiltinFileSystemLoader: false,
-        moduleLoaderResolve: Some(moduleLoaderResolve),
-        moduleLoaderEvaluate: Some(moduleLoaderEvaluate),
-        moduleLoaderFetch: Some(moduleLoaderFetch),
+        moduleLoaderResolve: Some(module_loader_resolve),
+        moduleLoaderEvaluate: Some(module_loader_evaluate),
+        moduleLoaderFetch: Some(module_loader_fetch),
         moduleLoaderCreateImportMetaProperties: Some(
-            moduleLoaderCreateImportMetaProperties,
+            module_loader_create_import_meta_properties,
         ),
     };
 
@@ -162,11 +157,17 @@ fn main() {
     let keys = &[JSStringProctected::from("@rust-jsc")];
     ctx.set_virtual_module_keys(keys);
 
-    // let result = ctx.evaluate_script("console.log('Hello, World!')", None);
-    let result = ctx.evaluate_module("../scripts/test.js");
-    // let result = ctx.evaluate_module("../scripts/jsc-test.mjs");
+    let result = ctx.evaluate_module_from_source(
+        r#"
+        import lib, { name } from '@rust-jsc';
+        console.log(`Virtual: ${lib.name} - ${name}`);
+        globalThis.exampleName = name;
+        "#,
+        "hello_world.js",
+        None,
+    );
     ctx.check_syntax("console.log('Kevin')", 0).unwrap();
-    println!("Result: M");
+    println!("Result:");
     // let result = ctx.load_module("../scripts/test.js");
     // assert!(result.is_ok());
     // read module from file system
@@ -176,11 +177,13 @@ fn main() {
     // let result = ctx.link_and_evaluate_module("test.js");
     // println!("Result: {:?}", result.is_undefined());
     match result {
-        Ok(value) => {
-            println!(
-                "Result: {:?}",
-                ctx.check_syntax("console.log('Kevin')", 0).unwrap()
-            );
+        Ok(()) => {
+            let example_name = ctx
+                .evaluate_script("globalThis.exampleName", None)
+                .unwrap()
+                .as_string()
+                .unwrap();
+            println!("Example module name: {}", example_name);
         }
         Err(error) => {
             eprintln!(

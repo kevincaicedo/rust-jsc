@@ -5,5 +5,7 @@ WebKit/LayoutTests
 WebKit/**/CMakeCache.txt
 WebKit/CMakeCache.txt
 WebKit/WebKitBuild
+WebKit/__cmake_systeminformation
+WebKit/**/__cmake_systeminformation
 WebKit/Websites
 WebKit/WebDriverTests

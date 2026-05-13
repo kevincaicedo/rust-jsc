@@ -19,10 +19,10 @@ Add the following line to your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-rust_jsc = { version = "0.4.2" }
+rust_jsc = { version = "1.0.0" }
 ```
 
-# Usage
+## Usage
 
 ### Evaluate Script
 
@@ -48,7 +48,7 @@ assert!(result.is_ok());
 ### Typed Arrays
 
 ```rust
-use crate::{JSArrayBuffer, JSContext, JSTypedArray, JSTypedArrayType};
+use rust_jsc::{JSArrayBuffer, JSContext, JSTypedArray, JSTypedArrayType};
 
 fn main() {
     let ctx = JSContext::new();
@@ -127,18 +127,20 @@ assert!(result.is_ok());
 ```rust
 use rust_jsc::{
     callback, module_evaluate, module_fetch, module_import_meta, module_resolve,
-    JSContext, JSFunction, JSObject, JSResult, JSString, JSStringRetain, JSValue, JSPromise,
+    JSContext, JSFunction, JSObject, JSResult, JSString, JSStringProctected, JSValue, JSPromise,
     PropertyDescriptorBuilder, JSModuleLoader, PropertyDescriptor,
 };
 
 #[module_resolve]
 fn module_loader_resolve(
-    ctx: JSContext,
+    _ctx: JSContext,
     key: JSValue,
-    referrer: JSValue,
-    script_fetcher: JSValue,
-) -> JSStringRetain {
-    JSStringRetain::from("@rust-jsc")
+    _referrer: JSValue,
+    _script_fetcher: JSValue,
+) -> JSStringProctected {
+    // referrer is the importing module. script_fetcher is currently undefined
+    // for API callbacks on the rebased WebKit backend.
+    JSStringProctected::from("@rust-jsc")
 }
 
 #[module_evaluate]
@@ -163,10 +165,11 @@ fn module_loader_fetch(
     key: JSValue,
     attributes_value: JSValue,
     script_fetcher: JSValue,
-) -> JSStringRetain {
+) -> JSStringProctected {
     // Module Loader Fetch
-    // fetch the content from file or network
-    JSStringRetain::from("let name = 'Kedojs'; export default name;")
+    // Fetch the content from file or network. attributes_value and
+    // script_fetcher are currently undefined for API callbacks.
+    JSStringProctected::from("let name = 'Kedojs'; export default name;")
 }
 
 #[module_import_meta]
@@ -175,7 +178,7 @@ fn module_loader_create_import_meta_properties(
     key: JSValue,
     script_fetcher: JSValue,
 ) -> JSObject {
-    let key_value = key.as_string().unwrap();
+    // script_fetcher is currently undefined for API callbacks.
 
     let object = JSObject::new(&ctx);
     object.set_property("url", &key, Default::default()).unwrap();
@@ -186,7 +189,7 @@ fn main() {
     let ctx = JSContext::new();
     let global_object = ctx.global_object();
 
-    let module_loader = JSAPIModuleLoader {
+    let module_loader = JSModuleLoader {
         // Disable the builtin file system loader
         disableBuiltinFileSystemLoader: true,
         moduleLoaderResolve: Some(module_loader_resolve),
@@ -203,6 +206,15 @@ fn main() {
 }
 ```
 
+Synthetic module evaluation callbacks return an object whose own string-named
+properties become module exports. A `"default"` property is used as the default
+export. Symbol properties are ignored.
+
+`JSContext::link_and_evaluate_module()` returns the JavaScript `Promise` created
+by JavaScriptCore's module evaluator. Use `evaluate_module()` or
+`evaluate_module_from_source()` when you want the current synchronous wrapper
+that drains microtasks and reports startup exceptions through `JSResult`.
+
 ## Supported Platforms
 
 Table below shows the supported platforms:
@@ -217,54 +229,85 @@ Table below shows the supported platforms:
 | Linux    | aarch64 | aarch64-unknown-linux-musl | ✅ |
 | Windows  | x86_64 | x86_64-pc-windows-msvc | ❌ |
 
+## JavaScriptCore Builds
+
+`rust_jsc` uses the `rust_jsc_sys` build script to locate and link the Kedo
+WebKit JavaScriptCore build. The default path is static: with no configuration,
+the build script downloads a prebuilt `libjsc-<target>.a.gz` archive from the
+rust-jsc GitHub release mirror and links `libJavaScriptCore.a`, `libWTF.a`, and
+`libbmalloc.a`; it also links `libJavaScriptCoreJIT.a` when a target produces a
+separate JIT archive.
+
+For local development against the bundled WebKit checkout:
+
+```bash
+make build-jsc-static
+RUST_JSC_BUILD_MODE=static \
+  RUST_JSC_CUSTOM_BUILD_PATH="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/lib" \
+  cargo test --lib -- --test-threads=1
+```
+
+Linux release archives are built in Docker and include bundled static
+`libstdc++`, ICU, and `libatomic` archives. Local Linux source builds may link
+those system dependencies dynamically when the static `.a` files are not present
+beside the local JSC archives; that is intended for development and does not
+change the default release archive path.
+
+For every build mode and environment variable, see
+[rust-jsc/sys/README.md](sys/README.md).
 
 ## FAQ
 
-### How do I build the static libraries?
+### How do I build JavaScriptCore locally?
 
-By default, this library will try to download the static libraries from the GitHub mirror. If you want to build the static libraries yourself, you can clone the [rust-jsc repo](https://github.com/kevincaicedo/rust-jsc) and build the Docker image from the Dockerfile. It will build the static libraries for you and copy them to the provided path.
-
-```bash
-DOCKER_BUILDKIT=1 docker build -o ./.libs -t $(IMAGE_NAME) .
-```
-
-This command will only work on Linux. For macOS, you should build the JavaScriptCore static libraries by running the following command from the Makefile:
+Use the direct CMake/JSCOnly Makefile target. The default local build is static.
 
 ```bash
-make build-jsc
+make build-jsc-static
+make jsc-smoke
+make test-local-jsc
 ```
 
-Then set the `RUST_JSC_CUSTOM_BUILD_PATH` environment variable to the path of the static libraries.
-
-in order to archive the static libraries, you can use the following command:
+To build and link the macOS framework layout instead:
 
 ```bash
-# For macOS
-make archive platform=aarch64-apple-darwin
-make archive platform=x86_64-apple-darwin
-
-# For Linux
-make archive platform=aarch64-unknown-linux-gnu
-make archive platform=x86_64-unknown-linux-gnu
+make build-jsc-framework
+RUST_JSC_BUILD_MODE=framework \
+  RUST_JSC_CUSTOM_BUILD_PATH="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release/lib" \
+  cargo test
 ```
 
-> :warning: **Keep in mind this lib use a custom version of [WebKit](https://github.com/kevincaicedo/Kedo-WebKit) to generate the bindings. this version of WebKit is a fork of the original WebKit with some patches to support esmodules and other features.**
+Linux release archives are produced with Docker:
+
+```bash
+make build-docker-jsc
+make build-docker-jsc-musl
+```
+
+The complete build configuration reference lives in
+[rust-jsc/sys/README.md](sys/README.md).
+
+> :warning: This crate uses a custom [Kedo WebKit](https://github.com/kevincaicedo/Kedo-WebKit)
+> fork. Stock system JavaScriptCore builds usually do not export the APIs that
+> rust-jsc needs.
 
 ### How do I troubleshoot linking problems?
 
-If you encounter any problems linking the static libraries, try setting the following environment variables:
+For static local builds, first confirm `RUST_JSC_CUSTOM_BUILD_PATH` points at
+the directory containing `libJavaScriptCore.a`, `libWTF.a`, and `libbmalloc.a`.
+For framework or dynamic builds, set the platform loader path if needed:
 
 ```bash
-# For macOS
-# Example path to the JavaScriptCore static libraries
-DYLD_LIBRARY_PATH=/Users/${user}/Documents/Projects/WebKit/WebKitBuild/JSCOnly/Release/lib:$DYLD_LIBRARY_PATH
+# macOS
+export DYLD_LIBRARY_PATH=/path/to/jsc/lib:$DYLD_LIBRARY_PATH
 ```
 
 ```bash
-# For Linux
-# Example path to the JavaScriptCore static libraries
-LD_LIBRARY_PATH=/Users/${user}/Documents/Projects/WebKit/WebKitBuild/JSCOnly/Release/lib:$LD_LIBRARY_PATH
+# Linux
+export LD_LIBRARY_PATH=/path/to/jsc/lib:$LD_LIBRARY_PATH
 ```
+
+More troubleshooting notes are in [rust-jsc/sys/README.md](sys/README.md).
 
 ## License
 

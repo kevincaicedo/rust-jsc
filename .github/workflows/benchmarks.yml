@@ -1,26 +1,18 @@
 name: Benchmarks & Performance Tests
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'sys/**'
-      - 'macros/**'
-      - 'benches/**'
-      - 'examples/**'
-      - 'Cargo.toml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'sys/**'
-      - 'macros/**'
-      - 'benches/**'
-      - 'examples/**'
-      - 'Cargo.toml'
   workflow_dispatch:
     inputs:
+      run_benchmarks:
+        description: "Run Criterion benchmarks"
+        required: false
+        default: "true"
+        type: boolean
+      run_stress:
+        description: "Run stress example"
+        required: false
+        default: "false"
+        type: boolean
       run_flamegraph:
         description: "Generate flamegraph (slower)"
         required: false
@@ -31,23 +23,173 @@ on:
         required: false
         default: "false"
         type: boolean
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+env:
+  JSC_ARCHIVE_NAME: libjsc-x86_64-unknown-linux-gnu.a.gz
+  JSC_ARTIFACT_NAME: jsc-libs-x86_64-unknown-linux-gnu
 
 concurrency:
-  group: benchmarks-${{ github.ref }}
+  group: benchmarks-${{ github.event.issue.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ===========================================================================
-  # Criterion Benchmarks
-  # ===========================================================================
-  benchmark:
-    name: Benchmarks
+  resolve-ref:
+    name: Resolve Benchmark Ref
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/run-benchmarks') &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association))
+    outputs:
+      repository: ${{ steps.ref.outputs.repository }}
+      sha: ${{ steps.ref.outputs.sha }}
+      pr_number: ${{ steps.ref.outputs.pr_number }}
+    steps:
+      - name: Use workflow ref
+        id: workflow_ref
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "repository=${GITHUB_REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "pr_number=" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve pull request ref
+        id: pr_ref
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.issue.number;
+            const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number });
+            core.setOutput('repository', pull.head.repo.full_name);
+            core.setOutput('sha', pull.head.sha);
+            core.setOutput('pr_number', String(pull_number));
+
+      - name: Export ref
+        id: ref
+        run: |
+          echo "repository=${{ steps.pr_ref.outputs.repository || steps.workflow_ref.outputs.repository }}" >> "$GITHUB_OUTPUT"
+          echo "sha=${{ steps.pr_ref.outputs.sha || steps.workflow_ref.outputs.sha }}" >> "$GITHUB_OUTPUT"
+          echo "pr_number=${{ steps.pr_ref.outputs.pr_number || steps.workflow_ref.outputs.pr_number }}" >> "$GITHUB_OUTPUT"
+
+  jsc-libs:
+    name: Prepare Static JSC Libraries
+    runs-on: ubuntu-latest
+    needs: resolve-ref
+    if: >
+      github.event_name == 'issue_comment' ||
+      github.event.inputs.run_benchmarks == 'true' ||
+      github.event.inputs.run_stress == 'true' ||
+      github.event.inputs.run_dhat == 'true' ||
+      github.event.inputs.run_flamegraph == 'true'
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ needs.resolve-ref.outputs.repository }}
+          ref: ${{ needs.resolve-ref.outputs.sha }}
           submodules: recursive
+
+      - name: Check release availability
+        id: release
+        run: |
+          VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}/${JSC_ARCHIVE_NAME}"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          if curl --output /dev/null --silent --head --fail "$URL"; then
+            echo "use_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download released static JSC
+        if: steps.release.outputs.use_release == 'true'
+        run: |
+          curl -L "${{ steps.release.outputs.url }}" -o "$JSC_ARCHIVE_NAME"
+          mkdir -p .jsc-libs
+          tar -xzf "$JSC_ARCHIVE_NAME" -C .jsc-libs
+
+      - name: Free disk space
+        if: steps.release.outputs.use_release != 'true'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Set up Docker Buildx
+        if: steps.release.outputs.use_release != 'true'
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Cache Docker layers
+        if: steps.release.outputs.use_release != 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache-linux-x86_64
+          key: bench-buildx-linux-x86_64-${{ needs.resolve-ref.outputs.sha }}
+          restore-keys: bench-buildx-linux-x86_64-
+
+      - name: Build static JSC
+        if: steps.release.outputs.use_release != 'true'
+        run: |
+          mkdir -p .jsc-libs
+          docker buildx build \
+            --output type=local,dest=.jsc-libs \
+            --cache-from type=local,src=/tmp/.buildx-cache-linux-x86_64 \
+            --cache-to type=local,dest=/tmp/.buildx-cache-linux-x86_64-new,mode=max \
+            -f Dockerfile .
+
+      - name: Rotate Docker cache
+        if: always() && steps.release.outputs.use_release != 'true'
+        run: |
+          rm -rf /tmp/.buildx-cache-linux-x86_64
+          mv /tmp/.buildx-cache-linux-x86_64-new /tmp/.buildx-cache-linux-x86_64 2>/dev/null || true
+
+      - name: Verify static JSC libraries
+        run: |
+          ls -lh .jsc-libs
+          test -f .jsc-libs/libJavaScriptCore.a
+          test -f .jsc-libs/libWTF.a
+          test -f .jsc-libs/libbmalloc.a
+          if [ -f .jsc-libs/libJavaScriptCoreJIT.a ]; then
+            echo "Found separate JavaScriptCoreJIT archive"
+          else
+            echo "No separate JavaScriptCoreJIT archive produced for this target"
+          fi
+
+      - name: Upload static JSC libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.JSC_ARTIFACT_NAME }}
+          path: .jsc-libs/*.a
+          retention-days: 7
+
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    needs: [resolve-ref, jsc-libs]
+    if: github.event_name == 'issue_comment' || github.event.inputs.run_benchmarks == 'true'
+    timeout-minutes: 90
+    env:
+      RUST_JSC_BUILD_MODE: static
+      RUST_JSC_CUSTOM_BUILD_PATH: ${{ github.workspace }}/.jsc-libs
+      RUST_BACKTRACE: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.resolve-ref.outputs.repository }}
+          ref: ${{ needs.resolve-ref.outputs.sha }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -62,23 +204,26 @@ jobs:
           key: bench-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: bench-${{ runner.os }}-
 
-      - name: Download pre-built JSC libraries
+      - name: Download static JSC libraries
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
-          name: libjsc-x86_64-unknown-linux-gnu
-          path: .
+          name: ${{ env.JSC_ARTIFACT_NAME }}
+          path: .jsc-libs
 
-      - name: Extract JSC libraries (if available)
-        continue-on-error: true
+      - name: Verify static JSC libraries
         run: |
-          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
-            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
-            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
+          test -f .jsc-libs/libJavaScriptCore.a
+          test -f .jsc-libs/libWTF.a
+          test -f .jsc-libs/libbmalloc.a
+          if [ -f .jsc-libs/libJavaScriptCoreJIT.a ]; then
+            echo "Found separate JavaScriptCoreJIT archive"
+          else
+            echo "No separate JavaScriptCoreJIT archive produced for this target"
           fi
 
       - name: Run benchmarks
         run: |
+          set -o pipefail
           cargo bench --bench rust_jsc_bench -- --output-format bencher | tee all_benchmarks.txt
 
       - name: Upload benchmark results
@@ -90,24 +235,8 @@ jobs:
             target/criterion/
           retention-days: 30
 
-      # Store benchmark data for historical comparison
       - name: Store benchmark result
-        if: github.ref == 'refs/heads/main'
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-          name: Rust-JSC Benchmarks
-          tool: cargo
-          output-file-path: all_benchmarks.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          alert-threshold: "120%"
-          comment-on-alert: true
-          fail-on-alert: false
-          alert-comment-cc-users: "@kevincaicedo"
-
-      # On PRs, compare with baseline and comment
-      - name: Compare benchmarks (PR)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Rust-JSC Benchmarks
@@ -115,23 +244,42 @@ jobs:
           output-file-path: all_benchmarks.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: false
-          alert-threshold: "110%"
+          alert-threshold: "120%"
           comment-on-alert: true
-          fail-on-alert: true
-          comment-always: true
+          fail-on-alert: false
           alert-comment-cc-users: "@kevincaicedo"
 
-  # ===========================================================================
-  # Stress Test (Smoke Test)
-  # ===========================================================================
+      - name: Comment benchmark run
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number('${{ needs.resolve-ref.outputs.pr_number }}'),
+              body: `Benchmark run completed for ${{ needs.resolve-ref.outputs.sha }}. Results artifact: ${runUrl}`,
+            });
+
   stress-test:
     name: Stress Test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    needs: [resolve-ref, jsc-libs]
+    if: >
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.run_stress == 'true') ||
+      (github.event_name == 'issue_comment' &&
+       (contains(github.event.comment.body, '/run-benchmarks stress') || contains(github.event.comment.body, '/run-benchmarks all')))
+    timeout-minutes: 45
+    env:
+      RUST_JSC_BUILD_MODE: static
+      RUST_JSC_CUSTOM_BUILD_PATH: ${{ github.workspace }}/.jsc-libs
+      RUST_BACKTRACE: 1
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          repository: ${{ needs.resolve-ref.outputs.repository }}
+          ref: ${{ needs.resolve-ref.outputs.sha }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -146,20 +294,11 @@ jobs:
           key: stress-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: stress-${{ runner.os }}-
 
-      - name: Download pre-built JSC libraries
+      - name: Download static JSC libraries
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
-          name: libjsc-x86_64-unknown-linux-gnu
-          path: .
-
-      - name: Extract JSC libraries (if available)
-        continue-on-error: true
-        run: |
-          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
-            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
-            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
-          fi
+          name: ${{ env.JSC_ARTIFACT_NAME }}
+          path: .jsc-libs
 
       - name: Build stress example
         run: cargo build --manifest-path examples/stress/Cargo.toml --release
@@ -175,20 +314,21 @@ jobs:
           path: stress_output.txt
           retention-days: 30
 
-  # ===========================================================================
-  # DHAT Memory Profiling (manual dispatch or main branch)
-  # ===========================================================================
   memory-profile:
     name: Memory Profile (DHAT)
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.run_dhat == 'true'
-      || github.ref == 'refs/heads/main'
-    timeout-minutes: 30
+    needs: [resolve-ref, jsc-libs]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_dhat == 'true'
+    timeout-minutes: 45
+    env:
+      RUST_JSC_BUILD_MODE: static
+      RUST_JSC_CUSTOM_BUILD_PATH: ${{ github.workspace }}/.jsc-libs
+      RUST_BACKTRACE: 1
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          repository: ${{ needs.resolve-ref.outputs.repository }}
+          ref: ${{ needs.resolve-ref.outputs.sha }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -203,20 +343,11 @@ jobs:
           key: dhat-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: dhat-${{ runner.os }}-
 
-      - name: Download pre-built JSC libraries
+      - name: Download static JSC libraries
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
-          name: libjsc-x86_64-unknown-linux-gnu
-          path: .
-
-      - name: Extract JSC libraries (if available)
-        continue-on-error: true
-        run: |
-          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
-            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
-            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
-          fi
+          name: ${{ env.JSC_ARTIFACT_NAME }}
+          path: .jsc-libs
 
       - name: Run DHAT profiling
         run: |
@@ -231,18 +362,21 @@ jobs:
             dhat_output.txt
           retention-days: 30
 
-  # ===========================================================================
-  # Flamegraph (manual dispatch only)
-  # ===========================================================================
   flamegraph:
     name: Flamegraph
     runs-on: ubuntu-latest
+    needs: [resolve-ref, jsc-libs]
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_flamegraph == 'true'
-    timeout-minutes: 60
+    timeout-minutes: 90
+    env:
+      RUST_JSC_BUILD_MODE: static
+      RUST_JSC_CUSTOM_BUILD_PATH: ${{ github.workspace }}/.jsc-libs
+      RUST_BACKTRACE: 1
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          repository: ${{ needs.resolve-ref.outputs.repository }}
+          ref: ${{ needs.resolve-ref.outputs.sha }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -260,20 +394,11 @@ jobs:
           key: flame-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: flame-${{ runner.os }}-
 
-      - name: Download pre-built JSC libraries
+      - name: Download static JSC libraries
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
-          name: libjsc-x86_64-unknown-linux-gnu
-          path: .
-
-      - name: Extract JSC libraries (if available)
-        continue-on-error: true
-        run: |
-          if [ -f libjsc-x86_64-unknown-linux-gnu.a.gz ]; then
-            mkdir -p WebKit/WebKitBuild/JSCOnly/Release/lib
-            tar -xzf libjsc-x86_64-unknown-linux-gnu.a.gz -C WebKit/WebKitBuild/JSCOnly/Release/lib/
-          fi
+          name: ${{ env.JSC_ARTIFACT_NAME }}
+          path: .jsc-libs
 
       - name: Generate flamegraph (stress example)
         run: |

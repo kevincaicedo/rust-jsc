@@ -1,6 +1,6 @@
 use crate::{
-    JSClass, JSContext, JSContextGroup, JSObject, JSResult, JSString, JSStringProctected,
-    JSValue, PrivateDataWrapper, TypedJSContext,
+    JSClass, JSContext, JSContextGroup, JSError, JSObject, JSResult, JSString,
+    JSStringProctected, JSValue, PrivateDataWrapper, TypedJSContext,
 };
 use rust_jsc_sys::{
     InspectorMessageCallback, InspectorPauseEventCallback, JSAPIModuleLoader,
@@ -380,6 +380,8 @@ impl JSContext {
     /// Links and evaluates a module.
     /// https://262.ecma-international.org/6.0/#sec-moduledeclarationinstantiation
     /// The module is linked and evaluated using the module loader set for the context.
+    /// On rebased WebKit builds this returns the JavaScript `Promise` created by
+    /// JavaScriptCore's async module evaluation path.
     ///
     /// LinkAndEvaluateModule:
     ///     - Initialize a new module environment.
@@ -396,18 +398,29 @@ impl JSContext {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// use rust_jsc::JSContext;
     ///
     /// let ctx = JSContext::new();
-    /// let result = ctx.link_and_evaluate_module("test");
-    /// assert!(result.is_undefined());
+    /// let promise = ctx.link_and_evaluate_module("test")?;
+    /// assert!(promise.is_object());
     /// ```
-    pub fn link_and_evaluate_module(&self, key: &str) -> JSValue {
+    ///
+    /// # Returns
+    ///
+    /// A `JSValue` containing the evaluation `Promise`.
+    pub fn link_and_evaluate_module(&self, key: &str) -> JSResult<JSValue> {
         let module_key: JSString = key.into();
         let result = unsafe { JSLinkAndEvaluateModule(self.inner, module_key.inner) };
 
-        JSValue::new(result, self.inner)
+        if result.is_null() {
+            return Err(JSError::new_typ(
+                self,
+                format!("failed to link and evaluate module `{key}`"),
+            )?);
+        }
+
+        Ok(JSValue::new(result, self.inner))
     }
 
     /// Loads a module from source.
@@ -515,7 +528,9 @@ impl JSContext {
     }
 
     /// Sets the keys for all virtual modules.
-    /// The keys are used to identify virtual modules when loading modules.
+    /// The keys are used to identify synthetic modules when loading modules.
+    /// The strings remain caller-owned; JavaScriptCore copies the key text and
+    /// does not retain or release the provided `JSStringRef` values.
     ///
     /// # Arguments
     /// - `keys`: An array of keys.

@@ -2473,7 +2473,7 @@ pub struct OpaqueJSValue {
 pub type JSValueRef = *const OpaqueJSValue;
 #[doc = " @typedef JSObjectRef A JavaScript object. A JSObject is a JSValue."]
 pub type JSObjectRef = *mut OpaqueJSValue;
-#[doc = "@typedef JSModuleLoaderResolve\n@abstract The callback invoked when resolving a module specifier.\n@param ctx The execution context to use.\n@param keyValue A JSValue containing the module specifier to resolve.\n@param referrerValue A JSValue containing the referrer URL.\n@param scriptFetcher A JSValue containing the script fetcher.\n@result A JSString containing the resolved module specifier."]
+#[doc = "@typedef JSModuleLoaderResolve\n@abstract The callback invoked when resolving a module specifier.\n@param ctx The execution context to use.\n@param keyValue A JSValue containing the module specifier to resolve.\n@param referrerValue A JSValue containing the referrer URL.\n@param scriptFetcher Reserved for future script fetcher support. Currently undefined for API callbacks.\n@result A JSString containing the resolved module specifier."]
 pub type JSModuleLoaderResolve = ::std::option::Option<
     unsafe extern "C" fn(
         ctx: JSContextRef,
@@ -2482,11 +2482,11 @@ pub type JSModuleLoaderResolve = ::std::option::Option<
         scriptFetcher: JSValueRef,
     ) -> JSStringRef,
 >;
-#[doc = "@typedef JSModuleLoaderEvaluate\n@abstract The callback invoked when evaluating a module.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier to evaluate.\n@param scriptFetcher A JSValue containing the script fetcher.\n@param sentValue A JSValue containing the value to send to the module.\n@param resumeMode A JSValue containing the resume mode.\n@result A JSValue containing the result of evaluating the module."]
+#[doc = "@typedef JSModuleLoaderEvaluate\n@abstract The callback invoked when evaluating a synthetic module.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier to evaluate.\n@result A JSObject containing the synthetic module exports. String-named own properties are exported; symbols are ignored."]
 pub type JSModuleLoaderEvaluate = ::std::option::Option<
     unsafe extern "C" fn(ctx: JSContextRef, key: JSValueRef) -> JSValueRef,
 >;
-#[doc = "@typedef JSModuleLoaderFetch\n@abstract The callback invoked when fetching a module.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier to fetch.\n@param attributesValue A JSValue containing the attributes.\n@param scriptFetcher A JSValue containing the script fetcher.\n@result A JSStringRef containing the fetched module."]
+#[doc = "@typedef JSModuleLoaderFetch\n@abstract The callback invoked when fetching a module.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier to fetch.\n@param attributesValue Reserved for future import-attributes support. Currently undefined for API callbacks.\n@param scriptFetcher Reserved for future script fetcher support. Currently undefined for API callbacks.\n@result A JSStringRef containing the fetched module."]
 pub type JSModuleLoaderFetch = ::std::option::Option<
     unsafe extern "C" fn(
         ctx: JSContextRef,
@@ -2495,7 +2495,7 @@ pub type JSModuleLoaderFetch = ::std::option::Option<
         scriptFetcher: JSValueRef,
     ) -> JSStringRef,
 >;
-#[doc = "@typedef JSModuleLoaderCreateImportMetaProperties\n@abstract The callback invoked when creating import meta properties.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier.\n@param scriptFetcher A JSValue containing the script fetcher.\n@result A JSObjectRef containing the import meta properties."]
+#[doc = "@typedef JSModuleLoaderCreateImportMetaProperties\n@abstract The callback invoked when creating import meta properties.\n@param ctx The execution context to use.\n@param key A JSValue containing the module specifier.\n@param scriptFetcher Reserved for future script fetcher support. Currently undefined for API callbacks.\n@result A JSObjectRef containing the import meta properties."]
 pub type JSModuleLoaderCreateImportMetaProperties = ::std::option::Option<
     unsafe extern "C" fn(
         ctx: JSContextRef,
@@ -2648,14 +2648,14 @@ extern "C" {
     );
 }
 extern "C" {
-    #[doc = "@function JSLinkAndEvaluateModule\n@abstract Links and evaluates a module.\n@param ctx The execution context to use.\n@param moduleKey A JSString containing the module key to link and evaluate.\n@result The JSValue that results from evaluating the module, or NULL if an exception is thrown."]
+    #[doc = "@function JSLinkAndEvaluateModule\n@abstract Links and evaluates a module.\n@param ctx The execution context to use.\n@param moduleKey A JSString containing the module key to link and evaluate.\n@result A Promise for module evaluation, or NULL if evaluation could not start."]
     pub fn JSLinkAndEvaluateModule(
         ctx: JSContextRef,
         moduleKey: JSStringRef,
     ) -> JSValueRef;
 }
 extern "C" {
-    #[doc = "@function JSSetSyntheticModuleKeys\n@abstract Sets the synthetic module keys.\n@param ctx The execution context to use.\n@param argumentCount The number of keys.\n@param keys An array of JSString containing the keys.\n@param exception A pointer to a JSValueRef in which to store an exception, if any. Pass NULL if you do not care to store an exception."]
+    #[doc = "@function JSSetSyntheticModuleKeys\n@abstract Sets the synthetic module keys.\n@param ctx The execution context to use.\n@param argumentCount The number of keys.\n@param keys An array of caller-owned JSString values containing the keys. The strings are not retained or released by this function."]
     pub fn JSSetSyntheticModuleKeys(
         ctx: JSContextRef,
         argumentCount: usize,
@@ -30690,10 +30690,6 @@ extern "C" {
         ctx: JSGlobalContextRef,
         message: *const ::std::os::raw::c_char,
     );
-}
-extern "C" {
-    #[doc = "@function\n@abstract Cleans up inspector resources.\n@deprecated Use JSInspectorDisconnect instead."]
-    pub fn JSInspectorCleanup();
 }
 extern "C" {
     #[doc = "@function\n@abstract Disconnects the inspector frontend from the given context.\n@param ctx The JavaScript context to disconnect from the inspector."]

@@ -1,14 +1,38 @@
 # Define variables
 IMAGE_NAME := javascriptcore
+AR ?= ar
+WEBKIT_DIR ?= WebKit
+JSC_PROFILE ?= Release
+JSC_JOBS ?= $(shell sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+JSC_GENERATOR ?= Ninja
+JSC_STATIC ?= ON
+JSC_BUILD_ROOT ?= $(WEBKIT_DIR)/WebKitBuild/RustJSC
+JSC_BUILD_VARIANT = $(if $(filter ON,$(JSC_STATIC)),$(JSC_PROFILE)-Static,$(JSC_PROFILE))
+JSC_BUILD_DIR ?= $(JSC_BUILD_ROOT)/JSCOnly/$(JSC_BUILD_VARIANT)
+LOCAL_JSC_LIB_DIR ?= $(JSC_BUILD_DIR)/lib
+LOCAL_JSC_LIB_DIR_ABS = $(abspath $(LOCAL_JSC_LIB_DIR))
+JSC_EXTRA_CMAKE_ARGS ?=
+JSC_CMAKE_ARGS := -DPORT=JSCOnly -DCMAKE_BUILD_TYPE=$(JSC_PROFILE) -DSHOW_BINDINGS_GENERATION_PROGRESS=1 -DDEVELOPER_MODE=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_FTL_JIT=ON $(JSC_EXTRA_CMAKE_ARGS)
+
+ifeq ($(JSC_STATIC),ON)
+JSC_CMAKE_ARGS += -DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF
+endif
 
 help:
 	@echo "Usage: make [target] [platform=<platform>]"
 	@echo "Targets:"
 	@echo "  build-docker-jsc: Build the Docker image with JavaScriptCore"
-	@echo "  build-jsc: Build JavaScriptCore"
+	@echo "  build-jsc: Build JavaScriptCore static archives with direct CMake/JSCOnly"
+	@echo "  build-jsc-static: Alias for the default static JSC build"
+	@echo "  build-jsc-framework: Build JavaScriptCore as a local macOS framework/dynamic build"
+	@echo "  jsc-jit-archive: Create libJavaScriptCoreJIT.a from CMake JIT objects when present"
+	@echo "  build-jsc-buildjsc: Build JavaScriptCore through WebKit/Tools/Scripts/build-jsc"
+	@echo "  jsc-smoke: Run a small smoke test against the local jsc binary"
 	@echo "  build-lib: Build the Rust library"
+	@echo "  build-lib-local-jsc: Build Rust library against the local JSC build"
 	@echo "  gen-bindings: Generate the Rust bindings"
 	@echo "  test: Run the unit tests"
+	@echo "  test-local-jsc: Run unit tests against the local JSC build"
 	@echo "  all-tests: Run all the tests (including workspace members)"
 	@echo "  archive: Archive the build artifacts with the platform parameter"
 	@echo "  bench: Run all Criterion benchmarks"
@@ -70,29 +94,44 @@ build-jsc:
 	@if [ ! -d "WebKit/Tools" ]; then \
 		git submodule update --init --recursive; \
 	fi
-# if it is macOS, build with cmake, check if cmake is installed or install it with brew
-	@if [ "$(shell uname)" = "Darwin" ]; then \
-		if [ ! -x "$(shell command -v cmake)" ]; then \
-			brew install cmake; \
-		fi; \
+	cmake -S $(WEBKIT_DIR) -B $(JSC_BUILD_DIR) -G "$(JSC_GENERATOR)" $(JSC_CMAKE_ARGS)
+	cmake --build $(JSC_BUILD_DIR) --target jsc --parallel $(JSC_JOBS)
+	@if [ "$(JSC_STATIC)" = "ON" ]; then \
+		$(MAKE) jsc-jit-archive JSC_BUILD_DIR=$(JSC_BUILD_DIR); \
 	fi
-	WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS='-Wno-error=missing-template-arg-list-after-template-kw -Wno-error=constant-conversion -Wno-unused-variable -Wno-error=unused-variable'"
+
+build-jsc-static:
+	$(MAKE) build-jsc JSC_STATIC=ON JSC_BUILD_DIR=$(JSC_BUILD_ROOT)/JSCOnly/$(JSC_PROFILE)-Static
+
+build-jsc-framework:
+	$(MAKE) build-jsc JSC_STATIC=OFF JSC_BUILD_DIR=$(JSC_BUILD_ROOT)/JSCOnly/$(JSC_PROFILE)
+
+jsc-jit-archive:
+	@if [ ! -d "$(JSC_BUILD_DIR)/Source/JavaScriptCore/CMakeFiles/JavaScriptCoreJIT.dir" ]; then \
+		echo "JavaScriptCoreJIT object directory not produced for $(JSC_BUILD_DIR); libJavaScriptCore.a is self-contained for this target"; \
+		$(RM) "$(LOCAL_JSC_LIB_DIR)/libJavaScriptCoreJIT.a"; \
+	else \
+		mkdir -p "$(LOCAL_JSC_LIB_DIR)"; \
+		$(RM) "$(LOCAL_JSC_LIB_DIR)/libJavaScriptCoreJIT.a"; \
+		find "$(JSC_BUILD_DIR)/Source/JavaScriptCore/CMakeFiles/JavaScriptCoreJIT.dir" -type f -name '*.o' -exec "$(AR)" rcs "$(LOCAL_JSC_LIB_DIR)/libJavaScriptCoreJIT.a" {} +; \
+	fi
 
 build-jsc-debug:
 # Check if WebKit submodule is initialized otherwise initialize it
 	@if [ ! -d "WebKit/Tools" ]; then \
 		git submodule update --init --recursive; \
 	fi
-# if it is macOS, build with cmake, check if cmake is installed or install it with brew
-	@if [ "$(shell uname)" = "Darwin" ]; then \
-		if [ ! -x "$(shell command -v cmake)" ]; then \
-			brew install cmake; \
-		fi; \
-	fi
-# WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_EXE_LINKER_FLAGS='-framework Foundation -framework CoreFoundation' -DCMAKE_SHARED_LINKER_FLAGS='-framework Foundation -framework CoreFoundation' -DCMAKE_CXX_FLAGS='-Wno-deprecated-declarations' -DCMAKE_BUILD_TYPE=Debug"
-	WebKit/Tools/Scripts/build-jsc --jsc-only --debug --cmakeargs="-DENABLE_STATIC_JSC=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DUSE_THIN_ARCHIVES=OFF -DCMAKE_BUILD_TYPE=Debug"
+	$(MAKE) build-jsc JSC_PROFILE=Debug JSC_BUILD_DIR=$(JSC_BUILD_ROOT)/JSCOnly/Debug-Static
 
-# archive all *.a files from JSOnly build receive the name libjsc-<platform>.a.gz, platforn is a parameter
+build-jsc-buildjsc:
+	WebKit/Tools/Scripts/build-jsc --jsc-only --cmakeargs="-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_EXPERIMENTAL_FEATURES=OFF -DCMAKE_BUILD_TYPE=$(JSC_PROFILE)"
+	$(MAKE) jsc-jit-archive JSC_BUILD_DIR=$(WEBKIT_DIR)/WebKitBuild/JSCOnly/$(JSC_PROFILE) LOCAL_JSC_LIB_DIR=$(WEBKIT_DIR)/WebKitBuild/JSCOnly/$(JSC_PROFILE)/lib
+
+jsc-smoke:
+	$(JSC_BUILD_DIR)/bin/jsc -e "print(1 + 1)"
+	$(JSC_BUILD_DIR)/bin/jsc -e "var b = UFT8Encoding('hé'); print(b.constructor.name + ':' + b.length + ':' + b[0] + ':' + b[1] + ':' + b[2]);"
+
+# archive all *.a files from JSCOnly build receive the name libjsc-<platform>.a.gz, platform is a parameter
 archive:
 	@echo "Archiving the build artifacts..."
 
@@ -101,21 +140,20 @@ archive:
 		exit 1; \
 	fi
 
-	@cd WebKit/WebKitBuild/JSCOnly/Release/lib/ && \
-	tar -czf libjsc-$(platform).a.gz *.a && \
-	mv libjsc-$(platform).a.gz ../../../../../
+	@if [ "$(JSC_STATIC)" = "ON" ]; then \
+		$(MAKE) jsc-jit-archive JSC_BUILD_DIR=$(JSC_BUILD_DIR); \
+	fi
 
-archive-debug:
-	@echo "Archiving the build artifacts..."
-
-	@if [ -z "$(platform)" ]; then \
-		echo "Please provide the platform parameter"; \
+	@if [ ! -d "$(LOCAL_JSC_LIB_DIR)" ]; then \
+		echo "Static library directory not found: $(LOCAL_JSC_LIB_DIR)"; \
 		exit 1; \
 	fi
 
-	@cd WebKit/WebKitBuild/JSCOnly/Debug/lib/ && \
-	tar -czf libjsc-$(platform).a.gz *.a && \
-	mv libjsc-$(platform).a.gz ../../../../../
+	@cd "$(LOCAL_JSC_LIB_DIR)" && \
+	tar -czf "$(CURDIR)/libjsc-$(platform).a.gz" *.a
+
+archive-debug:
+	$(MAKE) archive platform=$(platform) JSC_PROFILE=Debug JSC_BUILD_DIR=$(JSC_BUILD_ROOT)/JSCOnly/Debug-Static
 
 archive-linux:
 	@echo "Archiving the build artifacts..."
@@ -131,6 +169,12 @@ archive-linux:
 
 build-lib:
 	cargo build --release
+
+build-lib-local-jsc:
+	DYLD_FRAMEWORK_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$DYLD_FRAMEWORK_PATH" LD_LIBRARY_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$LD_LIBRARY_PATH" RUST_JSC_BUILD_MODE=static RUST_JSC_CUSTOM_BUILD_PATH="$(LOCAL_JSC_LIB_DIR_ABS)" cargo build --release
+
+test-local-jsc:
+	DYLD_FRAMEWORK_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$DYLD_FRAMEWORK_PATH" LD_LIBRARY_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$LD_LIBRARY_PATH" RUST_JSC_BUILD_MODE=static RUST_JSC_CUSTOM_BUILD_PATH="$(LOCAL_JSC_LIB_DIR_ABS)" RUST_BACKTRACE=1 cargo test --lib -- --test-threads=1
 
 gen-bindings:
 	(cd gen && cargo build --release)
@@ -152,4 +196,4 @@ flamegraph:
 	cargo flamegraph --root --manifest-path examples/stress/Cargo.toml --release -o flamegraph.svg
 	@echo "Flamegraph written to flamegraph.svg"
 
-.PHONY: build-docker-jsc build-jsc build-lib gen-bindings test archive bench bench-report run-stress profile-heap flamegraph
+.PHONY: build-docker-jsc build-jsc build-jsc-static build-jsc-framework jsc-jit-archive build-jsc-debug build-jsc-buildjsc jsc-smoke build-lib build-lib-local-jsc gen-bindings test test-local-jsc archive bench bench-report run-stress profile-heap flamegraph

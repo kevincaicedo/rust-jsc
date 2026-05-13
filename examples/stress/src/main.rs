@@ -1,46 +1,8 @@
 use rust_jsc::{
-    callback, JSArray, JSArrayBuffer, JSClass, JSContext, JSError, JSFunction, JSObject, JSPromise,
-    JSRegExp, JSResult, JSTypedArray, JSTypedArrayType, JSValue, PropertyDescriptorBuilder,
+    JSContext, JSObject, JSTypedArray, JSTypedArrayType, JSValue,
+    PropertyDescriptorBuilder,
 };
 use std::time::Instant;
-
-// ─── Callbacks ──────────────────────────────────────────────────────────────
-#[callback]
-fn console_log(
-    ctx: JSContext,
-    _function: JSObject,
-    _this: JSObject,
-    arguments: &[JSValue],
-) -> JSResult<JSValue> {
-    let parts: Vec<String> = arguments
-        .iter()
-        .map(|a| {
-            a.as_string()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|_| format!("{:?}", a.as_json_string(0)))
-        })
-        .collect();
-    println!("  [JS] {}", parts.join(" "));
-    Ok(JSValue::undefined(&ctx))
-}
-
-fn setup_console(ctx: &JSContext) {
-    let global = ctx.global_object();
-    let console = JSObject::new(ctx);
-    let attrs = PropertyDescriptorBuilder::new()
-        .writable(true)
-        .configurable(true)
-        .enumerable(true)
-        .build();
-
-    let log_fn = JSFunction::callback(ctx, Some("log"), Some(console_log));
-    console.set_property("log", &log_fn, attrs).unwrap();
-    console.set_property("info", &log_fn, attrs).unwrap();
-    console.set_property("warn", &log_fn, attrs).unwrap();
-    console.set_property("error", &log_fn, attrs).unwrap();
-
-    global.set_property("console", &console, attrs).unwrap();
-}
 
 fn timed<F, T>(name: &str, f: F) -> T
 where
@@ -49,7 +11,11 @@ where
     let start = Instant::now();
     let result = f();
     let elapsed = start.elapsed();
-    println!("  [Stress] {:<30} took {:.2}ms", name, elapsed.as_secs_f64() * 1000.0);
+    println!(
+        "  [Stress] {:<30} took {:.2}ms",
+        name,
+        elapsed.as_secs_f64() * 1000.0
+    );
     result
 }
 
@@ -69,7 +35,8 @@ fn scenario_fibonacci_stress() {
             fib(30);
             "#,
             None,
-        ).unwrap();
+        )
+        .unwrap();
     });
 }
 
@@ -80,7 +47,10 @@ fn scenario_json_processing() {
         for i in 0..500 {
             items.push(format!(
                 r#"{{"id":{},"name":"user_{}","active":{},"score":{}}}"#,
-                i, i, if i % 3 != 0 { "true" } else { "false" }, i * 10
+                i,
+                i,
+                if i % 3 != 0 { "true" } else { "false" },
+                i * 10
             ));
         }
         let json_str = format!("[{}]", items.join(","));
@@ -106,15 +76,22 @@ fn scenario_typed_array_stress() {
     timed("typed_array_data_pipeline", || {
         let ctx = JSContext::new();
         let mut data: Vec<u8> = (0..4096).map(|i| (i % 256) as u8).collect();
-        let ta = JSTypedArray::with_bytes(&ctx, data.as_mut_slice(), JSTypedArrayType::Uint8Array).unwrap();
-        
+        let ta = JSTypedArray::with_bytes(
+            &ctx,
+            data.as_mut_slice(),
+            JSTypedArrayType::Uint8Array,
+        )
+        .unwrap();
+
         let global = ctx.global_object();
         let attrs = PropertyDescriptorBuilder::new()
             .writable(true)
             .configurable(true)
             .enumerable(true)
             .build();
-        global.set_property("inputArray", &ta.into(), attrs).unwrap();
+        global
+            .set_property("inputArray", &ta.into(), attrs)
+            .unwrap();
 
         ctx.evaluate_script(
             r#"
@@ -124,7 +101,8 @@ fn scenario_typed_array_stress() {
             }
             "#,
             None,
-        ).unwrap();
+        )
+        .unwrap();
     });
 }
 
@@ -140,7 +118,8 @@ fn scenario_property_storm() {
         let obj = JSObject::new(&ctx);
         for i in 0..10_000 {
             let val = JSValue::number(&ctx, i as f64);
-            obj.set_property(format!("prop_{}", i), &val, attrs).unwrap();
+            obj.set_property(format!("prop_{}", i), &val, attrs)
+                .unwrap();
         }
         for i in 0..10_000 {
             let _ = obj.get_property(format!("prop_{}", i).as_str()).unwrap();
@@ -162,7 +141,9 @@ fn scenario_memory_churn() {
                 "#
             );
             ctx.evaluate_script(&script, None).unwrap();
-            if cycle % 3 == 0 { ctx.garbage_collect(); }
+            if cycle % 3 == 0 {
+                ctx.garbage_collect();
+            }
         }
         ctx.garbage_collect();
     });
@@ -171,12 +152,12 @@ fn scenario_memory_churn() {
 fn main() {
     println!("=== Rust-JSC Stress Example ===");
     println!("Running complex scenarios for profiling and manual verification...");
-    
+
     scenario_fibonacci_stress();
     scenario_json_processing();
     scenario_typed_array_stress();
     scenario_property_storm();
     scenario_memory_churn();
-    
+
     println!("=== Stress tests complete ===");
 }
