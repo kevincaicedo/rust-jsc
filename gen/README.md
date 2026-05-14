@@ -11,6 +11,10 @@ before running the following command, make sure you have the following environme
 # JAVASCRIPTCORE_HEADERS_PATH: Path to the JavaScriptCore headers e.g: /Users/${user}/Documents/Projects/WebKit/Source/JavaScriptCore/API
 JAVASCRIPTCORE_HEADERS_PATH = "/Users/${user}/Documents/Projects/WebKit/Source/JavaScriptCore/API"
 
+# JAVASCRIPTCORE_FRAMEWORK_HEADERS_PATH: Path to generated framework-style headers from a JSCOnly build.
+# This keeps regeneration pointed at the local WebKit fork instead of system JavaScriptCore headers.
+JAVASCRIPTCORE_FRAMEWORK_HEADERS_PATH = "/Users/${user}/Documents/Projects/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/JavaScriptCore/Headers"
+
 # CORE_FOUNDATION_HEADERS_PATH: Path to the CoreFoundation headers e.g: /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers
 CORE_FOUNDATION_HEADERS_PATH = "/Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk/System/Library/Frameworks/CoreFoundation.framework/Versions/A/Headers"
 

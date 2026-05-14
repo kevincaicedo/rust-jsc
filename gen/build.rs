@@ -9,8 +9,9 @@ fn main() {
     let framework_dir = env::var("CUSTOM_BUILD_FRAMEWORK_PATH").unwrap();
     let system_frameworks_path = env::var("SYSTEM_FRAMEWORKS_PATH").unwrap();
     let core_foundation_headers_path = env::var("CORE_FOUNDATION_HEADERS_PATH").unwrap();
+    let framework_headers_path = env::var("JAVASCRIPTCORE_FRAMEWORK_HEADERS_PATH").ok();
 
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         // Specify the JavaScriptCore header files
         .header(format!("{}/JavaScriptCore.h", jsc_headers_path))
         // Include our custom Inspector C API so sys bindings contain the new inspector symbols.
@@ -22,7 +23,13 @@ fn main() {
         .clang_arg(format!("-F{}", system_frameworks_path))
         .clang_arg(format!("-F{}", framework_dir))
         .clang_arg(format!("-I{}", core_foundation_headers_path))
-        .clang_arg("-DJS_EXPORT_PRIVATE=1")
+        .clang_arg("-DJS_EXPORT_PRIVATE=1");
+
+    if let Some(framework_headers_path) = framework_headers_path {
+        builder = builder.clang_arg(format!("-I{}", framework_headers_path));
+    }
+
+    let bindings = builder
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate bindings");

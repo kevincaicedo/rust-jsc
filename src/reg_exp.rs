@@ -1,6 +1,8 @@
 use rust_jsc_sys::{JSObjectMakeRegExp, JSValueRef};
 
-use crate::{JSContext, JSError, JSObject, JSRegExp, JSResult, JSValue};
+use crate::{
+    with_raw_value_refs, JSContext, JSError, JSObject, JSRegExp, JSResult, JSValue,
+};
 
 impl JSRegExp {
     pub fn new(object: JSObject) -> Self {
@@ -31,15 +33,24 @@ impl JSRegExp {
     /// The new `JSRegExp` object.
     pub fn new_regexp(ctx: &JSContext, args: &[JSValue]) -> JSResult<Self> {
         let mut exception: JSValueRef = std::ptr::null_mut();
-        let args: Vec<JSValueRef> = args.iter().map(|arg| arg.inner).collect();
-
-        let result = unsafe {
-            JSObjectMakeRegExp(ctx.inner, args.len(), args.as_ptr(), &mut exception)
-        };
+        let result = with_raw_value_refs(args, |argument_count, arguments| {
+            // SAFETY: `ctx.inner` is a live context and `arguments` points to
+            // `argument_count` raw JS values for the duration of this call.
+            unsafe {
+                JSObjectMakeRegExp(ctx.inner, argument_count, arguments, &mut exception)
+            }
+        });
 
         if !exception.is_null() {
             let value = JSValue::new(exception, ctx.inner);
             return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            return Err(JSError::from_message(
+                ctx,
+                "failed to create JavaScript RegExp object",
+            ));
         }
 
         Ok(Self::new(JSObject::from_ref(result, ctx.inner)))
@@ -71,10 +82,7 @@ impl JSRegExp {
     /// ```
     pub fn exec(&self, ctx: &JSContext, string: &str) -> JSResult<JSValue> {
         let string = JSValue::string(ctx, string);
-        self.object
-            .get_property("exec")?
-            .as_object()?
-            .call(Some(&self.object), &[string])
+        self.object.call_method("exec", &[string])
     }
 
     /// Tests for a match in a specified string.
@@ -103,10 +111,7 @@ impl JSRegExp {
     /// `true` if a match was found, otherwise `false`.
     pub fn test(&self, ctx: &JSContext, string: &str) -> JSResult<JSValue> {
         let string = JSValue::string(ctx, string);
-        self.object
-            .get_property("test")?
-            .as_object()?
-            .call(Some(&self.object), &[string])
+        self.object.call_method("test", &[string])
     }
 }
 
@@ -134,6 +139,6 @@ mod tests {
         assert_eq!(result.as_string().unwrap(), "a");
 
         let result = regexp.test(&ctx, "abc").unwrap();
-        assert_eq!(result.as_boolean(), true);
+        assert!(result.as_boolean());
     }
 }

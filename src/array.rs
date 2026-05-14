@@ -1,8 +1,12 @@
 use std::ops::Deref;
 
-use rust_jsc_sys::{JSObjectMakeArray, JSValueRef};
+use rust_jsc_sys::{
+    JSObjectArrayPush, JSObjectGetArrayLength, JSObjectMakeArray, JSValueRef,
+};
 
-use crate::{JSArray, JSContext, JSError, JSObject, JSResult, JSValue};
+use crate::{
+    with_raw_value_refs, JSArray, JSContext, JSError, JSObject, JSResult, JSValue,
+};
 
 impl JSArray {
     pub fn new(object: JSObject) -> Self {
@@ -39,15 +43,24 @@ impl JSArray {
     /// The new `JSArray` object.
     pub fn new_array(ctx: &JSContext, args: &[JSValue]) -> JSResult<Self> {
         let mut exception: JSValueRef = std::ptr::null_mut();
-        let args: Vec<JSValueRef> = args.iter().map(|arg| arg.inner).collect();
-
-        let result = unsafe {
-            JSObjectMakeArray(ctx.inner, args.len(), args.as_ptr(), &mut exception)
-        };
+        let result = with_raw_value_refs(args, |argument_count, arguments| {
+            // SAFETY: `ctx.inner` is a live context and `arguments` points to
+            // `argument_count` raw JS values for the duration of this call.
+            unsafe {
+                JSObjectMakeArray(ctx.inner, argument_count, arguments, &mut exception)
+            }
+        });
 
         if !exception.is_null() {
             let value = JSValue::new(exception, ctx.inner);
             return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            return Err(JSError::from_message(
+                ctx,
+                "failed to create JavaScript array",
+            ));
         }
 
         Ok(Self::new(JSObject::from_ref(result, ctx.inner)))
@@ -121,8 +134,11 @@ impl JSArray {
         self.object.set_property_at_index(index, value)
     }
 
-    /// Gets the length of the array.
-    /// This is equivalent to `array.length` in JavaScript.
+    /// Gets the length of an exact JavaScript Array.
+    ///
+    /// This uses JavaScriptCore's native array length instead of reading the
+    /// observable `array.length` property. Proxies and array-like objects are
+    /// rejected.
     ///
     /// # Example
     /// ```
@@ -137,7 +153,7 @@ impl JSArray {
     ///       JSValue::number(&ctx, 3.0),
     ///    ]
     /// ).unwrap();
-    /// assert_eq!(array.length().unwrap(), 3.0);
+    /// assert_eq!(array.length().unwrap(), 3);
     /// ```
     ///
     /// # Errors
@@ -146,8 +162,36 @@ impl JSArray {
     ///
     /// # Returns
     /// The length of the array.
-    pub fn length(&self) -> JSResult<f64> {
-        self.object.get_property("length")?.as_number()
+    pub fn length(&self) -> JSResult<usize> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        let mut length = 0;
+        // SAFETY: `self.object` holds a live object/context pair. The native
+        // helper writes either `length` or `exception` without taking ownership.
+        let ok = unsafe {
+            JSObjectGetArrayLength(
+                self.object.ctx,
+                self.object.inner,
+                &mut length,
+                &mut exception,
+            )
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.object.ctx);
+            return Err(JSError::from(value));
+        }
+
+        if !ok {
+            // SAFETY: this creates a borrowed, non-releasing context view from
+            // the live context pointer already stored on `self.object`.
+            let ctx = unsafe { JSContext::borrowed(self.object.ctx) };
+            return Err(JSError::from_message(
+                &ctx,
+                "failed to get JavaScript array length",
+            ));
+        }
+
+        Ok(length)
     }
 
     /// Pushes a value to the end of the array.
@@ -182,10 +226,38 @@ impl JSArray {
     ///
     /// # Returns
     /// The new length of the array.
-    pub fn push(&self, value: &JSValue) -> JSResult<f64> {
-        let length = self.length()?;
-        self.set(length as u32, value)?;
-        Ok(length + 1.0)
+    pub fn push(&self, value: &JSValue) -> JSResult<usize> {
+        let mut exception: JSValueRef = std::ptr::null_mut();
+        let mut new_length = 0;
+        // SAFETY: `self.object` and `value` hold live same-context
+        // JavaScriptCore handles. The helper writes either `new_length` or
+        // `exception` without taking ownership.
+        let ok = unsafe {
+            JSObjectArrayPush(
+                self.object.ctx,
+                self.object.inner,
+                value.inner,
+                &mut new_length,
+                &mut exception,
+            )
+        };
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.object.ctx);
+            return Err(JSError::from(value));
+        }
+
+        if !ok {
+            // SAFETY: this creates a borrowed, non-releasing context view from
+            // the live context pointer already stored on `self.object`.
+            let ctx = unsafe { JSContext::borrowed(self.object.ctx) };
+            return Err(JSError::from_message(
+                &ctx,
+                "failed to push JavaScript array value",
+            ));
+        }
+
+        Ok(new_length)
     }
 }
 
@@ -275,7 +347,45 @@ mod tests {
             ],
         )
         .unwrap();
-        assert_eq!(array.length().unwrap(), 3.0);
+        assert_eq!(array.length().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_array_length_rejects_proxy() {
+        let ctx = JSContext::new();
+        let array = ctx
+            .evaluate_script(
+                "new Proxy([], { get(_target, property) { if (property === 'length') throw new Error('length failed'); return 0; } })",
+                None,
+            )
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let array = JSArray::new(array);
+
+        let error = array.length().unwrap_err();
+        assert_eq!(
+            error.message().unwrap().to_string(),
+            "JSObjectGetArrayLength expects object to be an Array object"
+        );
+    }
+
+    #[test]
+    fn test_array_set_propagates_exception() {
+        let ctx = JSContext::new();
+        let array = ctx
+            .evaluate_script(
+                "new Proxy([], { set() { throw new Error('set failed'); } })",
+                None,
+            )
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let array = JSArray::new(array);
+        let value = JSValue::number(&ctx, 1.0);
+
+        let error = array.set(0, &value).unwrap_err();
+        assert_eq!(error.message().unwrap().to_string(), "set failed");
     }
 
     #[test]
@@ -290,9 +400,9 @@ mod tests {
             ],
         )
         .unwrap();
-        array.push(&JSValue::number(&ctx, 4 as f64)).unwrap();
-        array.push(&JSValue::number(&ctx, 5 as f64)).unwrap();
-        array.push(&JSValue::number(&ctx, 6 as f64)).unwrap();
+        assert_eq!(array.push(&JSValue::number(&ctx, 4.0)).unwrap(), 4);
+        assert_eq!(array.push(&JSValue::number(&ctx, 5.0)).unwrap(), 5);
+        assert_eq!(array.push(&JSValue::number(&ctx, 6.0)).unwrap(), 6);
         assert_eq!(array.as_string().unwrap(), "1,2,3,4,5,6");
     }
 }

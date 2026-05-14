@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, FnArg, ItemFn, PatType, Type, TypePath};
+use quote::quote;
+use syn::{parse_macro_input, ItemFn};
+
+mod internal;
 
 #[proc_macro_attribute]
 pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -8,72 +10,42 @@ pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
 
-    // Collect typed params (excluding the first three)
-    // e.g. ctx, func, this -> skip them
-    let params: Vec<_> = input.sig.inputs.iter().skip(3).collect();
-
-    // Check if using raw arguments slice
-    if params.len() == 1 {
-        if let FnArg::Typed(PatType { ty, .. }) = &params[0] {
-            if let Type::Reference(_) = &**ty {
-                // Handle old-style with raw arguments slice
-                return generate_legacy_callback(&input, fn_name, visibility, generics);
-            }
-        }
+    if let Err(error) = internal::validate_abi_role(&input, internal::AbiRole::Callback) {
+        return TokenStream::from(error.into_compile_error());
     }
 
-    // Generate argument parsing code
-    let mut parse_stmts = Vec::new();
-    for (i, param) in params.iter().enumerate() {
-        if let FnArg::Typed(PatType { pat, ty, .. }) = param {
-            let idx = syn::Index::from(i);
-            let var_ident = format_ident!("arg_{}", i);
-            let param_name = quote!(#pat).to_string();
-
-            parse_stmts.push(match &**ty {
-                Type::Path(TypePath { path, .. }) => {
-                    let is_optional = path
-                        .segments
-                        .last()
-                        .map(|s| s.ident == "Option")
-                        .unwrap_or(false);
-
-                    if is_optional {
-                        generate_optional_param_parsing(idx, var_ident)
-                    } else {
-                        generate_required_param_parsing(
-                            idx,
-                            var_ident,
-                            fn_name.to_string().as_str(),
-                            param_name.as_str(),
-                        )
-                    }
-                }
-                _ => quote! {
-                    panic!("[callback] Unsupported parameter type for {}", #param_name);
-                },
-            });
-        }
-    }
-
-    let call_args: Vec<_> = params
-        .iter()
-        .enumerate()
-        .map(|(i, _)| {
-            let var_ident = format_ident!("arg_{}", i);
-            quote!(#var_ident)
-        })
-        .collect();
-
-    let func_call = quote! {
-        #fn_name ::<#generic_params>(ctx, function, this_object, #(#call_args),*)
+    let callback_args = match internal::callback_arguments(&input) {
+        Ok(args) => args,
+        Err(error) => return TokenStream::from(error.into_compile_error()),
     };
 
+    let (raw_arguments, parse_stmts, func_call) = match callback_args {
+        internal::MacroArguments::LegacyRawSlice { call_args } => (
+            internal::raw_argument_view(),
+            Vec::new(),
+            quote!(#fn_name #turbofish(#(#call_args),*)),
+        ),
+        internal::MacroArguments::Typed {
+            parse_stmts,
+            call_args,
+        } => (
+            internal::raw_argument_refs(),
+            parse_stmts,
+            quote!(#fn_name #turbofish(#(#call_args),*)),
+        ),
+    };
+    let exception_ident = syn::Ident::new("__exception", proc_macro2::Span::call_site());
+    let result_mapping = internal::map_js_result_to_value(
+        quote!(result),
+        &exception_ident,
+        quote!(std::ptr::null()),
+    );
+
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __function: rust_jsc::internal::JSObjectRef,
             __this_object: rust_jsc::internal::JSObjectRef,
@@ -82,132 +54,66 @@ pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> *const rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let function = rust_jsc::JSObject::from_ref(__function, __ctx_ref);
-            let this_object = rust_jsc::JSObject::from_ref(__this_object, __ctx_ref);
-            let arguments = if __arguments.is_null() || __argument_count == 0 {
-                vec![]
-            } else {
-                unsafe { std::slice::from_raw_parts(__arguments, __argument_count) }
-                    .iter()
-                    .map(|__inner_value| rust_jsc::JSValue::new(*__inner_value, __ctx_ref))
-                    .collect::<Vec<_>>()
-            };
+            if __ctx_ref.is_null() {
+                return std::ptr::null();
+            }
+
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the callback. The wrapper does not retain or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            if __function.is_null() || __this_object.is_null() {
+                if !__exception.is_null() {
+                    // SAFETY: JavaScriptCore owns the exception out-pointer
+                    // when it is non-null; this wrapper reports invalid raw
+                    // callback inputs as a JavaScript TypeError.
+                    unsafe {
+                        *__exception = rust_jsc::JSError::new_typ_raw(
+                            &ctx,
+                            "JavaScriptCore callback object was null",
+                        );
+                    }
+                }
+                return std::ptr::null();
+            }
+
+            // SAFETY: JavaScriptCore provided non-null borrowed object handles
+            // that belong to `__ctx_ref` for the callback duration.
+            let __function_object =
+                unsafe { rust_jsc::JSObject::from_raw_unchecked(__function, __ctx_ref) };
+            // SAFETY: JavaScriptCore provided non-null borrowed object handles
+            // that belong to `__ctx_ref` for the callback duration.
+            let __this_object_value =
+                unsafe { rust_jsc::JSObject::from_raw_unchecked(__this_object, __ctx_ref) };
+            #raw_arguments
 
             #(#parse_stmts)*
 
-            let result = (|| {
-                #input
-                #func_call
-            })();
-
-            match result {
-                Ok(value) => {
-                    *__exception = std::ptr::null_mut();
-                    value.into()
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #func_call
+                })()
+            })) {
+                Ok(result) => result,
+                Err(_) => {
+                    if !__exception.is_null() {
+                        // SAFETY: JavaScriptCore owns the exception
+                        // out-pointer when it is non-null; panics are
+                        // converted to a JavaScript TypeError before returning
+                        // across the C ABI.
+                        unsafe {
+                            *__exception = rust_jsc::JSError::new_typ_raw(
+                                &ctx,
+                                "Rust callback panicked",
+                            );
+                        }
+                    }
+                    return std::ptr::null();
                 }
-                Err(exception) => {
-                    *__exception = rust_jsc::internal::JSValueRef::from(exception) as *mut _;
-                    std::ptr::null_mut()
-                }
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
-}
-
-fn generate_optional_param_parsing(
-    idx: syn::Index,
-    var_ident: syn::Ident,
-) -> proc_macro2::TokenStream {
-    quote! {
-        let #var_ident = match arguments.get(#idx).map(|value| value.try_into()) {
-            Some(Ok(value)) => Some(value),
-            Some(Err(err)) => {
-                *__exception = rust_jsc::internal::JSValueRef::from(err) as *mut _;
-                return std::ptr::null_mut();
-            },
-            None => None,
-        };
-    }
-}
-
-fn generate_required_param_parsing(
-    idx: syn::Index,
-    var_ident: syn::Ident,
-    fn_name: &str,
-    param_name: &str,
-) -> proc_macro2::TokenStream {
-    quote! {
-        let #var_ident = match arguments.get(#idx).map(|value| value.try_into()) {
-            Some(Ok(value)) => value,
-            Some(Err(err)) => {
-                *__exception = rust_jsc::internal::JSValueRef::from(err) as *mut _;
-                return std::ptr::null_mut();
-            },
-            None => {
-                *__exception = rust_jsc::JSError::new_typ_raw(&ctx, format!("[{}] Missing argument {}", #fn_name, #param_name)) as *mut _;
-                return std::ptr::null_mut();
-            },
-        };
-    }
-}
-
-fn generate_legacy_callback(
-    input: &ItemFn,
-    fn_name: &syn::Ident,
-    visibility: &syn::Visibility,
-    generics: &syn::Generics,
-) -> TokenStream {
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
-
-    let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
-            __ctx_ref: rust_jsc::internal::JSContextRef,
-            __function: rust_jsc::internal::JSObjectRef,
-            __this_object: rust_jsc::internal::JSObjectRef,
-            __argument_count: usize,
-            __arguments: *const rust_jsc::internal::JSValueRef,
-            __exception: *mut rust_jsc::internal::JSValueRef,
-        ) -> *const rust_jsc::internal::OpaqueJSValue
-        #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let function = rust_jsc::JSObject::from_ref(__function, __ctx_ref);
-            let this_object = rust_jsc::JSObject::from_ref(__this_object, __ctx_ref);
-            let arguments = if __arguments.is_null() || __argument_count == 0 {
-                vec![]
-            } else {
-                unsafe { std::slice::from_raw_parts(__arguments, __argument_count) }
-                    .iter()
-                    .map(|__inner_value| rust_jsc::JSValue::new(*__inner_value, __ctx_ref))
-                    .collect::<Vec<_>>()
             };
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSObject,
-                rust_jsc::JSObject,
-                &[rust_jsc::JSValue],
-            ) -> rust_jsc::JSResult<rust_jsc::JSValue> = {
-                #input
-
-                #fn_name ::<#generic_params>
-            };
-
-            let result = func(ctx, function, this_object, arguments.as_slice());
-
-            match result {
-                Ok(value) => {
-                    *__exception = std::ptr::null_mut();
-                    value.into()
-                }
-                Err(exception) => {
-                    *__exception = rust_jsc::internal::JSValueRef::from(exception) as *mut _;
-                    std::ptr::null_mut()
-                }
-            }
+            let result = rust_jsc::IntoJSResult::into_js_result(result, &ctx);
+            #result_mapping
         }
     };
 
@@ -220,11 +126,44 @@ pub fn constructor(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::Constructor)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
+
+    let constructor_args = match internal::constructor_arguments(&input) {
+        Ok(args) => args,
+        Err(error) => return TokenStream::from(error.into_compile_error()),
+    };
+
+    let (raw_arguments, parse_stmts, func_call) = match constructor_args {
+        internal::MacroArguments::LegacyRawSlice { call_args } => (
+            internal::raw_argument_view(),
+            Vec::new(),
+            quote!(#fn_name #turbofish(#(#call_args),*)),
+        ),
+        internal::MacroArguments::Typed {
+            parse_stmts,
+            call_args,
+        } => (
+            internal::raw_argument_refs(),
+            parse_stmts,
+            quote!(#fn_name #turbofish(#(#call_args),*)),
+        ),
+    };
+    let exception_ident = syn::Ident::new("__exception", proc_macro2::Span::call_site());
+    let result_mapping = internal::map_js_result_to_value(
+        quote!(result),
+        &exception_ident,
+        quote!(std::ptr::null_mut()),
+    );
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __constructor: rust_jsc::internal::JSObjectRef,
             __argument_count: usize,
@@ -232,39 +171,63 @@ pub fn constructor(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let constructor = rust_jsc::JSObject::from_ref(__constructor, __ctx_ref);
-            let arguments = if __arguments.is_null() || __argument_count == 0 {
-                vec![]
-            } else {
-                unsafe { std::slice::from_raw_parts(__arguments, __argument_count) }
-                    .iter()
-                    .map(|__inner_value| rust_jsc::JSValue::new(*__inner_value, __ctx_ref))
-                    .collect::<Vec<_>>()
-            };
-
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSObject,
-                &[rust_jsc::JSValue],
-            ) -> rust_jsc::JSResult<rust_jsc::JSValue> = {
-                #input
-
-                #fn_name ::<#generic_params>
-            };
-
-            let result = func(ctx, constructor, arguments.as_slice());
-
-            match result {
-                Ok(value) => {
-                    *__exception = std::ptr::null_mut();
-                    value.into()
-                }
-                Err(exception) => {
-                    *__exception = rust_jsc::internal::JSValueRef::from(exception) as *mut _;
-                    std::ptr::null_mut()
-                }
+            if __ctx_ref.is_null() {
+                return std::ptr::null_mut();
             }
+
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the constructor callback. The wrapper does not retain
+            // or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            if __constructor.is_null() {
+                if !__exception.is_null() {
+                    // SAFETY: JavaScriptCore owns the exception out-pointer
+                    // when it is non-null; this wrapper reports invalid raw
+                    // constructor inputs as a JavaScript TypeError.
+                    unsafe {
+                        *__exception = rust_jsc::JSError::new_typ_raw(
+                            &ctx,
+                            "JavaScriptCore constructor object was null",
+                        );
+                    }
+                }
+                return std::ptr::null_mut();
+            }
+
+            // SAFETY: JavaScriptCore provided a non-null borrowed constructor
+            // object that belongs to `__ctx_ref` for the callback duration.
+            let __constructor_object =
+                unsafe { rust_jsc::JSObject::from_raw_unchecked(__constructor, __ctx_ref) };
+            #raw_arguments
+
+            #(#parse_stmts)*
+
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #func_call
+                })()
+            })) {
+                Ok(result) => result,
+                Err(_) => {
+                    if !__exception.is_null() {
+                        // SAFETY: JavaScriptCore owns the exception
+                        // out-pointer when it is non-null; panics are
+                        // converted to a JavaScript TypeError before returning
+                        // across the C ABI.
+                        unsafe {
+                            *__exception = rust_jsc::JSError::new_typ_raw(
+                                &ctx,
+                                "Rust constructor callback panicked",
+                            );
+                        }
+                    }
+                    return std::ptr::null_mut();
+                }
+            };
+
+            let result = rust_jsc::IntoJSResult::into_js_result(result, &ctx);
+            #result_mapping
         }
     };
 
@@ -277,28 +240,39 @@ pub fn initialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) = internal::validate_abi_role(&input, internal::AbiRole::Initialize)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __object: rust_jsc::internal::JSObjectRef,
         )
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let object = rust_jsc::JSObject::from_ref(__object, __ctx_ref);
+            if __ctx_ref.is_null() || __object.is_null() {
+                return;
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSObject,
-            ) = {
-                #input
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the initialize callback. The wrapper does not retain
+            // or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null borrowed object that
+            // belongs to `__ctx_ref` for the initialize callback duration.
+            let object =
+                unsafe { rust_jsc::JSObject::from_raw_unchecked(__object, __ctx_ref) };
 
-                #fn_name ::<#generic_params>
-            };
-
-            func(ctx, object);
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, object)
+                })()
+            }));
         }
     };
 
@@ -310,30 +284,34 @@ pub fn finalize(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
-
-    let (impl_generics, type_generics, where_clause) =
-        input.sig.generics.split_for_impl();
-
-    // Convert <T> to ::<T> so the Rust parser knows it's a type argument in an expression
+    let generics = &input.sig.generics;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) = internal::validate_abi_role(&input, internal::AbiRole::Finalize) {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
         #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __object: rust_jsc::internal::JSObjectRef,
         )
         #where_clause {
-            let data_ptr = rust_jsc::internal::JSObjectGetPrivate(__object);
+            if __object.is_null() {
+                return;
+            }
 
-            let func: fn(
-                rust_jsc::PrivateData
-            ) = {
-                #input
+            // SAFETY: JavaScriptCore passes a borrowed object pointer for the
+            // duration of the finalize callback. Reading its private-data slot
+            // does not take ownership of the object.
+            let data_ptr = unsafe { rust_jsc::internal::JSObjectGetPrivate(__object) };
 
-                // Apply the turbofish here!
-                #fn_name #turbofish
-            };
-
-            func(data_ptr);
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(data_ptr)
+                })()
+            }));
         }
     };
 
@@ -346,43 +324,69 @@ pub fn has_instance(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::HasInstance)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
+
+    let exception_ident = syn::Ident::new("__exception", proc_macro2::Span::call_site());
+    let result_mapping =
+        internal::map_js_result_to_bool(quote!(result), &exception_ident);
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __constructor: rust_jsc::internal::JSObjectRef,
             __possible_instance: rust_jsc::internal::JSValueRef,
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> bool
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let constructor = rust_jsc::JSObject::from_ref(__constructor, __ctx_ref);
-            let possible_instance = rust_jsc::JSValue::new(__possible_instance, __ctx_ref);
+            if __ctx_ref.is_null() || __constructor.is_null() || __possible_instance.is_null() {
+                return false;
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSObject,
-                rust_jsc::JSValue,
-            ) -> rust_jsc::JSResult<bool> = {
-                #input
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the has-instance callback. The wrapper does not retain
+            // or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided non-null borrowed handles that
+            // belong to `__ctx_ref` for the has-instance callback duration.
+            let __constructor_object =
+                unsafe { rust_jsc::JSObject::from_raw_unchecked(__constructor, __ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the callback duration.
+            let __possible_instance_value =
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__possible_instance, __ctx_ref) };
 
-                #fn_name ::<#generic_params>
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __constructor_object, __possible_instance_value)
+                })()
+            })) {
+                Ok(result) => result,
+                Err(_) => {
+                    if !__exception.is_null() {
+                        // SAFETY: JavaScriptCore owns the exception
+                        // out-pointer when it is non-null; panics are
+                        // converted to a JavaScript TypeError before returning
+                        // across the C ABI.
+                        unsafe {
+                            *__exception = rust_jsc::JSError::new_typ_raw(
+                                &ctx,
+                                "Rust has-instance callback panicked",
+                            );
+                        }
+                    }
+                    return false;
+                }
             };
 
-            let result = func(ctx, constructor, possible_instance);
-
-            match result {
-                Ok(value) => {
-                    *__exception = std::ptr::null_mut();
-                    value
-                }
-                Err(exception) => {
-                    *__exception = rust_jsc::internal::JSValueRef::from(exception) as *mut _;
-                    false
-                }
-            }
+            #result_mapping
         }
     };
 
@@ -395,35 +399,58 @@ pub fn module_resolve(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::ModuleResolve)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __key_value: rust_jsc::internal::JSValueRef,
             __referrer: rust_jsc::internal::JSValueRef,
             __script_fetcher: rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSString
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
-            let referrer = rust_jsc::JSValue::new(__referrer, __ctx_ref);
-            let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
+            if __ctx_ref.is_null() || __key_value.is_null() {
+                return std::ptr::null_mut();
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSValue,
-                rust_jsc::JSValue,
-                rust_jsc::JSValue,
-            ) -> rust_jsc::JSStringProctected = {
-                #input
-
-                #fn_name ::<#generic_params>
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the module resolver callback. The wrapper does not
+            // retain or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the module callback duration.
+            let __key = unsafe { rust_jsc::JSValue::from_raw_unchecked(__key_value, __ctx_ref) };
+            let __referrer_value = if __referrer.is_null() {
+                rust_jsc::JSValue::undefined(&ctx)
+            } else {
+                // SAFETY: JavaScriptCore provided a value handle that belongs
+                // to `__ctx_ref` for the module callback duration.
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__referrer, __ctx_ref) }
+            };
+            let __script_fetcher_value = if __script_fetcher.is_null() {
+                rust_jsc::JSValue::undefined(&ctx)
+            } else {
+                // SAFETY: JavaScriptCore provided a value handle that belongs
+                // to `__ctx_ref` for the module callback duration.
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__script_fetcher, __ctx_ref) }
             };
 
-            let result = func(ctx, key_value, referrer, script_fetcher);
-            rust_jsc::internal::JSStringRef::from(result)
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __key, __referrer_value, __script_fetcher_value)
+                })()
+            })) {
+                Ok(result) => rust_jsc::internal::JSStringRef::from(result),
+                Err(_) => std::ptr::null_mut(),
+            }
         }
     };
 
@@ -436,29 +463,42 @@ pub fn module_evaluate(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::ModuleEvaluate)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __key_value: rust_jsc::internal::JSValueRef,
         ) -> *const rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
+            if __ctx_ref.is_null() || __key_value.is_null() {
+                return std::ptr::null();
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSValue,
-            ) -> rust_jsc::JSValue = {
-                #input
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the module evaluate callback. The wrapper does not
+            // retain or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the module callback duration.
+            let __key = unsafe { rust_jsc::JSValue::from_raw_unchecked(__key_value, __ctx_ref) };
 
-                #fn_name ::<#generic_params>
-            };
-
-            let result = func(ctx, key_value);
-            result.into()
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __key)
+                })()
+            })) {
+                Ok(result) => result.into(),
+                Err(_) => std::ptr::null(),
+            }
         }
     };
 
@@ -471,35 +511,58 @@ pub fn module_fetch(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::ModuleFetch)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __key_value: rust_jsc::internal::JSValueRef,
             __attributes_value: rust_jsc::internal::JSValueRef,
             __script_fetcher: rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSString
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
-            let attributes_value = rust_jsc::JSValue::new(__attributes_value, __ctx_ref);
-            let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
+            if __ctx_ref.is_null() || __key_value.is_null() {
+                return std::ptr::null_mut();
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSValue,
-                rust_jsc::JSValue,
-                rust_jsc::JSValue,
-            ) -> rust_jsc::JSStringProctected = {
-                #input
-
-                #fn_name ::<#generic_params>
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the module fetch callback. The wrapper does not
+            // retain or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the module callback duration.
+            let __key = unsafe { rust_jsc::JSValue::from_raw_unchecked(__key_value, __ctx_ref) };
+            let __attributes = if __attributes_value.is_null() {
+                rust_jsc::JSValue::undefined(&ctx)
+            } else {
+                // SAFETY: JavaScriptCore provided a value handle that belongs
+                // to `__ctx_ref` for the module callback duration.
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__attributes_value, __ctx_ref) }
+            };
+            let __script_fetcher_value = if __script_fetcher.is_null() {
+                rust_jsc::JSValue::undefined(&ctx)
+            } else {
+                // SAFETY: JavaScriptCore provided a value handle that belongs
+                // to `__ctx_ref` for the module callback duration.
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__script_fetcher, __ctx_ref) }
             };
 
-            let result = func(ctx, key_value, attributes_value, script_fetcher);
-            rust_jsc::internal::JSStringRef::from(result)
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __key, __attributes, __script_fetcher_value)
+                })()
+            })) {
+                Ok(result) => rust_jsc::internal::JSStringRef::from(result),
+                Err(_) => std::ptr::null_mut(),
+            }
         }
     };
 
@@ -512,32 +575,255 @@ pub fn module_import_meta(_attr: TokenStream, item: TokenStream) -> TokenStream 
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::ModuleImportMeta)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __key_value: rust_jsc::internal::JSValueRef,
             __script_fetcher: rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
-            let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
+            if __ctx_ref.is_null() || __key_value.is_null() {
+                return std::ptr::null_mut();
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSValue,
-                rust_jsc::JSValue,
-            ) -> rust_jsc::JSObject = {
-                #input
-
-                #fn_name ::<#generic_params>
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the import.meta callback. The wrapper does not retain
+            // or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the module callback duration.
+            let __key = unsafe { rust_jsc::JSValue::from_raw_unchecked(__key_value, __ctx_ref) };
+            let __script_fetcher_value = if __script_fetcher.is_null() {
+                rust_jsc::JSValue::undefined(&ctx)
+            } else {
+                // SAFETY: JavaScriptCore provided a value handle that belongs
+                // to `__ctx_ref` for the module callback duration.
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__script_fetcher, __ctx_ref) }
             };
 
-            let result = func(ctx, key_value, script_fetcher);
-            rust_jsc::internal::JSObjectRef::from(result)
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __key, __script_fetcher_value)
+                })()
+            })) {
+                Ok(result) => rust_jsc::internal::JSObjectRef::from(result),
+                Err(_) => std::ptr::null_mut(),
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn module_resolver(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::ModuleResolver)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __key_value: rust_jsc::internal::JSValueRef,
+            __referrer: rust_jsc::internal::JSValueRef,
+            __script_fetcher: rust_jsc::internal::JSValueRef,
+        ) -> *mut rust_jsc::internal::OpaqueJSString
+        #where_clause {
+            if __ctx_ref.is_null() || __key_value.is_null() {
+                return std::ptr::null_mut();
+            }
+
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the module resolver callback. The wrapper does not
+            // retain or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the module callback duration.
+            let __key = unsafe { rust_jsc::JSValue::from_raw_unchecked(__key_value, __ctx_ref) };
+            let __specifier = match __key.as_string() {
+                Ok(value) => value.to_string(),
+                Err(_) => return std::ptr::null_mut(),
+            };
+            let __referrer = if __referrer.is_null() {
+                None
+            } else {
+                // SAFETY: JavaScriptCore provided a value handle that belongs
+                // to `__ctx_ref` for the module callback duration.
+                let __referrer_value =
+                    unsafe { rust_jsc::JSValue::from_raw_unchecked(__referrer, __ctx_ref) };
+                if __referrer_value.is_undefined() || __referrer_value.is_null() {
+                    None
+                } else {
+                    match __referrer_value.as_string() {
+                        Ok(value) => Some(value.to_string()),
+                        Err(_) => return std::ptr::null_mut(),
+                    }
+                }
+            };
+
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __specifier, __referrer)
+                })()
+            })) {
+                Ok(result) => result,
+                Err(_) => return std::ptr::null_mut(),
+            };
+
+            match rust_jsc::IntoModuleResolveResult::into_module_resolve_result(
+                result,
+                &ctx,
+            ) {
+                Ok(Some(resolved)) => rust_jsc::internal::JSStringRef::from(resolved),
+                Ok(None) | Err(_) => std::ptr::null_mut(),
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn module_fetcher(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::ModuleFetcher)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __key_value: rust_jsc::internal::JSValueRef,
+            __attributes_value: rust_jsc::internal::JSValueRef,
+            __script_fetcher: rust_jsc::internal::JSValueRef,
+        ) -> rust_jsc::internal::JSModuleSourceRef
+        #where_clause {
+            if __ctx_ref.is_null() || __key_value.is_null() {
+                return std::ptr::null_mut();
+            }
+
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the module fetch-source callback. The wrapper does
+            // not retain or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the module callback duration.
+            let __key = unsafe { rust_jsc::JSValue::from_raw_unchecked(__key_value, __ctx_ref) };
+            let __specifier = match __key.as_string() {
+                Ok(value) => value.to_string(),
+                Err(_) => return std::ptr::null_mut(),
+            };
+            let __import_type = if __attributes_value.is_null() {
+                rust_jsc::ModuleImportType::Unknown
+            } else {
+                // SAFETY: JavaScriptCore provided a value handle that belongs
+                // to `__ctx_ref` for the module callback duration.
+                let __attributes = unsafe {
+                    rust_jsc::JSValue::from_raw_unchecked(__attributes_value, __ctx_ref)
+                };
+                rust_jsc::ModuleImportType::from_js_value(&__attributes)
+            };
+
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __specifier, __import_type)
+                })()
+            })) {
+                Ok(result) => result,
+                Err(_) => return std::ptr::null_mut(),
+            };
+
+            match rust_jsc::IntoModuleSourceResult::into_module_source_result(result, &ctx) {
+                Ok(Some(source)) => source.into_raw(),
+                Ok(None) | Err(_) => std::ptr::null_mut(),
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_attribute]
+pub fn module_import_meta_provider(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+    let fn_name = &input.sig.ident;
+    let visibility = &input.vis;
+    let generics = &input.sig.generics;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::ModuleImportMetaProvider)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
+
+    let expanded = quote! {
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
+            __ctx_ref: rust_jsc::internal::JSContextRef,
+            __key_value: rust_jsc::internal::JSValueRef,
+            __script_fetcher: rust_jsc::internal::JSValueRef,
+        ) -> rust_jsc::internal::JSObjectRef
+        #where_clause {
+            if __ctx_ref.is_null() || __key_value.is_null() {
+                return std::ptr::null_mut();
+            }
+
+            // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+            // duration of the import.meta callback. The wrapper does not
+            // retain or release it.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null value handle that
+            // belongs to `__ctx_ref` for the module callback duration.
+            let __key = unsafe { rust_jsc::JSValue::from_raw_unchecked(__key_value, __ctx_ref) };
+            let __specifier = match __key.as_string() {
+                Ok(value) => value.to_string(),
+                Err(_) => return std::ptr::null_mut(),
+            };
+
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __specifier)
+                })()
+            })) {
+                Ok(result) => result,
+                Err(_) => return std::ptr::null_mut(),
+            };
+
+            match rust_jsc::IntoImportMetaResult::into_import_meta_result(result, &ctx) {
+                Ok(Some(object)) => rust_jsc::internal::JSObjectRef::from(object),
+                Ok(None) | Err(_) => std::ptr::null_mut(),
+            }
         }
     };
 
@@ -550,30 +836,43 @@ pub fn uncaught_exception(_attr: TokenStream, item: TokenStream) -> TokenStream 
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::UncaughtException)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __filename: rust_jsc::internal::JSStringRef,
             __exception: rust_jsc::internal::JSValueRef,
         ) #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let filename = rust_jsc::JSString::from(__filename);
-            let exception = rust_jsc::JSValue::new(__exception, __ctx_ref);
+            if __ctx_ref.is_null() || __filename.is_null() || __exception.is_null() {
+                return;
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSString,
-                rust_jsc::JSValue,
-            ) = {
-                #input
+            // SAFETY: JavaScriptCore passes borrowed raw values for the
+            // duration of the uncaught-exception callback. The context wrapper
+            // does not retain or release the context.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provides a borrowed string valid for the
+            // callback duration; retaining gives Rust an owned wrapper.
+            let __filename_value = unsafe { rust_jsc::JSString::retain_from_ref(__filename) };
+            // SAFETY: JavaScriptCore provided a non-null exception value that
+            // belongs to `__ctx_ref` for the callback duration.
+            let __exception_value =
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__exception, __ctx_ref) };
 
-                #fn_name ::<#generic_params>
-            };
-
-            func(ctx, filename, exception);
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __filename_value, __exception_value)
+                })()
+            }));
         }
     };
 
@@ -589,27 +888,39 @@ pub fn uncaught_exception_event_loop(
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::UncaughtExceptionEventLoop)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __exception: rust_jsc::internal::JSValueRef,
         ) #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
-            let exception = rust_jsc::JSValue::new(__exception, __ctx_ref);
+            if __ctx_ref.is_null() || __exception.is_null() {
+                return;
+            }
 
-            let func: fn(
-                rust_jsc::JSContext,
-                rust_jsc::JSValue,
-            ) = {
-                #input
+            // SAFETY: JavaScriptCore passes borrowed raw values for the
+            // duration of the event-loop exception callback. The context
+            // wrapper does not retain or release the context.
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
+            // SAFETY: JavaScriptCore provided a non-null exception value that
+            // belongs to `__ctx_ref` for the callback duration.
+            let __exception_value =
+                unsafe { rust_jsc::JSValue::from_raw_unchecked(__exception, __ctx_ref) };
 
-                #fn_name ::<#generic_params>
-            };
-
-            func(ctx, exception);
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(ctx, __exception_value)
+                })()
+            }));
         }
     };
 
@@ -622,22 +933,45 @@ pub fn inspector_callback(_attr: TokenStream, item: TokenStream) -> TokenStream 
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) =
+        internal::validate_abi_role(&input, internal::AbiRole::InspectorCallback)
+    {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
-            message: *const std::os::raw::c_char
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
+            message: *const std::os::raw::c_char,
+            message_len: usize,
         ) #where_clause {
-            let message_str = std::ffi::CStr::from_ptr(message).to_str().expect("[Inspector] Invalid UTF-8");
+            if message.is_null() {
+                return;
+            }
 
-            let func: fn(&str) = {
-                #input
-
-                #fn_name ::<#generic_params>
+            // SAFETY: JavaScriptCore passes `message_len` borrowed bytes for
+            // the duration of the inspector callback. The wrapper does not
+            // retain the pointer beyond this call.
+            let message_bytes = unsafe {
+                std::slice::from_raw_parts(message.cast::<u8>(), message_len)
+            };
+            let __message_lossy;
+            let __message_str = match std::str::from_utf8(message_bytes) {
+                Ok(message) => message,
+                Err(_) => {
+                    __message_lossy = std::string::String::from_utf8_lossy(message_bytes);
+                    __message_lossy.as_ref()
+                }
             };
 
-            func(message_str);
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(__message_str)
+                })()
+            }));
         }
     };
 
@@ -653,14 +987,25 @@ pub fn inspector_pause_event_callback(
     let fn_name = &input.sig.ident;
     let visibility = &input.vis;
     let generics = &input.sig.generics;
-    let generic_params = &generics.params;
-    let where_clause = &generics.where_clause;
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+    let turbofish = type_generics.as_turbofish();
+
+    if let Err(error) = internal::validate_abi_role(
+        &input,
+        internal::AbiRole::InspectorPauseEventCallback,
+    ) {
+        return TokenStream::from(error.into_compile_error());
+    }
 
     let expanded = quote! {
-        #visibility unsafe extern "C" fn #fn_name <#generic_params> (
+        #visibility unsafe extern "C" fn #fn_name #impl_generics (
             ctx: rust_jsc::internal::JSContextRef,
             event: rust_jsc::internal::InspectorPauseEvent
         ) #where_clause {
+            if ctx.is_null() {
+                return;
+            }
+
             // Map the C enum to the Rust enum.
             let event = match event {
                 rust_jsc::internal::InspectorPauseEvent_InspectorPauseEventPaused => rust_jsc::context::InspectorPauseEvent::Paused,
@@ -670,15 +1015,14 @@ pub fn inspector_pause_event_callback(
             };
 
             // Convert raw context ref to safe wrapper without taking ownership.
-            let js_ctx = rust_jsc::JSContext::from(ctx);
+            let js_ctx = unsafe { rust_jsc::JSContext::borrowed(ctx) };
 
-            let func: fn(rust_jsc::JSContext, rust_jsc::context::InspectorPauseEvent) = {
-                #input
-
-                #fn_name ::<#generic_params>
-            };
-
-            func(js_ctx, event);
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (|| {
+                    #input
+                    #fn_name #turbofish(js_ctx, event)
+                })()
+            }));
         }
     };
 

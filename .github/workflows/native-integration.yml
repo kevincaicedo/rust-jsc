@@ -1,0 +1,93 @@
+name: Native Integration
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/native-integration.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "sys/**"
+      - "macros/**"
+      - "tests/**"
+  schedule:
+    - cron: "0 11 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-prebuilt-archive:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            archive: libjsc-x86_64-unknown-linux-gnu.a.gz
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            archive: libjsc-aarch64-unknown-linux-gnu.a.gz
+            os: ubuntu-24.04-arm
+          - target: aarch64-apple-darwin
+            archive: libjsc-aarch64-apple-darwin.a.gz
+            os: macos-15
+          - target: x86_64-apple-darwin
+            archive: libjsc-x86_64-apple-darwin.a.gz
+            os: macos-15-intel
+    env:
+      RUST_BACKTRACE: 1
+      RUST_JSC_BUILD_MODE: download
+      RUST_JSC_LIB_DIR: ${{ github.workspace }}/.jsc-libs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 tar
+
+      - name: Download released static JSC archive
+        run: |
+          set -euo pipefail
+          VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          BASE_URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}"
+          curl --fail --silent --show-error --location "${BASE_URL}/${{ matrix.archive }}" -o "${{ matrix.archive }}"
+          curl --fail --silent --show-error --location "${BASE_URL}/SHA256SUMS" -o SHA256SUMS
+          awk -v archive="${{ matrix.archive }}" '$2 == archive { print; found=1 } END { exit found ? 0 : 1 }' SHA256SUMS > archive.sha256
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum -c archive.sha256
+          else
+            shasum -a 256 -c archive.sha256
+          fi
+          mkdir -p .jsc-libs
+          tar -xzf "${{ matrix.archive }}" -C .jsc-libs
+
+      - name: Verify static JSC libraries
+        run: |
+          test -f .jsc-libs/libJavaScriptCore.a
+          test -f .jsc-libs/libWTF.a
+          test -f .jsc-libs/libbmalloc.a
+          if [ -f .jsc-libs/libJavaScriptCoreJIT.a ]; then
+            echo "Found separate JavaScriptCoreJIT archive"
+          else
+            echo "No separate JavaScriptCoreJIT archive produced for this target"
+          fi
+
+      - name: Run workspace tests against prebuilt archive
+        run: cargo test --workspace --target ${{ matrix.target }} -- --test-threads=1

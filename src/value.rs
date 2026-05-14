@@ -1,5 +1,5 @@
 use rust_jsc_sys::{
-    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueFastUFT8Encoding,
+    JSContextRef, JSObjectRef, JSValueCreateJSONString, JSValueCreateUTF8ArrayBuffer,
     JSValueGetType, JSValueIsArray, JSValueIsBoolean, JSValueIsDate, JSValueIsEqual,
     JSValueIsInstanceOfConstructor, JSValueIsNull, JSValueIsNumber, JSValueIsObject,
     JSValueIsObjectOfClass, JSValueIsStrictEqual, JSValueIsString, JSValueIsSymbol,
@@ -10,14 +10,24 @@ use rust_jsc_sys::{
 };
 
 use crate::{
-    JSClass, JSContext, JSError, JSObject, JSResult, JSString, JSStringProctected,
-    JSValue, JSValueType,
+    not_send_or_sync, JSClass, JSContext, JSError, JSObject, JSResult, JSString,
+    JSStringProtected, JSValue, JSValueType, ProtectedObject, ProtectedValue,
 };
 
 impl JSValue {
-    /// Creates a new `JSValue` object.
-    pub fn new(inner: JSValueRef, ctx: JSContextRef) -> Self {
+    pub(crate) fn new(inner: JSValueRef, ctx: JSContextRef) -> Self {
         Self { inner, ctx }
+    }
+
+    /// Creates a JavaScript value wrapper from raw JavaScriptCore handles.
+    ///
+    /// # Safety
+    /// `inner` must be a valid `JSValueRef` belonging to the live
+    /// JavaScriptCore context `ctx`. The returned wrapper does not retain,
+    /// protect, or extend the lifetime of either handle, so callers must keep
+    /// both handles valid for every use of the wrapper.
+    pub unsafe fn from_raw_unchecked(inner: JSValueRef, ctx: JSContextRef) -> Self {
+        Self::new(inner, ctx)
     }
 
     /// Creates a JavaScript boolean value.
@@ -37,14 +47,20 @@ impl JSValue {
     /// # Returns
     /// A JavaScript boolean value.
     pub fn boolean(ctx: &JSContext, value: bool) -> JSValue {
+        // SAFETY: `ctx.inner` is a live JavaScriptCore context owned or
+        // borrowed by `JSContext`; the boolean payload has no additional
+        // lifetime requirements.
         let inner = unsafe { JSValueMakeBoolean(ctx.inner, value) };
         Self::new(inner, ctx.inner)
     }
 
     pub fn utf8_encode(ctx: &JSContext, value: JSValue) -> JSResult<JSValue> {
         let mut exception: JSValueRef = std::ptr::null_mut();
-        let inner =
-            unsafe { JSValueFastUFT8Encoding(ctx.inner, value.inner, &mut exception) };
+        // SAFETY: `ctx.inner` and `value.inner` are live JavaScriptCore handles.
+        // JavaScriptCore initializes `exception` when conversion throws.
+        let inner = unsafe {
+            JSValueCreateUTF8ArrayBuffer(ctx.inner, value.inner, &mut exception)
+        };
 
         if !exception.is_null() {
             let value = JSValue::new(exception, ctx.inner);
@@ -68,6 +84,7 @@ impl JSValue {
     /// # Returns
     /// A JavaScript undefined value.
     pub fn undefined(ctx: &JSContext) -> JSValue {
+        // SAFETY: `ctx.inner` is a live JavaScriptCore context.
         let inner = unsafe { JSValueMakeUndefined(ctx.inner) };
         Self::new(inner, ctx.inner)
     }
@@ -86,6 +103,7 @@ impl JSValue {
     /// # Returns
     /// A JavaScript null value.
     pub fn null(ctx: &JSContext) -> JSValue {
+        // SAFETY: `ctx.inner` is a live JavaScriptCore context.
         let inner = unsafe { JSValueMakeNull(ctx.inner) };
         Self::new(inner, ctx.inner)
     }
@@ -107,6 +125,8 @@ impl JSValue {
     /// # Returns
     /// A JavaScript number value.
     pub fn number(ctx: &JSContext, value: f64) -> JSValue {
+        // SAFETY: `ctx.inner` is a live JavaScriptCore context; numeric values
+        // are copied into the returned JavaScript value.
         let inner = unsafe { JSValueMakeNumber(ctx.inner, value) };
         Self::new(inner, ctx.inner)
     }
@@ -128,6 +148,9 @@ impl JSValue {
     /// # Returns
     /// A JavaScript string value.
     pub fn string(ctx: &JSContext, value: impl Into<JSString>) -> JSValue {
+        // SAFETY: `ctx.inner` is live and `JSString` owns a live
+        // `JSStringRef`; JavaScriptCore copies/retains the string value for the
+        // created `JSValue`.
         let inner = unsafe { JSValueMakeString(ctx.inner, value.into().inner) };
         Self::new(inner, ctx.inner)
     }
@@ -153,9 +176,11 @@ impl JSValue {
     /// A JavaScript string value.
     pub fn string_retain(
         ctx: &JSContext,
-        value: impl Into<JSStringProctected>,
+        value: impl Into<JSStringProtected>,
     ) -> JSValue {
         let inner_string = value.into();
+        // SAFETY: `ctx.inner` is live and `inner_string.0` is a retained
+        // `JSStringRef` that stays alive for the duration of this call.
         let inner = unsafe { JSValueMakeString(ctx.inner, inner_string.0) };
         Self::new(inner, ctx.inner)
     }
@@ -177,6 +202,8 @@ impl JSValue {
     /// # Returns
     /// A JavaScript symbol value.
     pub fn symbol(ctx: &JSContext, description: impl Into<JSString>) -> JSValue {
+        // SAFETY: `ctx.inner` is live and the temporary `JSString` description
+        // owns a live `JSStringRef` for the duration of the call.
         let inner = unsafe { JSValueMakeSymbol(ctx.inner, description.into().inner) };
         Self::new(inner, ctx.inner)
     }
@@ -199,6 +226,8 @@ impl JSValue {
     /// A JavaScript value, or null if the input is not valid JSON.
     pub fn from_json(ctx: &JSContext, string: impl Into<JSString>) -> JSValue {
         let string = string.into();
+        // SAFETY: `ctx.inner` is live and `string.inner` is a live
+        // `JSStringRef` owned by `string` for the duration of the call.
         let inner = unsafe { JSValueMakeFromJSONString(ctx.inner, string.inner) };
         Self::new(inner, ctx.inner)
     }
@@ -221,6 +250,9 @@ impl JSValue {
     /// A JSString with the result of serialization, or JSError if an exception occurs.
     pub fn as_json_string(&self, indent: u32) -> JSResult<JSString> {
         let mut exception: JSValueRef = std::ptr::null_mut();
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value
+        // pair. JavaScriptCore initializes `exception` when serialization
+        // throws and returns a retained string on success.
         let string = unsafe {
             JSValueCreateJSONString(self.ctx, self.inner, indent, &mut exception)
         };
@@ -230,7 +262,8 @@ impl JSValue {
             return Err(JSError::from(value));
         }
 
-        Ok(string.into())
+        // SAFETY: JavaScriptCore returned an owned JSStringRef on success.
+        Ok(unsafe { JSString::from_owned_ref(string) })
     }
 
     /// Converts a JavaScript value to a js string and returns the resulting js string.
@@ -248,6 +281,9 @@ impl JSValue {
     /// A JavaScript string.
     pub fn as_string(&self) -> JSResult<JSString> {
         let mut exception: JSValueRef = std::ptr::null_mut();
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value
+        // pair. JavaScriptCore initializes `exception` when conversion throws
+        // and returns a retained string on success.
         let string = unsafe { JSValueToStringCopy(self.ctx, self.inner, &mut exception) };
 
         if !exception.is_null() {
@@ -255,7 +291,8 @@ impl JSValue {
             return Err(JSError::from(value));
         }
 
-        Ok(string.into())
+        // SAFETY: JavaScriptCore returned an owned JSStringRef on success.
+        Ok(unsafe { JSString::from_owned_ref(string) })
     }
 
     /// Converts a JavaScript value to an object and returns the resulting object.
@@ -273,6 +310,8 @@ impl JSValue {
     /// A JavaScript object.
     pub fn as_object(&self) -> JSResult<JSObject> {
         let mut exception: JSValueRef = std::ptr::null_mut();
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value
+        // pair. JavaScriptCore initializes `exception` when conversion throws.
         let object = unsafe { JSValueToObject(self.ctx, self.inner, &mut exception) };
 
         if !exception.is_null() {
@@ -297,6 +336,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn as_boolean(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueToBoolean(self.ctx, self.inner) }
     }
 
@@ -315,6 +355,8 @@ impl JSValue {
     /// A number value.
     pub fn as_number(&self) -> JSResult<f64> {
         let mut exception: JSValueRef = std::ptr::null_mut();
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value
+        // pair. JavaScriptCore initializes `exception` when conversion throws.
         let number = unsafe { JSValueToNumber(self.ctx, self.inner, &mut exception) };
 
         if !exception.is_null() {
@@ -339,6 +381,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_undefined(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsUndefined(self.ctx, self.inner) }
     }
 
@@ -356,6 +399,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_null(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsNull(self.ctx, self.inner) }
     }
 
@@ -373,6 +417,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_boolean(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsBoolean(self.ctx, self.inner) }
     }
 
@@ -390,6 +435,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_number(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsNumber(self.ctx, self.inner) }
     }
 
@@ -407,6 +453,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_string(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsString(self.ctx, self.inner) }
     }
 
@@ -424,6 +471,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_object(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsObject(self.ctx, self.inner) }
     }
 
@@ -441,6 +489,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_symbol(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsSymbol(self.ctx, self.inner) }
     }
 
@@ -458,6 +507,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_array(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsArray(self.ctx, self.inner) }
     }
 
@@ -475,6 +525,7 @@ impl JSValue {
     /// # Returns
     /// A boolean value.
     pub fn is_date(&self) -> bool {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         unsafe { JSValueIsDate(self.ctx, self.inner) }
     }
 
@@ -489,6 +540,9 @@ impl JSValue {
     /// as compared by the JS instanceof operator, otherwise false.
     pub fn is_instance_of(&self, constructor: &JSObject) -> JSResult<bool> {
         let mut exception: JSValueRef = std::ptr::null_mut();
+        // SAFETY: `self` and `constructor` hold live same-context JavaScriptCore
+        // handles. JavaScriptCore initializes `exception` if `instanceof`
+        // evaluation throws.
         let result = unsafe {
             JSValueIsInstanceOfConstructor(
                 self.ctx,
@@ -524,7 +578,9 @@ impl JSValue {
     /// # Returns
     /// true if the object is an instance of class, otherwise false.
     pub fn is_object_of_class(&self, class: &JSClass) -> JSResult<bool> {
-        return Ok(unsafe { JSValueIsObjectOfClass(self.ctx, self.inner, class.inner) });
+        // SAFETY: `self.ctx`, `self.inner`, and `class.inner` are live
+        // JavaScriptCore handles. This predicate does not take ownership.
+        Ok(unsafe { JSValueIsObjectOfClass(self.ctx, self.inner, class.inner) })
     }
 
     /// Tests whether two JavaScript values are equal, as compared by the JS == operator.
@@ -547,6 +603,9 @@ impl JSValue {
     pub fn is_equal(&self, other: &JSValue) -> JSResult<bool> {
         let mut exception: JSValueRef = std::ptr::null_mut();
         let result =
+            // SAFETY: `self` and `other` hold live same-context JavaScriptCore
+            // values. JavaScriptCore initializes `exception` if equality
+            // evaluation throws.
             unsafe { JSValueIsEqual(self.ctx, self.inner, other.inner, &mut exception) };
 
         if !exception.is_null() {
@@ -575,7 +634,28 @@ impl JSValue {
     /// A value may be protected multiple times and must be unprotected an equal number of times
     /// before becoming eligible for garbage collection.
     pub fn protect(&self) {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
+        // Protection counts are balanced by `unprotect` or `ProtectedValue`.
         unsafe { JSValueProtect(self.ctx, self.inner) };
+    }
+
+    /// Returns an RAII guard that protects this JavaScript value from garbage
+    /// collection until the guard is dropped.
+    ///
+    /// Prefer this over manual [`JSValue::protect`] / [`JSValue::unprotect`]
+    /// calls when Rust owns the lifetime of a stored JavaScript value.
+    ///
+    /// # Examples
+    /// ```
+    /// use rust_jsc::*;
+    ///
+    /// let ctx = JSContext::new();
+    /// let value = JSValue::number(&ctx, 42.0);
+    /// let protected = value.protected();
+    /// assert_eq!(protected.value().as_number().unwrap(), 42.0);
+    /// ```
+    pub fn protected(&self) -> ProtectedValue {
+        ProtectedValue::new(self)
     }
 
     /// Unprotects a JavaScript value from garbage collection.
@@ -594,6 +674,8 @@ impl JSValue {
     /// A value may be protected multiple times and must be unprotected an\n
     /// equal number of times before becoming eligible for garbage collection.
     pub fn unprotect(&self) {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
+        // Callers must balance this with a prior protection count.
         unsafe { JSValueUnprotect(self.ctx, self.inner) };
     }
 
@@ -611,14 +693,105 @@ impl JSValue {
     /// # Returns
     /// The type of the JavaScript value.
     pub fn get_type(&self) -> JSValueType {
+        // SAFETY: `self.ctx` and `self.inner` are a live same-context value pair.
         let type_ = unsafe { JSValueGetType(self.ctx, self.inner) };
         JSValueType::from_js_type(type_)
+    }
+}
+
+impl ProtectedValue {
+    /// Protects `value` from JavaScriptCore garbage collection until the guard
+    /// is dropped.
+    pub fn new(value: &JSValue) -> Self {
+        value.protect();
+        Self {
+            value: value.clone(),
+            _not_send_or_sync: not_send_or_sync(),
+        }
+    }
+
+    /// Returns the protected value.
+    pub fn value(&self) -> &JSValue {
+        &self.value
+    }
+
+    /// Returns a borrowed-handle clone of the protected value.
+    ///
+    /// The returned `JSValue` does not own another protection count; keep this
+    /// guard alive while using the clone if the value must remain protected.
+    pub fn clone_value(&self) -> JSValue {
+        self.value.clone()
+    }
+}
+
+impl ProtectedObject {
+    /// Protects `object` from JavaScriptCore garbage collection until the guard
+    /// is dropped.
+    pub fn new(object: JSObject) -> Self {
+        let protection = object.protected();
+        Self {
+            object,
+            _protection: protection,
+        }
+    }
+
+    /// Returns the protected object.
+    pub fn object(&self) -> &JSObject {
+        &self.object
+    }
+
+    /// Returns a borrowed-handle clone of the protected object.
+    ///
+    /// The returned [`JSObject`] does not own another protection count; keep
+    /// this guard alive while using the clone if the object must remain
+    /// protected.
+    pub fn clone_object(&self) -> JSObject {
+        self.object.clone()
+    }
+
+    /// Calls the protected object as a JavaScript function.
+    pub fn call(&self, this: Option<&JSObject>, args: &[JSValue]) -> JSResult<JSValue> {
+        self.object.call(this, args)
+    }
+}
+
+impl std::ops::Deref for ProtectedObject {
+    type Target = JSObject;
+
+    fn deref(&self) -> &Self::Target {
+        self.object()
+    }
+}
+
+impl AsRef<JSObject> for ProtectedObject {
+    fn as_ref(&self) -> &JSObject {
+        self.object()
+    }
+}
+
+impl Clone for ProtectedValue {
+    fn clone(&self) -> Self {
+        Self::new(&self.value)
+    }
+}
+
+impl Drop for ProtectedValue {
+    fn drop(&mut self) {
+        self.value.unprotect();
+    }
+}
+
+impl AsRef<JSValue> for ProtectedValue {
+    fn as_ref(&self) -> &JSValue {
+        self.value()
     }
 }
 
 /// This is equivalent to `===` in JavaScript.
 impl PartialEq for JSValue {
     fn eq(&self, other: &JSValue) -> bool {
+        // SAFETY: `self` and `other` hold live same-context JavaScriptCore
+        // values. Strict equality has no exception slot.
         unsafe { JSValueIsStrictEqual(self.ctx, self.inner, other.inner) }
     }
 }
@@ -761,7 +934,7 @@ mod tests {
     fn test_as_boolean() {
         let ctx = crate::JSContext::new();
         let value = JSValue::boolean(&ctx, true);
-        assert_eq!(value.as_boolean(), true);
+        assert!(value.as_boolean());
     }
 
     #[test]
@@ -863,6 +1036,23 @@ mod tests {
         let value = JSValue::number(&ctx, 42.0);
         value.protect();
         value.unprotect();
+    }
+
+    #[test]
+    fn test_protected_value_guard() {
+        let ctx = crate::JSContext::new();
+        let value = JSValue::number(&ctx, 42.0);
+        let protected = value.protected();
+        assert_eq!(protected.value().as_number().unwrap(), 42.0);
+    }
+
+    #[test]
+    fn test_protected_value_clone_adds_protection_count() {
+        let ctx = crate::JSContext::new();
+        let value = JSValue::string(&ctx, "kept");
+        let protected = value.protected();
+        let cloned = protected.clone();
+        assert_eq!(cloned.value().as_string().unwrap().to_string(), "kept");
     }
 
     #[test]

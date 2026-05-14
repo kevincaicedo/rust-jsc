@@ -1,8 +1,12 @@
 use rust_jsc::{
-    JSContext, JSObject, JSTypedArray, JSTypedArrayType, JSValue,
-    PropertyDescriptorBuilder,
+    JSArray, JSContext, JSObject, JSTypedArray, JSTypedArrayType, JSValue,
+    ModuleLoader, PropertyDescriptorBuilder,
 };
-use std::time::Instant;
+use std::{
+    fs,
+    path::PathBuf,
+    time::{Instant, SystemTime, UNIX_EPOCH},
+};
 
 fn timed<F, T>(name: &str, f: F) -> T
 where
@@ -106,6 +110,98 @@ fn scenario_typed_array_stress() {
     });
 }
 
+fn scenario_array_and_method_helpers() {
+    timed("array_method_api_helpers", || {
+        let ctx = JSContext::new();
+        let array = JSArray::new_array(&ctx, &[]).unwrap();
+        for i in 0..2_000 {
+            let value = JSValue::number(&ctx, i as f64);
+            array.push(&value).unwrap();
+        }
+        assert_eq!(array.length().unwrap(), 2_000);
+
+        let object = ctx
+            .evaluate_script(
+                "({ base: 41, add(value) { return this.base + value; } })",
+                None,
+            )
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let result = object
+            .call_method("add", &[JSValue::number(&ctx, 1.0)])
+            .unwrap();
+        assert_eq!(result.as_number().unwrap(), 42.0);
+    });
+}
+
+fn scenario_module_loader_stress() {
+    timed("file_module_loader_real_files", || {
+        let ctx = JSContext::new();
+        ctx.set_module_loader(ModuleLoader::file_system());
+
+        let dir = temp_dir("rust-jsc-stress-modules");
+        fs::write(
+            dir.join("config.json"),
+            r#"{"name":"stress-json","count":100}"#,
+        )
+        .unwrap();
+        fs::write(
+            dir.join("dep.js"),
+            "export const label = 'stress-js'; export const plus = value => value + 23;",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("main.js"),
+            r#"
+                import { label, plus } from './dep.js';
+                import config from './config.json' with { type: 'json' };
+                globalThis.stressModuleSummary = `${label}:${config.name}:${plus(config.count)}`;
+            "#,
+        )
+        .unwrap();
+
+        ctx.evaluate_module(dir.join("main.js").to_string_lossy().as_ref())
+            .unwrap();
+        for _ in 0..8 {
+            ctx.run_deferred_work();
+            ctx.run_microtasks();
+        }
+
+        let summary = ctx
+            .evaluate_script("globalThis.stressModuleSummary", None)
+            .unwrap()
+            .as_string()
+            .unwrap()
+            .to_string();
+        assert_eq!(summary, "stress-js:stress-json:123");
+
+        let source_url = dir.join("source-entry.js");
+        ctx.evaluate_module_from_source(
+            r#"
+                import { plus } from './dep.js';
+                globalThis.stressSourceSummary = plus(19);
+            "#,
+            source_url.to_string_lossy().as_ref(),
+            None,
+        )
+        .unwrap();
+        for _ in 0..8 {
+            ctx.run_deferred_work();
+            ctx.run_microtasks();
+        }
+        assert_eq!(
+            ctx.evaluate_script("globalThis.stressSourceSummary", None)
+                .unwrap()
+                .as_number()
+                .unwrap(),
+            42.0
+        );
+
+        let _ = fs::remove_dir_all(dir);
+    });
+}
+
 fn scenario_property_storm() {
     timed("property_storm_10k", || {
         let ctx = JSContext::new();
@@ -125,6 +221,19 @@ fn scenario_property_storm() {
             let _ = obj.get_property(format!("prop_{}", i).as_str()).unwrap();
         }
     });
+}
+
+fn temp_dir(prefix: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!(
+        "{prefix}-{}-{nanos}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    dir
 }
 
 fn scenario_memory_churn() {
@@ -156,6 +265,8 @@ fn main() {
     scenario_fibonacci_stress();
     scenario_json_processing();
     scenario_typed_array_stress();
+    scenario_array_and_method_helpers();
+    scenario_module_loader_stress();
     scenario_property_storm();
     scenario_memory_churn();
 

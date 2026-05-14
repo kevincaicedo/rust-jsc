@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -15,6 +18,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -23,6 +28,9 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt -- --check
+
+      - name: Check PR diff whitespace
+        run: git diff --check "origin/${{ github.base_ref }}...HEAD"
 
   build-check:
     name: Build Check
@@ -48,9 +56,9 @@ jobs:
         run: cargo check -p rust_jsc_macros
 
   test:
-    name: Run Tests
+    name: Rust Validation
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,6 +66,8 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Cache Rust dependencies
         uses: actions/cache@v4
@@ -73,12 +83,16 @@ jobs:
         id: check_release
         run: |
           VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}/libjsc-x86_64-unknown-linux-gnu.a.gz"
-          if curl --output /dev/null --silent --head --fail "$URL"; then
-            echo "Release for $VERSION exists. sys/build.rs will download it."
+          ARCHIVE="libjsc-x86_64-unknown-linux-gnu.a.gz"
+          URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}/${ARCHIVE}"
+          MANIFEST_URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}/SHA256SUMS"
+          if curl --output /dev/null --silent --head --fail "$URL" && \
+             curl --fail --silent --show-error --location "$MANIFEST_URL" -o SHA256SUMS && \
+             awk -v archive="$ARCHIVE" '$2 == archive { found=1 } END { exit found ? 0 : 1 }' SHA256SUMS; then
+            echo "Release for $VERSION exists with checksum manifest entry. sys/build.rs will download it."
             echo "BUILD_STATIC=false" >> $GITHUB_ENV
           else
-            echo "Release for $VERSION not found. Will build static lib via Docker."
+            echo "Release for $VERSION or exact checksum manifest entry not found. Will build static lib via Docker."
             echo "BUILD_STATIC=true" >> $GITHUB_ENV
           fi
 
@@ -99,7 +113,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-linux-x86_64
-          key: buildx-linux-x86_64-${{ github.sha }}
+          key: buildx-linux-x86_64-${{ hashFiles('Dockerfile', 'Makefile', 'sys/Cargo.toml') }}
           restore-keys: buildx-linux-x86_64-
 
       - name: Build JavaScriptCore static
@@ -124,8 +138,8 @@ jobs:
           else
             echo "No separate JavaScriptCoreJIT archive produced for this target"
           fi
-          echo "RUST_JSC_BUILD_MODE=static" >> $GITHUB_ENV
-          echo "RUST_JSC_CUSTOM_BUILD_PATH=${{ github.workspace }}/.libs" >> $GITHUB_ENV
+          echo "RUST_JSC_BUILD_MODE=download" >> $GITHUB_ENV
+          echo "RUST_JSC_LIB_DIR=${{ github.workspace }}/.libs" >> $GITHUB_ENV
 
       - name: Rotate cache
         if: always() && env.BUILD_STATIC == 'true'
@@ -133,8 +147,40 @@ jobs:
           rm -rf /tmp/.buildx-cache-linux-x86_64
           mv /tmp/.buildx-cache-linux-x86_64-new /tmp/.buildx-cache-linux-x86_64 2>/dev/null || true
 
-      - name: Run tests
+      - name: Run clippy
         env:
-          RUST_JSC_BUILD_MODE: static
+          RUST_JSC_BUILD_MODE: download
           RUST_BACKTRACE: 1
-        run: cargo test --lib -- --test-threads=1
+        run: cargo clippy --workspace --all-targets -- -A clippy::approx_constant
+
+      - name: Run workspace tests, integration tests, doctests, and trybuild
+        env:
+          RUST_JSC_BUILD_MODE: download
+          RUST_BACKTRACE: 1
+        run: cargo test --workspace -- --test-threads=1
+
+      - name: Compile runnable examples
+        env:
+          RUST_JSC_BUILD_MODE: download
+          RUST_BACKTRACE: 1
+        run: |
+          cargo check --manifest-path examples/hello_world/Cargo.toml
+          cargo check --manifest-path examples/modules/Cargo.toml
+          cargo check --manifest-path examples/debugger/Cargo.toml
+          cargo check --manifest-path examples/profiling/Cargo.toml
+          cargo check --manifest-path examples/stress/Cargo.toml
+          cargo check --manifest-path examples/api_showcase/Cargo.toml
+
+      - name: Run deterministic example smoke tests
+        env:
+          RUST_JSC_BUILD_MODE: download
+          RUST_BACKTRACE: 1
+        run: |
+          cargo run --manifest-path examples/modules/Cargo.toml
+          cargo run --manifest-path examples/api_showcase/Cargo.toml --bin classes
+          cargo run --manifest-path examples/api_showcase/Cargo.toml --bin callbacks
+          cargo run --manifest-path examples/api_showcase/Cargo.toml --bin modules_file
+          cargo run --manifest-path examples/api_showcase/Cargo.toml --bin modules_custom_loader
+          cargo run --manifest-path examples/api_showcase/Cargo.toml --bin typed_arrays
+          cargo run --manifest-path examples/api_showcase/Cargo.toml --bin promises
+          cargo run --manifest-path examples/api_showcase/Cargo.toml --bin kedo_integration

@@ -1,7 +1,10 @@
 # Profiling rust-jsc
 
-This directory contains tools for examples/profiling the rust-jsc library's memory
-allocation patterns and CPU hot paths.
+This directory contains the DHAT heap-profiling harness used by
+`scripts/performance_snapshot.sh`.
+
+For the full performance workflow, benchmark commands, and CI artifact contract,
+see [../../docs/performance-validation.md](../../docs/performance-validation.md).
 
 ## DHAT Heap Profiling
 
@@ -11,10 +14,13 @@ JSON report you can explore in an interactive viewer.
 ### Run
 
 ```bash
-cargo run --manifest-path examples/profiling/Cargo.toml --release
+RUST_JSC_BUILD_MODE=download \
+RUST_JSC_LIB_DIR=/path/to/JSCOnly/Release-Static/lib \
+bash scripts/performance_snapshot.sh --output-dir .artifacts/performance/dhat --dhat
 ```
 
-This produces `dhat-heap.json` in the current directory.
+This produces `dhat-heap.json`, `dhat_output.txt`, and `environment.txt` in the
+chosen output directory.
 
 ### View
 
@@ -38,30 +44,16 @@ obvious.
 cargo install flamegraph
 ```
 
-### Generate for Benchmarks
+### Generate For The Stress Example
 
 ```bash
-# Profile a specific benchmark
-cargo flamegraph --bench context_bench -- --bench "evaluate_complex_script"
-
-# Profile all context benchmarks
-cargo flamegraph --bench context_bench -- --bench
+RUST_JSC_BUILD_MODE=download \
+RUST_JSC_LIB_DIR=/path/to/JSCOnly/Release-Static/lib \
+bash scripts/performance_snapshot.sh --output-dir .artifacts/performance/flamegraph --flamegraph
 ```
 
-### Generate for Functional Tests
-
-```bash
-cargo flamegraph --manifest-path functional_tests/Cargo.toml --bin functional_tests
-```
-
-### Generate for Profiling Harness
-
-```bash
-cargo flamegraph --manifest-path examples/profiling/Cargo.toml --bin profile_heap
-```
-
-The output is `flamegraph.svg` in the current directory. Open it in a browser
-for an interactive zoomable view.
+The output is `flamegraph_stress.svg` in the chosen output directory. Open it in
+a browser for an interactive zoomable view.
 
 > **macOS note:** You may need to run with `sudo` or use `dtrace` permissions.
 > See `cargo flamegraph --help` for platform-specific instructions.
@@ -95,8 +87,8 @@ let usage = ctx.get_memory_usage();
 // Returns an object with: heapSize, heapCapacity, extraMemorySize, objectCount, etc.
 ```
 
-The functional test suite (`functional_tests/`) uses this to report memory
-snapshots before and after stress tests.
+Use the profiling harness or targeted tests to capture snapshots before and
+after stress scenarios.
 
 ## Interpreting Results
 

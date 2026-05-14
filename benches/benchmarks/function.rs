@@ -21,9 +21,52 @@ fn add_callback(
     _this: JSObject,
     arguments: &[JSValue],
 ) -> JSResult<JSValue> {
-    let a = arguments.get(0).unwrap().as_number().unwrap();
+    let a = arguments.first().unwrap().as_number().unwrap();
     let b = arguments.get(1).unwrap().as_number().unwrap();
     Ok(JSValue::number(&ctx, a + b))
+}
+
+#[callback]
+fn typed_add_callback(
+    _ctx: JSContext,
+    _function: JSObject,
+    _this: JSObject,
+    a: f64,
+    b: f64,
+) -> f64 {
+    a + b
+}
+
+unsafe extern "C" fn manual_add_callback(
+    ctx_ref: rust_jsc::internal::JSContextRef,
+    _function: rust_jsc::internal::JSObjectRef,
+    _this_object: rust_jsc::internal::JSObjectRef,
+    argument_count: usize,
+    arguments: *const rust_jsc::internal::JSValueRef,
+    _exception: *mut rust_jsc::internal::JSValueRef,
+) -> *const rust_jsc::internal::OpaqueJSValue {
+    if ctx_ref.is_null() || arguments.is_null() || argument_count < 2 {
+        return std::ptr::null();
+    }
+
+    // SAFETY: JavaScriptCore passes `argument_count` readable argument
+    // pointers for the duration of this callback when `arguments` is non-null.
+    let arguments = unsafe { std::slice::from_raw_parts(arguments, argument_count) };
+    // SAFETY: JavaScriptCore passes a borrowed context pointer for the
+    // callback duration. This benchmark callback does not retain or release it.
+    let ctx = unsafe { JSContext::borrowed(ctx_ref) };
+    // SAFETY: JavaScriptCore provided both argument values for this callback
+    // invocation, and they belong to `ctx_ref` for the callback duration.
+    let a = unsafe { JSValue::from_raw_unchecked(arguments[0], ctx_ref) }
+        .as_number()
+        .unwrap();
+    // SAFETY: JavaScriptCore provided both argument values for this callback
+    // invocation, and they belong to `ctx_ref` for the callback duration.
+    let b = unsafe { JSValue::from_raw_unchecked(arguments[1], ctx_ref) }
+        .as_number()
+        .unwrap();
+
+    JSValue::number(&ctx, a + b).into()
 }
 
 #[callback]
@@ -69,6 +112,39 @@ fn bench_function_call_with_args(c: &mut Criterion) {
         let args = vec![JSValue::number(&ctx, 10.0), JSValue::number(&ctx, 20.0)];
         b.iter(|| {
             let result = f.call(None, &args);
+            black_box(result.unwrap());
+        });
+    });
+
+    group.finish();
+}
+
+fn bench_macro_callback_call_with_args(c: &mut Criterion) {
+    let ctx = JSContext::new();
+    let legacy = JSFunction::callback(&ctx, Some("legacyAdd"), Some(add_callback));
+    let typed = JSFunction::callback(&ctx, Some("typedAdd"), Some(typed_add_callback));
+    let manual = JSFunction::callback(&ctx, Some("manualAdd"), Some(manual_add_callback));
+    let args = [JSValue::number(&ctx, 10.0), JSValue::number(&ctx, 20.0)];
+
+    let mut group = c.benchmark_group("macro_callback_call_with_args");
+
+    group.bench_function("legacy_raw_slice", |b| {
+        b.iter(|| {
+            let result = legacy.call(None, &args);
+            black_box(result.unwrap());
+        });
+    });
+
+    group.bench_function("typed_conversion", |b| {
+        b.iter(|| {
+            let result = typed.call(None, &args);
+            black_box(result.unwrap());
+        });
+    });
+
+    group.bench_function("manual_raw_callback", |b| {
+        b.iter(|| {
+            let result = manual.call(None, &args);
             black_box(result.unwrap());
         });
     });
@@ -161,6 +237,7 @@ criterion_group!(
     bench_function_callback_create,
     bench_function_call_noop,
     bench_function_call_with_args,
+    bench_macro_callback_call_with_args,
     bench_function_call_return_value,
     bench_function_js_to_rust_roundtrip,
     bench_function_call_from_js_repeated,

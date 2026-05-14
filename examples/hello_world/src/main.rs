@@ -1,197 +1,83 @@
-// use rust_jsc::internal::{
-//     JSContextRef, JSModuleLoaderCallbacks, JSObjectMake, JSObjectRef, JSStringRef,
-//     JSValueMakeUndefined, JSValueRef, PropertyDescriptor
-// };
-
 use rust_jsc::{
-    callback, module_evaluate, module_fetch, module_import_meta, module_resolve,
-    JSContext, JSFunction, JSModuleLoader, JSObject, JSResult, JSStringProctected,
-    JSValue, PropertyDescriptor, PropertyDescriptorBuilder,
+    callback, module_import_meta_provider, module_resolver, JSContext, JSFunction,
+    JSObject, JSResult, JSValue, ModuleLoadError, ModuleLoaderBuilder,
 };
 
 #[callback]
-fn log_info(
-    ctx: JSContext,
-    _function: JSObject,
-    _this: JSObject,
-    arguments: &[JSValue],
-) -> JSResult<JSValue> {
-    let message = arguments.get(0).unwrap().as_string().unwrap();
-    println!("INFO: {}", message);
-
-    Ok(JSValue::undefined(&ctx))
+fn log_info(message: String) {
+    println!("INFO: {message}");
 }
 
-#[callback]
-fn set_timeout(
-    ctx: JSContext,
-    _function: JSObject,
-    _this: JSObject,
-    arguments: &[JSValue],
-) -> JSResult<JSValue> {
-    println!("Set Timeout");
-    let _callback = arguments.get(0).unwrap().as_object().unwrap();
-    let timeout = arguments.get(1).unwrap().as_number().unwrap();
-    // wait for timeout and then call the callback and return the result
-    // 1. sleep for timeout
-    std::thread::sleep(std::time::Duration::from_millis(timeout as u64));
-    // 2. call the callback
-    // let result = callback.call(None, &[]);
-    // 3. return the result
-    Ok(JSValue::undefined(&ctx))
-}
-
-#[module_resolve]
-fn module_loader_resolve(
+#[module_resolver]
+fn resolve(
     _ctx: JSContext,
-    key: JSValue,
-    _referrer: JSValue,
-    _script_fetcher: JSValue,
-) -> JSStringProctected {
-    let _key_value = key.as_string().unwrap();
-
-    // println!("ModuleLoaderResolve, Key: {:?}", key_value);
-
-    JSStringProctected::from("@rust-jsc")
+    specifier: String,
+    _referrer: Option<String>,
+) -> Result<Option<String>, ModuleLoadError> {
+    Ok(Some(specifier))
 }
 
-#[module_evaluate]
-fn module_loader_evaluate(ctx: JSContext, key: JSValue) -> JSValue {
-    // let key = key.as_string().unwrap();
-
-    println!("ModuleLoaderEvaluate, Key: {:?}", key.as_string().unwrap());
-
-    let object = JSObject::new(&ctx);
-    let keydata = JSValue::string(&ctx, "name");
-    let value = JSValue::string(&ctx, "John Doe");
-    let result = object.set(&keydata, &value, PropertyDescriptor::default());
-    match result {
-        Ok(_) => {
-            // println!("Set Property");
-        }
-        Err(error) => {
-            println!("Error M: {:?}", error.message().unwrap());
-        }
-    }
-
-    let default = JSObject::new(&ctx);
-    default
-        .set_property("default", &object.into(), PropertyDescriptor::default())
-        .unwrap();
-    default
-        .set_property("name", &value, PropertyDescriptor::default())
-        .unwrap();
-
-    default.into()
+#[module_import_meta_provider]
+fn import_meta(ctx: JSContext, key: String) -> JSResult<Option<JSObject>> {
+    let meta = JSObject::new(&ctx);
+    meta.set_property(
+        "url",
+        &JSValue::string(&ctx, format!("hello://{key}")),
+        Default::default(),
+    )?;
+    Ok(Some(meta))
 }
 
-#[module_fetch]
-fn module_loader_fetch(
-    _ctx: JSContext,
-    key: JSValue,
-    _attributes_value: JSValue,
-    _script_fetcher: JSValue,
-) -> JSStringProctected {
-    let key_value = key.as_string().unwrap();
+fn install_console(ctx: &JSContext) -> JSResult<()> {
+    let console = JSObject::new(ctx);
+    let log = JSFunction::callback(ctx, Some("log"), Some(log_info));
+    let log_value: JSValue = log.into();
 
-    println!("ModuleLoaderFetch, Key: {:?}", key_value);
-
-    JSStringProctected::from("let name = 'Kevin'; export default name;")
+    console.set_property("log", &log_value, Default::default())?;
+    let console_value: JSValue = console.into();
+    ctx.global_object()
+        .set_property("console", &console_value, Default::default())
 }
 
-#[module_import_meta]
-fn module_loader_create_import_meta_properties(
-    ctx: JSContext,
-    key: JSValue,
-    _script_fetcher: JSValue,
-) -> JSObject {
-    // let key_value = key.as_string().unwrap();
-
-    // println!("ImportMeta, Key: {:?}", key_value);
-
-    let object = JSObject::new(&ctx);
-    object
-        .set_property("url", &key, Default::default())
-        .unwrap();
-    object
-}
-
-fn main() {
+fn main() -> JSResult<()> {
     let ctx = JSContext::new();
-    let global_object = ctx.global_object();
-
-    let object = JSObject::new(&ctx);
-    let attributes = PropertyDescriptorBuilder::new()
-        .writable(true)
-        .configurable(true)
-        .enumerable(true)
-        .build();
-    let function = JSFunction::callback(&ctx, Some("log"), Some(log_info));
-    object
-        .set_property("log", &function.into(), attributes)
-        .unwrap();
-    let timeout_function =
-        JSFunction::callback(&ctx, Some("setTimeout"), Some(set_timeout));
-    object
-        .set_property("setTimeout", &timeout_function.into(), attributes)
-        .unwrap();
-
-    global_object
-        .set_property("console", &object.into(), attributes)
-        .unwrap();
-
     ctx.set_inspectable(true);
+    install_console(&ctx)?;
+    ctx.set_module_loader(
+        ModuleLoaderBuilder::new()
+            .resolve(Some(resolve))
+            .import_meta(Some(import_meta)),
+    );
 
-    let callbacks = JSModuleLoader {
-        disableBuiltinFileSystemLoader: false,
-        moduleLoaderResolve: Some(module_loader_resolve),
-        moduleLoaderEvaluate: Some(module_loader_evaluate),
-        moduleLoaderFetch: Some(module_loader_fetch),
-        moduleLoaderCreateImportMetaProperties: Some(
-            module_loader_create_import_meta_properties,
-        ),
-    };
+    let name = JSValue::string(&ctx, "John Doe");
+    let default = JSObject::new(&ctx);
+    default.set_property("name", &name, Default::default())?;
+    let default_value: JSValue = default.into();
+    ctx.create_synthetic_module(
+        "@rust-jsc",
+        &[("default", &default_value), ("name", &name)],
+    )?;
 
-    ctx.set_module_loader(callbacks);
-
-    let keys = &[JSStringProctected::from("@rust-jsc")];
-    ctx.set_virtual_module_keys(keys);
-
-    let result = ctx.evaluate_module_from_source(
+    let promise = ctx.evaluate_module_from_source(
         r#"
-        import lib, { name } from '@rust-jsc';
+        import lib, { name } from "@rust-jsc";
         console.log(`Virtual: ${lib.name} - ${name}`);
         globalThis.exampleName = name;
+        globalThis.exampleMeta = import.meta.url;
         "#,
         "hello_world.js",
         None,
-    );
-    ctx.check_syntax("console.log('Kevin')", 0).unwrap();
-    println!("Result:");
-    // let result = ctx.load_module("../scripts/test.js");
-    // assert!(result.is_ok());
-    // read module from file system
-    // let module_source = std::fs::read_to_string("../scripts/output/jsc.js").unwrap();
-    // let result = ctx.evaluate_module_from_source(&module_source, "../scripts/output/jsc.js", None);
-    // println!("Hello, World!");
-    // let result = ctx.link_and_evaluate_module("test.js");
-    // println!("Result: {:?}", result.is_undefined());
-    match result {
-        Ok(()) => {
-            let example_name = ctx
-                .evaluate_script("globalThis.exampleName", None)
-                .unwrap()
-                .as_string()
-                .unwrap();
-            println!("Example module name: {}", example_name);
-        }
-        Err(error) => {
-            eprintln!(
-                "Error M: {:?}, {:?}",
-                error.message().unwrap(),
-                ctx.check_syntax("console.log('Kevin')", 0).unwrap()
-            );
-        }
-    }
-    // assert!(result.is_ok());
+    )?;
+    ctx.global_object()
+        .set_property("__module_promise", &promise, Default::default())?;
+    ctx.run_deferred_work();
+    ctx.run_microtasks();
+
+    let example_name = ctx
+        .evaluate_script("globalThis.exampleName", None)?
+        .as_string()?
+        .to_string();
+    println!("Example module name: {example_name}");
+
+    Ok(())
 }

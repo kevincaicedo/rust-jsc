@@ -113,9 +113,13 @@ When the debugger pauses (via breakpoint or `debugger;` statement), JSC enters a
 3. Use thread-safe synchronization primitives (`Arc`, `Mutex`, `Condvar`, `mpsc`) to coordinate with the main thread
 
 ### Module Loading
-Both examples use `JSContext::evaluate_module()` with file paths:
+Both examples install `module_loader::file_module_loader()` with
+`JSContext::set_module_loader()` and then call `JSContext::evaluate_module()`
+with file paths:
 - Module specifiers must be absolute or start with `./` or `../`
 - Example: `"./examples/debugger/scripts/breakpoint_debugger.js"`
+- Module evaluation returns a JavaScript `Promise`; the examples call
+  `JSContext::run_microtasks()` at explicit host checkpoints.
 
 ## Building and Running
 

@@ -16,8 +16,8 @@
 
 use rust_jsc::context::InspectorPauseEvent;
 use rust_jsc::{
-    callback, JSContext, JSFunction, JSObject, JSResult, JSValue,
-    PropertyDescriptorBuilder,
+    callback, module_loader, JSContext, JSFunction, JSObject, JSValue,
+    OwnedJSContext, PropertyDescriptorBuilder,
 };
 use rust_jsc_macros::{inspector_callback, inspector_pause_event_callback};
 use std::path::PathBuf;
@@ -31,7 +31,7 @@ struct DebuggerState {
     // We store the context here so callbacks can use it to send messages.
     // Since everything runs on one thread, we don't need Arc/Mutex for the context itself,
     // but the callbacks receive `&mut DebuggerState`.
-    ctx: Arc<JSContext>,
+    ctx: Arc<OwnedJSContext>,
     paused: bool,
     // Synchronization to notify the main thread (for demonstration purposes)
     sync: Arc<(Mutex<bool>, Condvar)>,
@@ -43,17 +43,15 @@ fn on_inspector_message(message: &str) {
     println!("[Inspector Protocol] {}", message);
 }
 
-#[callback]
-fn log_info(
-    ctx: JSContext,
-    _function: JSObject,
-    _this: JSObject,
-    arguments: &[JSValue],
-) -> JSResult<JSValue> {
-    let message = arguments.get(0).unwrap().as_string().unwrap();
-    println!("INFO: {}", message);
+fn send_inspector_message(ctx: &JSContext, message: &str) {
+    if ctx.inspector_send_message(message).is_err() {
+        eprintln!("[Inspector Protocol] failed to send message");
+    }
+}
 
-    Ok(JSValue::undefined(&ctx))
+#[callback]
+fn log_info(message: String) {
+    println!("INFO: {message}");
 }
 
 /// Single unified callback invoked for debugger pause-loop events (Paused/Resumed/Tick).
@@ -62,11 +60,9 @@ fn log_info(
 #[inspector_pause_event_callback]
 fn on_pause_event(ctx: JSContext, event: InspectorPauseEvent) {
     // Recover our state from the context with type-safe downcasting.
-    let state = unsafe { ctx.get_shared_data_mut::<DebuggerState>() };
-    if state.is_none() {
+    let Some(mut state) = ctx.get_shared_data_mut::<DebuggerState>() else {
         return;
-    }
-    let state = state.unwrap();
+    };
 
     match event {
         InspectorPauseEvent::Paused => {
@@ -81,9 +77,10 @@ fn on_pause_event(ctx: JSContext, event: InspectorPauseEvent) {
 
             // Immediately resume for a deterministic handshake demo.
             println!("[Host Callback] paused: sending Debugger.resume...");
-            state
-                .ctx
-                .inspector_send_message(r#"{"id": 1000, "method": "Debugger.resume"}"#);
+            send_inspector_message(
+                &state.ctx,
+                r#"{"id": 1000, "method": "Debugger.resume"}"#,
+            );
         }
         InspectorPauseEvent::Tick => {
             if state.paused {
@@ -125,6 +122,7 @@ fn main() {
         let ctx = Arc::new(JSContext::new());
         ctx.set_inspectable(true);
         ctx.set_inspector_callback(Some(on_inspector_message));
+        ctx.set_module_loader(module_loader::file_module_loader());
 
         let _global_object = ctx.global_object();
 
@@ -135,13 +133,12 @@ fn main() {
             .enumerable(true)
             .build();
         let function = JSFunction::callback(&ctx, Some("log"), Some(log_info));
-        object
-            .set_property("log", &function.into(), attributes)
-            .unwrap();
+        let function_value: JSValue = function.into();
+        object.set_property("log", &function_value, attributes).unwrap();
 
         // Setup state
         let state = DebuggerState {
-            ctx: ctx.clone(), // JSContext is a wrapper around a pointer, clone is cheap (ref count)
+            ctx: ctx.clone(), // Clone the local Arc; the owned context stays on this JS thread.
             paused: false,
             sync: pair_clone,
         };
@@ -155,14 +152,16 @@ fn main() {
 
         // Enable Debugger
         println!("-> [JS Thread] Enabling Debugger...");
-        ctx.inspector_send_message(r#"{"id": 1, "method": "Debugger.enable"}"#);
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Runtime.enable"}"#);
+        send_inspector_message(&ctx, r#"{"id": 1, "method": "Debugger.enable"}"#);
+        send_inspector_message(&ctx, r#"{"id": 2, "method": "Runtime.enable"}"#);
 
         // IMPORTANT: allow debugger statements to pause.
-        ctx.inspector_send_message(
+        send_inspector_message(
+            &ctx,
             r#"{"id": 3, "method": "Debugger.setPauseOnDebuggerStatements", "params": {"enabled": true}}"#,
         );
-        ctx.inspector_send_message(
+        send_inspector_message(
+            &ctx,
             r#"{"id": 3, "method": "Debugger.setBreakpointsActive", "params": {"active": true}}"#,
         );
 
@@ -179,7 +178,8 @@ fn main() {
         // NOTE: `evaluate_module` expects a filesystem path.
         match ctx.evaluate_module(module_path.to_string_lossy().as_ref()) {
             Ok(val) => {
-                println!("-> [JS Thread] Module Result: {:?}", val)
+                println!("-> [JS Thread] Module Promise: {:?}", val);
+                ctx.run_microtasks();
             }
             Err(e) => {
                 println!("-> [JS Thread] Module Error:");

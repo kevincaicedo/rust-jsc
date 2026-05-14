@@ -1,16 +1,27 @@
 name: Cargo Publish
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to publish (e.g., v0.4.2)'
+        description: 'Tag to publish or dry-run (e.g., v1.0.0)'
         required: true
         type: string
+      dry_run:
+        description: 'Run dry-run package preparation instead of publishing crates'
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
-  group: cargo-publish-${{ github.ref }}
+  group: cargo-publish-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -22,17 +33,35 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.tag.outputs.tag }}
+      dry_run: ${{ steps.mode.outputs.dry_run }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
 
       - name: Determine Tag
         id: tag
         run: |
-          TAG="${{ github.event.inputs.tag }}"
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          if [[ "$TAG" != v* ]]; then
+            echo "Error: Cargo publish tags must be v<version>, got $TAG"
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Using tag: $TAG"
+
+      - name: Determine Publish Mode
+        id: mode
+        run: |
+          DRY_RUN="true"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            DRY_RUN="${{ inputs.dry_run }}"
+          else
+            echo "Tag-triggered runs validate the release in dry-run mode."
+            echo "Dispatch this workflow manually with dry_run=false to publish crates."
+          fi
+          echo "dry_run=$DRY_RUN" >> "$GITHUB_OUTPUT"
+          echo "Dry run: $DRY_RUN"
 
       - name: Extract version and validate
         id: version
@@ -41,6 +70,10 @@ jobs:
           # Extract version from root Cargo.toml
           VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           TAG_VERSION=${TAG#v}
+          SYS_VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          MACROS_VERSION=$(grep '^version' macros/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          SYS_DEP_VERSION=$(grep '^rust_jsc_sys' Cargo.toml | sed 's/.*version = "\([^"]*\)".*/\1/')
+          MACROS_DEP_VERSION=$(grep '^rust_jsc_macros' Cargo.toml | sed 's/.*version = "\([^"]*\)".*/\1/')
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"
@@ -49,9 +82,62 @@ jobs:
             echo "Error: Tag version ($TAG_VERSION) does not match Cargo.toml version ($VERSION)"
             exit 1
           fi
+          if [ "$SYS_VERSION" != "$VERSION" ] || [ "$SYS_DEP_VERSION" != "=$VERSION" ]; then
+            echo "Error: rust_jsc_sys version/dependency ($SYS_VERSION/$SYS_DEP_VERSION) must match root version $VERSION with an exact root dependency"
+            exit 1
+          fi
+          if [ "$MACROS_VERSION" != "$VERSION" ] || [ "$MACROS_DEP_VERSION" != "=$VERSION" ]; then
+            echo "Error: rust_jsc_macros version/dependency ($MACROS_VERSION/$MACROS_DEP_VERSION) must match root version $VERSION with an exact root dependency"
+            exit 1
+          fi
+
+      - name: Verify release prerequisites
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          SYS_TAG="sys-v${VERSION}"
+          BASE_URL="https://github.com/kevincaicedo/rust-jsc/releases/download/${SYS_TAG}"
+          ARCHIVES=(
+            libjsc-x86_64-apple-darwin.a.gz
+            libjsc-aarch64-apple-darwin.a.gz
+            libjsc-x86_64-unknown-linux-gnu.a.gz
+            libjsc-aarch64-unknown-linux-gnu.a.gz
+            libjsc-x86_64-unknown-linux-musl.a.gz
+            libjsc-aarch64-unknown-linux-musl.a.gz
+          )
+
+          for attempt in $(seq 1 12); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 12 ]; then
+              echo "Error: GitHub release $TAG does not exist. Run release-crates.yml before publishing crates."
+              exit 1
+            fi
+            echo "Waiting for GitHub release $TAG to exist..."
+            sleep 10
+          done
+
+          curl --fail --silent --show-error --location "${BASE_URL}/SHA256SUMS" -o SHA256SUMS
+          for archive in "${ARCHIVES[@]}"; do
+            metadata="${archive%.a.gz}.metadata.json"
+            curl --fail --silent --show-error --head "${BASE_URL}/${archive}" >/dev/null
+            curl --fail --silent --show-error --head "${BASE_URL}/${archive}.sha256" >/dev/null
+            curl --fail --silent --show-error --head "${BASE_URL}/${metadata}" >/dev/null
+            if ! awk -v archive="$archive" '$2 == archive { found=1 } END { exit found ? 0 : 1 }' SHA256SUMS; then
+              echo "Error: SHA256SUMS is missing an exact entry for ${archive}" >&2
+              exit 1
+            fi
+          done
+
+          echo "Release prerequisites exist for ${TAG} and ${SYS_TAG}"
 
   # ===========================================================================
-  # Test Matrix: Run unit tests for each supported platform
+  # Test Matrix: Run workspace tests for each supported platform
   # ===========================================================================
 
   test:
@@ -62,9 +148,9 @@ jobs:
       matrix:
         include:
           - target: x86_64-apple-darwin
-            os: macos-14
+            os: macos-15-intel
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-15
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
           - target: x86_64-unknown-linux-musl
@@ -93,13 +179,13 @@ jobs:
             sudo apt-get install -y musl-tools
           fi
 
-      - name: Run tests
+      - name: Run workspace tests
         env:
-          RUST_JSC_BUILD_MODE: static
+          RUST_JSC_BUILD_MODE: download
           RUST_BACKTRACE: 1
         run: |
           # Use --test-threads=1 to avoid SIGSEGV from parallel access to JSC global state.
-          cargo test --lib --target ${{ matrix.target }} -- --test-threads=1
+          cargo test --workspace --target ${{ matrix.target }} -- --test-threads=1
 
   # ===========================================================================
   # Publish all crates
@@ -119,16 +205,35 @@ jobs:
 
       - name: Publish rust_jsc_sys
         working-directory: sys
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} || echo "Already published"
+          if [ "${{ needs.prepare.outputs.dry_run }}" = "true" ]; then
+            cargo publish --locked --dry-run
+          else
+            cargo publish --locked --token "$CARGO_REGISTRY_TOKEN"
+          fi
 
       - name: Publish rust_jsc_macros
         working-directory: macros
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} || echo "Already published"
+          if [ "${{ needs.prepare.outputs.dry_run }}" = "true" ]; then
+            cargo publish --locked --dry-run
+          else
+            cargo publish --locked --token "$CARGO_REGISTRY_TOKEN"
+          fi
 
       - name: Publish rust_jsc (root)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          # Wait for crates.io to index macros and sys
-          sleep 20
-          cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} || echo "Already published"
+          if [ "${{ needs.prepare.outputs.dry_run }}" = "true" ]; then
+            cargo package -p rust_jsc --locked --no-verify --list >/tmp/rust_jsc-package-files.txt
+            wc -l /tmp/rust_jsc-package-files.txt
+          else
+            # Wait for crates.io to index macros and sys
+            sleep 20
+            cargo publish --locked --token "$CARGO_REGISTRY_TOKEN"
+          fi

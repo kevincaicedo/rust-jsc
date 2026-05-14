@@ -23,7 +23,7 @@
 //!   to reliably send step/resume commands while the VM is paused.
 
 use rust_jsc::context::InspectorPauseEvent;
-use rust_jsc::JSContext;
+use rust_jsc::{module_loader, JSContext, OwnedJSContext};
 use rust_jsc_macros::{inspector_callback, inspector_pause_event_callback};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -178,8 +178,14 @@ fn on_inspector_message(message: &str) {
     }
 }
 
+fn send_inspector_message(ctx: &JSContext, message: &str) {
+    if ctx.inspector_send_message(message).is_err() {
+        eprintln!("[Inspector Protocol] failed to send message");
+    }
+}
+
 struct HostState {
-    ctx: Arc<JSContext>,
+    ctx: Arc<OwnedJSContext>,
     sync: Sync,
     inspector_rx: Arc<Mutex<mpsc::Receiver<String>>>,
 }
@@ -225,7 +231,7 @@ fn on_pause(state: &mut HostState) {
                 }
             });
 
-            state.ctx.inspector_send_message(&msg.to_string());
+            send_inspector_message(&state.ctx, &msg.to_string());
         }
     } else {
         println!("[Host Callback] on_pause: could not find callFrameId from Debugger.paused event");
@@ -249,18 +255,20 @@ fn on_tick(state: &mut HostState) {
         drop(shared);
 
         println!("[Host Callback] on_tick: stepNext (#{})", step_id);
-        state.ctx.inspector_send_message(&format!(
-            r#"{{"id": {step_id}, "method": "Debugger.stepNext"}}"#
-        ));
+        send_inspector_message(
+            &state.ctx,
+            &format!(r#"{{"id": {step_id}, "method": "Debugger.stepNext"}}"#),
+        );
         return;
     }
 
     if !shared.resumed {
         drop(shared);
         println!("[Host Callback] on_tick: resume");
-        state
-            .ctx
-            .inspector_send_message(r#"{"id": 4000, "method": "Debugger.resume"}"#);
+        send_inspector_message(
+            &state.ctx,
+            r#"{"id": 4000, "method": "Debugger.resume"}"#,
+        );
         return;
     }
 }
@@ -276,12 +284,14 @@ fn on_resume(state: &mut HostState) {
 
 #[inspector_pause_event_callback]
 fn on_pause_event(ctx: JSContext, event: InspectorPauseEvent) {
-    let state = unsafe { ctx.get_shared_data_mut::<HostState>() }.unwrap();
+    let Some(mut state) = ctx.get_shared_data_mut::<HostState>() else {
+        return;
+    };
 
     match event {
-        InspectorPauseEvent::Paused => on_pause(state),
-        InspectorPauseEvent::Tick => on_tick(state),
-        InspectorPauseEvent::Resumed => on_resume(state),
+        InspectorPauseEvent::Paused => on_pause(&mut state),
+        InspectorPauseEvent::Tick => on_tick(&mut state),
+        InspectorPauseEvent::Resumed => on_resume(&mut state),
     }
 }
 
@@ -318,6 +328,7 @@ fn main() {
         let ctx = Arc::new(JSContext::new());
         ctx.set_inspectable(true);
         ctx.set_inspector_callback(Some(on_inspector_message));
+        ctx.set_module_loader(module_loader::file_module_loader());
 
         // Shared inspector_rx for HostState and drain helper
         let inspector_rx_shared = Arc::new(Mutex::new(inspector_rx));
@@ -343,16 +354,18 @@ fn main() {
 
         // Enable domains.
         println!("-> [JS Thread] Enabling Debugger/Runtime...");
-        ctx.inspector_send_message(r#"{"id": 1, "method": "Debugger.enable"}"#);
-        ctx.inspector_send_message(r#"{"id": 2, "method": "Runtime.enable"}"#);
+        send_inspector_message(&ctx, r#"{"id": 1, "method": "Debugger.enable"}"#);
+        send_inspector_message(&ctx, r#"{"id": 2, "method": "Runtime.enable"}"#);
 
         // Ensure debugger statements can pause.
-        ctx.inspector_send_message(
+        send_inspector_message(
+            &ctx,
             r#"{"id": 3, "method": "Debugger.setPauseOnDebuggerStatements", "params": {"enabled": true}}"#,
         );
 
         // IMPORTANT for breakpoint workflows.
-        ctx.inspector_send_message(
+        send_inspector_message(
+            &ctx,
             r#"{"id": 4, "method": "Debugger.setBreakpointsActive", "params": {"active": true}}"#,
         );
 
@@ -360,7 +373,10 @@ fn main() {
         println!("-> [JS Thread] Evaluating module...");
         let module_spec = module_path_for_js.to_string_lossy().to_string();
         match ctx.evaluate_module(&module_spec) {
-            Ok(v) => println!("-> [JS Thread] evaluate_module result: {:?}", v),
+            Ok(v) => {
+                println!("-> [JS Thread] evaluate_module promise: {:?}", v);
+                ctx.run_microtasks();
+            }
             Err(e) => {
                 println!("-> [JS Thread] evaluate_module error:");
                 println!("   name:   {:?}", e.name());
@@ -389,7 +405,7 @@ fn main() {
             r#"{{"id": 10, "method": "Debugger.setBreakpointByUrl", "params": {{"url": "{}", "lineNumber": {}}}}}"#,
             url, break_line_0
         );
-        ctx.inspector_send_message(&msg);
+        send_inspector_message(&ctx, &msg);
 
         // Drain responses (so we don't miss state updates).
         std::thread::sleep(std::time::Duration::from_millis(50));
@@ -401,7 +417,10 @@ fn main() {
         println!("-> [JS Thread] Loading runner module to hit the breakpoint...");
         let runner_path = "./examples/debugger/scripts/breakpoint_runner.js";
         match ctx.evaluate_module(runner_path) {
-            Ok(v) => println!("-> [JS Thread] Runner module result: {:?}", v),
+            Ok(v) => {
+                println!("-> [JS Thread] Runner module promise: {:?}", v);
+                ctx.run_microtasks();
+            }
             Err(e) => {
                 println!("-> [JS Thread] Runner module error:");
                 println!("   name:   {:?}", e.name());

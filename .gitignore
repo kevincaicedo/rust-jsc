@@ -16,3 +16,4 @@ libjsc*.gz
 __cmake_systeminformation
 dhat-heap.json
 flamegraph.svg
+**/*.stderr

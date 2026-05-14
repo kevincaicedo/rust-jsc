@@ -2,17 +2,21 @@ name: Release Rust-JSC Crates
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'macros/**'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
+    tags:
+      - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.0.0)"
+        required: true
+        type: string
 
 concurrency:
-  group: release-crates-${{ github.ref }}
+  group: release-crates-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -23,13 +27,45 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - name: Determine Tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          if [[ "$TAG" != v* ]]; then
+            echo "Error: crate release tags must be v<version>, got $TAG"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag: $TAG"
 
       - name: Extract version from Cargo.toml
         id: version
         run: |
+          TAG="${{ steps.tag.outputs.tag }}"
           VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          TAG_VERSION=${TAG#v}
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "Error: tag version ($TAG_VERSION) does not match Cargo.toml version ($VERSION)"
+            exit 1
+          fi
+          SYS_VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          MACROS_VERSION=$(grep '^version' macros/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          SYS_DEP_VERSION=$(grep '^rust_jsc_sys' Cargo.toml | sed 's/.*version = "\([^"]*\)".*/\1/')
+          MACROS_DEP_VERSION=$(grep '^rust_jsc_macros' Cargo.toml | sed 's/.*version = "\([^"]*\)".*/\1/')
+          if [ "$SYS_VERSION" != "$VERSION" ] || [ "$SYS_DEP_VERSION" != "=$VERSION" ]; then
+            echo "Error: rust_jsc_sys version/dependency ($SYS_VERSION/$SYS_DEP_VERSION) must match root version $VERSION with an exact root dependency"
+            exit 1
+          fi
+          if [ "$MACROS_VERSION" != "$VERSION" ] || [ "$MACROS_DEP_VERSION" != "=$VERSION" ]; then
+            echo "Error: rust_jsc_macros version/dependency ($MACROS_VERSION/$MACROS_DEP_VERSION) must match root version $VERSION with an exact root dependency"
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"
 
@@ -45,12 +81,45 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Verify archive release prerequisites
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ needs.prepare.outputs.version }}"
+          SYS_TAG="sys-v${VERSION}"
+          BASE_URL="https://github.com/kevincaicedo/rust-jsc/releases/download/${SYS_TAG}"
+          ARCHIVES=(
+            libjsc-x86_64-apple-darwin.a.gz
+            libjsc-aarch64-apple-darwin.a.gz
+            libjsc-x86_64-unknown-linux-gnu.a.gz
+            libjsc-aarch64-unknown-linux-gnu.a.gz
+            libjsc-x86_64-unknown-linux-musl.a.gz
+            libjsc-aarch64-unknown-linux-musl.a.gz
+          )
+
+          gh release view "$SYS_TAG" >/dev/null
+          curl --fail --silent --show-error --location "${BASE_URL}/SHA256SUMS" -o SHA256SUMS
+          for archive in "${ARCHIVES[@]}"; do
+            metadata="${archive%.a.gz}.metadata.json"
+            curl --fail --silent --show-error --head "${BASE_URL}/${archive}" >/dev/null
+            curl --fail --silent --show-error --head "${BASE_URL}/${archive}.sha256" >/dev/null
+            curl --fail --silent --show-error --head "${BASE_URL}/${metadata}" >/dev/null
+            if ! awk -v archive="$archive" '$2 == archive { found=1 } END { exit found ? 0 : 1 }' SHA256SUMS; then
+              echo "Error: SHA256SUMS is missing an exact entry for ${archive}" >&2
+              exit 1
+            fi
+          done
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v${{ needs.prepare.outputs.version }}"
+          TAG="${{ needs.prepare.outputs.tag }}"
 
           echo "Release tag: $TAG"
 

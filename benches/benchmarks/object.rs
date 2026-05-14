@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use rust_jsc::{
-    JSContext, JSObject, JSValue, PropertyDescriptor, PropertyDescriptorBuilder,
+    JSClass, JSContext, JSObject, JSValue, PropertyDescriptor, PropertyDescriptorBuilder,
 };
 
 fn bench_object_create(c: &mut Criterion) {
@@ -215,17 +215,19 @@ fn bench_object_set_by_key(c: &mut Criterion) {
 
 fn bench_object_private_data(c: &mut Criterion) {
     let ctx = JSContext::new();
+    let class = JSClass::try_builder("BenchPrivateData")
+        .and_then(|builder| builder.build::<i32>())
+        .unwrap();
 
     c.bench_function("object_set_private_data", |b| {
         b.iter(|| {
-            let obj = JSObject::new(&ctx);
+            let obj = class.object::<i32>(&ctx, None);
             unsafe { obj.set_private_data(42i32) };
             black_box(&obj);
         });
     });
 
-    let obj = JSObject::new(&ctx);
-    unsafe { obj.set_private_data(42i32) };
+    let obj = class.object(&ctx, Some(42i32));
 
     c.bench_function("object_get_private_data_hit", |b| {
         b.iter(|| {

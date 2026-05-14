@@ -5,75 +5,142 @@ use std::{
 };
 
 use rust_jsc_sys::{
-    JSStringCreateWithUTF8CString, JSStringGetLength, JSStringGetMaximumUTF8CStringSize,
-    JSStringGetUTF8CString, JSStringIsEqual, JSStringIsEqualToUTF8CString, JSStringRef,
-    JSStringRelease,
+    JSChar, JSStringCreateWithCharacters, JSStringCreateWithUTF8CString,
+    JSStringGetLength, JSStringGetMaximumUTF8CStringSize, JSStringGetUTF8CString,
+    JSStringIsEqual, JSStringIsEqualToUTF8CString, JSStringRef, JSStringRelease,
+    JSStringRetain,
 };
 
-use crate::{JSString, JSStringProctected};
+use crate::{JSString, JSStringProtected};
 
-impl JSStringProctected {
+fn create_js_string_ref(value: &str) -> JSStringRef {
+    match CString::new(value.as_bytes()) {
+        Ok(value) => {
+            // SAFETY: `CString` provides a live NUL-terminated UTF-8 buffer for
+            // the duration of the call, and JavaScriptCore copies the input.
+            unsafe { JSStringCreateWithUTF8CString(value.as_ptr()) }
+        }
+        Err(_) => {
+            let utf16: Vec<JSChar> = value.encode_utf16().collect();
+            // SAFETY: `utf16.as_ptr()` points to `utf16.len()` initialized
+            // UTF-16 code units for the duration of the call, and
+            // JavaScriptCore copies the input.
+            unsafe { JSStringCreateWithCharacters(utf16.as_ptr(), utf16.len()) }
+        }
+    }
+}
+
+fn js_string_ref_to_utf8_bytes(inner: JSStringRef) -> Vec<u8> {
+    // SAFETY: callers pass a live `JSStringRef`; this only asks
+    // JavaScriptCore for the maximum UTF-8 buffer size.
+    let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(inner) };
+    if max_len == 0 {
+        return Vec::new();
+    }
+
+    let mut buffer = vec![0u8; max_len];
+    // SAFETY: `buffer` is initialized with `max_len` bytes and the pointer is
+    // writable for exactly that size. JavaScriptCore writes a NUL-terminated
+    // UTF-8 string and returns the byte count including the terminator.
+    let new_size = unsafe {
+        JSStringGetUTF8CString(inner, buffer.as_mut_ptr() as *mut c_char, max_len)
+    };
+    buffer.truncate(new_size.saturating_sub(1));
+    buffer
+}
+
+fn js_string_ref_eq_str(inner: JSStringRef, other: &str) -> bool {
+    match CString::new(other.as_bytes()) {
+        Ok(other) => {
+            // SAFETY: `inner` is a live `JSStringRef`, and `other` is a
+            // NUL-terminated UTF-8 buffer for the duration of the call.
+            unsafe { JSStringIsEqualToUTF8CString(inner, other.as_ptr()) }
+        }
+        Err(_) => {
+            let other = JSString::from(other);
+            // SAFETY: both inputs are live JavaScriptCore strings.
+            unsafe { JSStringIsEqual(inner, other.inner) }
+        }
+    }
+}
+
+impl JSStringProtected {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     pub fn len(&self) -> usize {
+        // SAFETY: `self.0` is a live `JSStringRef` retained by this wrapper.
         unsafe { JSStringGetLength(self.0) }
     }
 
-    pub fn release(&self) {
-        unsafe {
-            JSStringRelease(self.0);
-        }
+    /// Releases this retained string before the end of its scope.
+    pub fn release(self) {
+        drop(self);
     }
-}
 
-impl From<&str> for JSStringProctected {
-    fn from(s: &str) -> Self {
-        let c = CString::new(s.as_bytes())
-            .expect("&str to JSStringProctected conversion failed");
-        Self(unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) })
+    /// Transfers the retained string reference to another owner.
+    ///
+    /// The caller becomes responsible for exactly one `JSStringRelease` or
+    /// equivalent JavaScriptCore deref on the returned reference.
+    pub fn into_raw(self) -> JSStringRef {
+        let inner = self.0;
+        std::mem::forget(self);
+        inner
     }
-}
 
-impl From<String> for JSStringProctected {
-    fn from(s: String) -> Self {
-        let c = CString::new(s.as_bytes())
-            .expect("String to JSStringProctected conversion failed");
-        Self(unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) })
-    }
-}
-
-impl From<JSStringRef> for JSStringProctected {
-    fn from(inner: JSStringRef) -> Self {
+    /// Takes ownership of a retained JavaScriptCore string reference.
+    ///
+    /// # Safety
+    /// `inner` must be a non-null `JSStringRef` owned by the caller. After this
+    /// call, this wrapper releases it exactly once unless ownership is moved
+    /// with [`JSStringProtected::into_raw`].
+    pub unsafe fn from_owned_ref(inner: JSStringRef) -> Self {
         Self(inner)
     }
 }
 
-impl From<JSStringProctected> for JSStringRef {
-    fn from(s: JSStringProctected) -> Self {
-        s.0
+impl From<&str> for JSStringProtected {
+    fn from(s: &str) -> Self {
+        Self(create_js_string_ref(s))
     }
 }
 
-impl std::fmt::Display for JSStringProctected {
+impl From<String> for JSStringProtected {
+    fn from(s: String) -> Self {
+        Self(create_js_string_ref(&s))
+    }
+}
+
+impl From<JSStringProtected> for JSStringRef {
+    fn from(s: JSStringProtected) -> Self {
+        s.into_raw()
+    }
+}
+
+impl std::fmt::Display for JSStringProtected {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.0) };
-        let mut buffer = vec![0u8; max_len];
-        let new_size = unsafe {
-            JSStringGetUTF8CString(self.0, buffer.as_mut_ptr() as *mut c_char, max_len)
-        };
-        unsafe {
-            buffer.set_len(new_size - 1);
-        };
+        let buffer = js_string_ref_to_utf8_bytes(self.0);
         let s = String::from_utf8(buffer).map_err(|_| std::fmt::Error)?;
         write!(fmt, "{}", s)
     }
 }
 
-impl Clone for JSStringProctected {
+impl Clone for JSStringProtected {
     fn clone(&self) -> Self {
         self.to_string().into()
+    }
+}
+
+impl Drop for JSStringProtected {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            // SAFETY: `self.0` is the retained string reference owned by this
+            // RAII wrapper and is released exactly once from `Drop`.
+            unsafe {
+                JSStringRelease(self.0);
+            }
+        }
     }
 }
 
@@ -84,78 +151,77 @@ impl JSString {
         Self { inner }
     }
 
+    /// Takes ownership of a JavaScriptCore string reference.
+    ///
+    /// # Safety
+    /// `inner` must be a non-null `JSStringRef` owned by the caller. The
+    /// returned wrapper releases it exactly once in `Drop`.
+    pub unsafe fn from_owned_ref(inner: JSStringRef) -> Self {
+        Self::new(inner)
+    }
+
+    /// Retains a borrowed JavaScriptCore string reference.
+    ///
+    /// # Safety
+    /// `inner` must be a non-null live `JSStringRef`. The returned wrapper owns
+    /// one retained reference and releases it in `Drop`.
+    pub unsafe fn retain_from_ref(inner: JSStringRef) -> Self {
+        // SAFETY: caller guarantees `inner` is a live JavaScriptCore string.
+        Self::new(unsafe { JSStringRetain(inner) })
+    }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     pub fn len(&self) -> usize {
+        // SAFETY: `self.inner` is a live `JSStringRef` owned by this wrapper.
         unsafe { JSStringGetLength(self.inner) }
     }
 }
 
 impl PartialEq for JSString {
     fn eq(&self, other: &JSString) -> bool {
+        // SAFETY: both wrappers hold live JavaScriptCore strings.
         unsafe { JSStringIsEqual(self.inner, other.inner) }
     }
 }
 
 impl<'s> PartialEq<&'s str> for JSString {
     fn eq(&self, other: &&'s str) -> bool {
-        let utf8 =
-            CString::new(other.as_bytes()).expect("JSString to &str conversion failed");
-        unsafe { JSStringIsEqualToUTF8CString(self.inner, utf8.as_ptr()) }
+        js_string_ref_eq_str(self.inner, other)
     }
 }
 
 impl PartialEq<String> for JSString {
     fn eq(&self, other: &String) -> bool {
-        let utf8 =
-            CString::new(other.as_bytes()).expect("String to JSString conversion failed");
-        unsafe { JSStringIsEqualToUTF8CString(self.inner, utf8.as_ptr()) }
+        js_string_ref_eq_str(self.inner, other)
     }
 }
 
-impl<'s> PartialEq<JSString> for &'s str {
+impl PartialEq<JSString> for &str {
     fn eq(&self, other: &JSString) -> bool {
-        let utf8 =
-            CString::new(self.as_bytes()).expect("JSString to &str conversion failed");
-        unsafe { JSStringIsEqualToUTF8CString(other.inner, utf8.as_ptr()) }
+        js_string_ref_eq_str(other.inner, self)
     }
 }
 
 impl PartialEq<JSString> for String {
     fn eq(&self, other: &JSString) -> bool {
-        let utf8 =
-            CString::new(self.as_bytes()).expect("JSString to String conversion failed");
-        unsafe { JSStringIsEqualToUTF8CString(other.inner, utf8.as_ptr()) }
+        js_string_ref_eq_str(other.inner, self)
     }
 }
 
 impl From<&str> for JSString {
     fn from(s: &str) -> Self {
-        let c = CString::new(s.as_bytes()).expect("&str to JSString conversion failed");
         JSString {
-            inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
+            inner: create_js_string_ref(s),
         }
     }
 }
 
-impl<'a> Into<Vec<u8>> for JSString {
-    fn into(self) -> Vec<u8> {
-        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
-        let mut buffer = vec![0u8; max_len];
-        let new_size = unsafe {
-            JSStringGetUTF8CString(
-                self.inner,
-                buffer.as_mut_ptr() as *mut c_char,
-                max_len,
-            )
-        };
-        unsafe {
-            buffer.set_len(new_size - 1);
-        };
-
-        return buffer;
+impl From<JSString> for Vec<u8> {
+    fn from(value: JSString) -> Self {
+        js_string_ref_to_utf8_bytes(value.inner)
     }
 }
 
@@ -165,6 +231,8 @@ impl TryFrom<&[u8]> for JSString {
     fn try_from(s: &[u8]) -> Result<Self, Self::Error> {
         let c = CString::new(s)?;
         Ok(JSString {
+            // SAFETY: `CString` provides a live NUL-terminated UTF-8 buffer for
+            // the duration of the call, and JavaScriptCore copies the input.
             inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
         })
     }
@@ -176,6 +244,8 @@ impl TryFrom<&mut [u8]> for JSString {
     fn try_from(s: &mut [u8]) -> Result<Self, Self::Error> {
         let c = CString::new(s)?;
         Ok(JSString {
+            // SAFETY: `CString` provides a live NUL-terminated UTF-8 buffer for
+            // the duration of the call, and JavaScriptCore copies the input.
             inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
         })
     }
@@ -191,16 +261,9 @@ impl<const N: usize> TryFrom<&[u8; N]> for JSString {
 
 impl From<String> for JSString {
     fn from(s: String) -> Self {
-        let c = CString::new(s.as_bytes()).expect("String to JSString conversion failed");
         JSString {
-            inner: unsafe { JSStringCreateWithUTF8CString(c.as_ptr()) },
+            inner: create_js_string_ref(&s),
         }
-    }
-}
-
-impl From<JSStringRef> for JSString {
-    fn from(inner: JSStringRef) -> Self {
-        Self { inner }
     }
 }
 
@@ -212,18 +275,7 @@ impl Clone for JSString {
 
 impl Debug for JSString {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
-        let mut buffer = vec![0u8; max_len];
-        let new_size = unsafe {
-            JSStringGetUTF8CString(
-                self.inner,
-                buffer.as_mut_ptr() as *mut c_char,
-                max_len,
-            )
-        };
-        unsafe {
-            buffer.set_len(new_size - 1);
-        };
+        let buffer = js_string_ref_to_utf8_bytes(self.inner);
         let s = String::from_utf8(buffer).map_err(|_| std::fmt::Error)?;
         write!(fmt, "{:?}", s)
     }
@@ -231,18 +283,7 @@ impl Debug for JSString {
 
 impl std::fmt::Display for JSString {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let max_len = unsafe { JSStringGetMaximumUTF8CStringSize(self.inner) };
-        let mut buffer = vec![0u8; max_len];
-        let new_size = unsafe {
-            JSStringGetUTF8CString(
-                self.inner,
-                buffer.as_mut_ptr() as *mut c_char,
-                max_len,
-            )
-        };
-        unsafe {
-            buffer.set_len(new_size - 1);
-        };
+        let buffer = js_string_ref_to_utf8_bytes(self.inner);
         let s = String::from_utf8(buffer).map_err(|_| std::fmt::Error)?;
         write!(fmt, "{}", s)
     }
@@ -250,6 +291,8 @@ impl std::fmt::Display for JSString {
 
 impl Drop for JSString {
     fn drop(&mut self) {
+        // SAFETY: `self.inner` is an owned `JSStringRef` for this wrapper and
+        // is released exactly once from `Drop`.
         unsafe {
             JSStringRelease(self.inner);
         }
@@ -258,7 +301,7 @@ impl Drop for JSString {
 
 #[cfg(test)]
 mod tests {
-    use crate::{JSString, JSStringProctected};
+    use crate::{JSString, JSStringProtected};
 
     #[test]
     fn test_js_string() {
@@ -283,15 +326,15 @@ mod tests {
 
     #[test]
     fn test_js_string_retain_eq_utf8() {
-        let s1 = JSStringProctected::from("Hello, World!");
-        let s2 = JSStringProctected::from("Hello, World!");
-        let s3 = JSStringProctected::from("démonstration.html");
-        let s4 = JSStringProctected::from("こんにちは世界");
-        let s5 = JSStringProctected::from("Привет, мир!");
-        let s6 = JSStringProctected::from("😊👍🏽");
-        let s7 = JSStringProctected::from("");
-        let s8 = JSStringProctected::from("你好，世界！");
-        let s9 = JSStringProctected::from("Bonjour le monde!");
+        let s1 = JSStringProtected::from("Hello, World!");
+        let s2 = JSStringProtected::from("Hello, World!");
+        let s3 = JSStringProtected::from("démonstration.html");
+        let s4 = JSStringProtected::from("こんにちは世界");
+        let s5 = JSStringProtected::from("Привет, мир!");
+        let s6 = JSStringProtected::from("😊👍🏽");
+        let s7 = JSStringProtected::from("");
+        let s8 = JSStringProtected::from("你好，世界！");
+        let s9 = JSStringProtected::from("Bonjour le monde!");
 
         // Test equality with the same content
         assert_eq!(s1.to_string(), s2.to_string());
@@ -363,6 +406,18 @@ mod tests {
     }
 
     #[test]
+    fn test_js_string_interior_nul_does_not_panic_or_truncate() {
+        let value = "left\0right";
+        let js_string = JSString::from(value);
+        assert_eq!(js_string.to_string(), value);
+        assert_eq!(js_string, value);
+        assert_eq!(value, js_string);
+
+        let protected = JSStringProtected::from(value);
+        assert_eq!(protected.to_string(), value);
+    }
+
+    #[test]
     fn test_js_string_len() {
         let s = JSString::from("Hello, World!");
         assert_eq!(s.len(), 13);
@@ -371,7 +426,7 @@ mod tests {
     #[test]
     fn test_js_string_is_empty() {
         let s = JSString::from("");
-        assert_eq!(s.is_empty(), true);
+        assert!(s.is_empty());
     }
 
     #[test]
@@ -382,7 +437,7 @@ mod tests {
         let s = JSString::try_from(&b"Hello, World!"[..]).unwrap();
         assert_eq!(s.to_string(), "Hello, World!");
 
-        let mut data = b"Hello, World!".clone();
+        let mut data = *b"Hello, World!";
         let s = JSString::try_from(&mut data[..]).unwrap();
         assert_eq!(s.to_string(), "Hello, World!");
 
@@ -397,16 +452,21 @@ mod tests {
         let s = JSString::try_from(b"Hello, World!").unwrap();
         let bytes: Vec<u8> = s.into();
         assert_eq!(bytes, b"Hello, World!");
+
+        let s = JSString::try_from(b"Hello, World!").unwrap();
+        assert_eq!(Vec::<u8>::from(s), b"Hello, World!");
     }
 
     #[test]
     fn test_jsstring_retain() {
-        let s = JSStringProctected::from("Hello, World!");
+        let s = JSStringProtected::from("Hello, World!");
         assert_eq!(s.to_string(), "Hello, World!");
 
-        let s1 = JSStringProctected::from("Hello, World!");
-        let s2 = JSStringProctected::from("Hello, World!");
+        let s1 = JSStringProtected::from("Hello, World!");
+        let s2 = JSStringProtected::from("Hello, World!");
         assert_eq!(s1.clone().to_string(), s2.to_string());
         assert_eq!(s1.to_string(), s2.clone().to_string());
+
+        JSStringProtected::from("release early").release();
     }
 }

@@ -1,0 +1,36 @@
+[package]
+name = "api-showcase"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+rust_jsc = { path = "../.." }
+
+[[bin]]
+name = "classes"
+path = "src/bin/classes.rs"
+
+[[bin]]
+name = "callbacks"
+path = "src/bin/callbacks.rs"
+
+[[bin]]
+name = "typed_arrays"
+path = "src/bin/typed_arrays.rs"
+
+[[bin]]
+name = "modules_file"
+path = "src/bin/modules_file.rs"
+
+[[bin]]
+name = "modules_custom_loader"
+path = "src/bin/modules_custom_loader.rs"
+
+[[bin]]
+name = "promises"
+path = "src/bin/promises.rs"
+
+[[bin]]
+name = "kedo_integration"
+path = "src/bin/kedo_integration.rs"

@@ -13,6 +13,9 @@ LOCAL_JSC_LIB_DIR ?= $(JSC_BUILD_DIR)/lib
 LOCAL_JSC_LIB_DIR_ABS = $(abspath $(LOCAL_JSC_LIB_DIR))
 JSC_EXTRA_CMAKE_ARGS ?=
 JSC_CMAKE_ARGS := -DPORT=JSCOnly -DCMAKE_BUILD_TYPE=$(JSC_PROFILE) -DSHOW_BINDINGS_GENERATION_PROGRESS=1 -DDEVELOPER_MODE=ON -DENABLE_REMOTE_INSPECTOR=ON -DENABLE_FTL_JIT=ON $(JSC_EXTRA_CMAKE_ARGS)
+JSC_SANITIZER_BUILD_ROOT ?= $(WEBKIT_DIR)/WebKitBuild/RustJSC-Sanitizers
+JSC_SANITIZER_PROFILE ?= Release
+SANITIZER_ENV = WEBKIT_DIR="$(WEBKIT_DIR)" JSC_GENERATOR="$(JSC_GENERATOR)" JSC_JOBS="$(JSC_JOBS)" JSC_SANITIZER_BUILD_ROOT="$(JSC_SANITIZER_BUILD_ROOT)" JSC_SANITIZER_PROFILE="$(JSC_SANITIZER_PROFILE)" JSC_SANITIZER_CMAKE_ARGS="$(JSC_EXTRA_CMAKE_ARGS)"
 
 ifeq ($(JSC_STATIC),ON)
 JSC_CMAKE_ARGS += -DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF
@@ -24,7 +27,6 @@ help:
 	@echo "  build-docker-jsc: Build the Docker image with JavaScriptCore"
 	@echo "  build-jsc: Build JavaScriptCore static archives with direct CMake/JSCOnly"
 	@echo "  build-jsc-static: Alias for the default static JSC build"
-	@echo "  build-jsc-framework: Build JavaScriptCore as a local macOS framework/dynamic build"
 	@echo "  jsc-jit-archive: Create libJavaScriptCoreJIT.a from CMake JIT objects when present"
 	@echo "  build-jsc-buildjsc: Build JavaScriptCore through WebKit/Tools/Scripts/build-jsc"
 	@echo "  jsc-smoke: Run a small smoke test against the local jsc binary"
@@ -33,6 +35,11 @@ help:
 	@echo "  gen-bindings: Generate the Rust bindings"
 	@echo "  test: Run the unit tests"
 	@echo "  test-local-jsc: Run unit tests against the local JSC build"
+	@echo "  test-webkit-api-asan: Build ASAN JSCOnly and run TestWTF/TestJavaScriptCore"
+	@echo "  test-webkit-api-ubsan: Build UBSAN JSCOnly and run TestWTF/TestJavaScriptCore"
+	@echo "  test-rust-asan: Run Rust tests with nightly ASAN against ASAN JSCOnly"
+	@echo "  test-rust-ubsan: Run Rust tests against UBSAN JSCOnly with Rust UB checks where available"
+	@echo "  test-sanitizers: Run practical WebKit API and Rust ASAN/UBSAN validation"
 	@echo "  all-tests: Run all the tests (including workspace members)"
 	@echo "  archive: Archive the build artifacts with the platform parameter"
 	@echo "  bench: Run all Criterion benchmarks"
@@ -103,9 +110,6 @@ build-jsc:
 build-jsc-static:
 	$(MAKE) build-jsc JSC_STATIC=ON JSC_BUILD_DIR=$(JSC_BUILD_ROOT)/JSCOnly/$(JSC_PROFILE)-Static
 
-build-jsc-framework:
-	$(MAKE) build-jsc JSC_STATIC=OFF JSC_BUILD_DIR=$(JSC_BUILD_ROOT)/JSCOnly/$(JSC_PROFILE)
-
 jsc-jit-archive:
 	@if [ ! -d "$(JSC_BUILD_DIR)/Source/JavaScriptCore/CMakeFiles/JavaScriptCoreJIT.dir" ]; then \
 		echo "JavaScriptCoreJIT object directory not produced for $(JSC_BUILD_DIR); libJavaScriptCore.a is self-contained for this target"; \
@@ -129,9 +133,9 @@ build-jsc-buildjsc:
 
 jsc-smoke:
 	$(JSC_BUILD_DIR)/bin/jsc -e "print(1 + 1)"
-	$(JSC_BUILD_DIR)/bin/jsc -e "var b = UFT8Encoding('hé'); print(b.constructor.name + ':' + b.length + ':' + b[0] + ':' + b[1] + ':' + b[2]);"
 
-# archive all *.a files from JSCOnly build receive the name libjsc-<platform>.a.gz, platform is a parameter
+# Archive all *.a files from a JSCOnly build as libjsc-<platform>.a.gz.
+# The packager writes deterministic tar.gz bytes plus .sha256 and metadata JSON.
 archive:
 	@echo "Archiving the build artifacts..."
 
@@ -149,8 +153,7 @@ archive:
 		exit 1; \
 	fi
 
-	@cd "$(LOCAL_JSC_LIB_DIR)" && \
-	tar -czf "$(CURDIR)/libjsc-$(platform).a.gz" *.a
+	python3 scripts/package_jsc_archive.py --lib-dir "$(LOCAL_JSC_LIB_DIR)" --target-triple "$(platform)" --output-dir "$(CURDIR)" --repo-root "$(CURDIR)" --webkit-dir "$(WEBKIT_DIR)" --build-dir "$(JSC_BUILD_DIR)"
 
 archive-debug:
 	$(MAKE) archive platform=$(platform) JSC_PROFILE=Debug JSC_BUILD_DIR=$(JSC_BUILD_ROOT)/JSCOnly/Debug-Static
@@ -163,18 +166,37 @@ archive-linux:
 		exit 1; \
 	fi
 
-	@cd .libs && \
-	tar -czf libjsc-$(platform).a.gz *.a && \
-	mv libjsc-$(platform).a.gz ../
+	python3 scripts/package_jsc_archive.py --lib-dir ".libs" --target-triple "$(platform)" --output-dir "$(CURDIR)" --repo-root "$(CURDIR)" --webkit-dir "$(WEBKIT_DIR)"
 
 build-lib:
 	cargo build --release
 
 build-lib-local-jsc:
-	DYLD_FRAMEWORK_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$DYLD_FRAMEWORK_PATH" LD_LIBRARY_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$LD_LIBRARY_PATH" RUST_JSC_BUILD_MODE=static RUST_JSC_CUSTOM_BUILD_PATH="$(LOCAL_JSC_LIB_DIR_ABS)" cargo build --release
+	DYLD_FRAMEWORK_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$DYLD_FRAMEWORK_PATH" LD_LIBRARY_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$LD_LIBRARY_PATH" RUST_JSC_BUILD_MODE=download RUST_JSC_LIB_DIR="$(LOCAL_JSC_LIB_DIR_ABS)" cargo build --release
 
 test-local-jsc:
-	DYLD_FRAMEWORK_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$DYLD_FRAMEWORK_PATH" LD_LIBRARY_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$LD_LIBRARY_PATH" RUST_JSC_BUILD_MODE=static RUST_JSC_CUSTOM_BUILD_PATH="$(LOCAL_JSC_LIB_DIR_ABS)" RUST_BACKTRACE=1 cargo test --lib -- --test-threads=1
+	DYLD_FRAMEWORK_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$DYLD_FRAMEWORK_PATH" LD_LIBRARY_PATH="$(LOCAL_JSC_LIB_DIR_ABS):$$LD_LIBRARY_PATH" RUST_JSC_BUILD_MODE=download RUST_JSC_LIB_DIR="$(LOCAL_JSC_LIB_DIR_ABS)" RUST_BACKTRACE=1 cargo test --lib -- --test-threads=1
+
+build-jsc-asan:
+	$(SANITIZER_ENV) bash scripts/run-sanitizers.sh build-webkit-asan
+
+build-jsc-ubsan:
+	$(SANITIZER_ENV) bash scripts/run-sanitizers.sh build-webkit-ubsan
+
+test-webkit-api-asan:
+	$(SANITIZER_ENV) bash scripts/run-sanitizers.sh webkit-asan
+
+test-webkit-api-ubsan:
+	$(SANITIZER_ENV) bash scripts/run-sanitizers.sh webkit-ubsan
+
+test-rust-asan:
+	$(SANITIZER_ENV) bash scripts/run-sanitizers.sh rust-asan
+
+test-rust-ubsan:
+	$(SANITIZER_ENV) bash scripts/run-sanitizers.sh rust-ubsan
+
+test-sanitizers:
+	$(SANITIZER_ENV) bash scripts/run-sanitizers.sh all
 
 gen-bindings:
 	(cd gen && cargo build --release)
@@ -196,4 +218,4 @@ flamegraph:
 	cargo flamegraph --root --manifest-path examples/stress/Cargo.toml --release -o flamegraph.svg
 	@echo "Flamegraph written to flamegraph.svg"
 
-.PHONY: build-docker-jsc build-jsc build-jsc-static build-jsc-framework jsc-jit-archive build-jsc-debug build-jsc-buildjsc jsc-smoke build-lib build-lib-local-jsc gen-bindings test test-local-jsc archive bench bench-report run-stress profile-heap flamegraph
+.PHONY: build-docker-jsc build-jsc build-jsc-static jsc-jit-archive build-jsc-debug build-jsc-buildjsc jsc-smoke build-lib build-lib-local-jsc gen-bindings test test-local-jsc build-jsc-asan build-jsc-ubsan test-webkit-api-asan test-webkit-api-ubsan test-rust-asan test-rust-ubsan test-sanitizers archive bench bench-report run-stress profile-heap flamegraph

@@ -1,0 +1,117 @@
+name: WebKit Fork
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/webkit-fork.yml"
+      - "WebKit/**"
+      - "Makefile"
+      - "gen/**"
+      - "sys/src/lib.rs"
+      - "scripts/package_jsc_archive.py"
+  schedule:
+    - cron: "0 12 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webkit-fork-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jsc-only-linux:
+    name: JSCOnly Linux API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      JSC_BUILD_ROOT: WebKit/WebKitBuild/RustJSC-CI
+      JSC_JOBS: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Install WebKit build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bison \
+            clang \
+            cmake \
+            file \
+            flex \
+            libatomic1 \
+            libicu-dev \
+            ninja-build \
+            perl \
+            python3 \
+            ruby
+
+      - name: Build JavaScriptCore JSCOnly
+        run: make build-jsc-static
+
+      - name: Run jsc smoke
+        run: make jsc-smoke
+
+      - name: Build and run testapi
+        run: |
+          set -euo pipefail
+          JSC_BUILD_DIR="${PWD}/${JSC_BUILD_ROOT}/JSCOnly/Release-Static"
+          cmake --build "$JSC_BUILD_DIR" --target testapi --parallel "$JSC_JOBS"
+          "$JSC_BUILD_DIR/bin/testapi"
+
+      - name: Build and run TestJavaScriptCore
+        run: |
+          set -euo pipefail
+          JSC_BUILD_DIR="${PWD}/${JSC_BUILD_ROOT}/JSCOnly/Release-Static"
+          cmake --build "$JSC_BUILD_DIR" --target TestJavaScriptCore --parallel "$JSC_JOBS"
+          "$JSC_BUILD_DIR/bin/TestWebKitAPI/TestJavaScriptCore"
+
+      - name: Check WebKit diff whitespace
+        run: git diff --check
+
+  generated-bindings:
+    name: Generated Binding Drift
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      JSC_BUILD_ROOT: WebKit/WebKitBuild/RustJSC-BindingCheck
+      JSC_JOBS: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake ninja
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build JavaScriptCore headers
+        run: make build-jsc-static
+
+      - name: Regenerate sys bindings
+        run: |
+          set -euo pipefail
+          SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          JSC_BUILD_DIR="${PWD}/${JSC_BUILD_ROOT}/JSCOnly/Release-Static"
+          JAVASCRIPTCORE_HEADERS_PATH="${PWD}/WebKit/Source/JavaScriptCore/API" \
+          JAVASCRIPTCORE_FRAMEWORK_HEADERS_PATH="${JSC_BUILD_DIR}/JavaScriptCore/Headers" \
+          CUSTOM_BUILD_FRAMEWORK_PATH="${JSC_BUILD_DIR}/lib" \
+          SYSTEM_FRAMEWORKS_PATH="${SDKROOT}/System/Library/Frameworks" \
+          CORE_FOUNDATION_HEADERS_PATH="${SDKROOT}/System/Library/Frameworks/CoreFoundation.framework/Headers" \
+          cargo run --manifest-path gen/Cargo.toml
+
+      - name: Verify generated bindings are committed
+        run: git diff --exit-code -- sys/src/lib.rs

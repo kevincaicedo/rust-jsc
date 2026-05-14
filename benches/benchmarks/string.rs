@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, Criterion};
-use rust_jsc::{JSString, JSStringProctected};
+use rust_jsc::{JSString, JSStringProtected};
 
 fn bench_string_create(c: &mut Criterion) {
     let mut group = c.benchmark_group("string_create");
@@ -92,7 +92,7 @@ fn bench_string_to_rust(c: &mut Criterion) {
 fn bench_string_protected_lifecycle(c: &mut Criterion) {
     c.bench_function("string_protected_create_drop", |b| {
         b.iter(|| {
-            let s = JSStringProctected::from("protected string lifecycle");
+            let s = JSStringProtected::from("protected string lifecycle");
             black_box(&s);
             // s is not auto-dropped; it stays alive until explicitly released
             // This measures the creation overhead
