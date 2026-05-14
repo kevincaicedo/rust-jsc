@@ -1,16 +1,19 @@
 use crate::{
-    JSClass, JSContext, JSContextGroup, JSError, JSObject, JSResult, JSString,
-    JSStringProctected, JSValue, PrivateDataWrapper, TypedJSContext,
+    not_send_or_sync, JSClass, JSContext, JSContextGroup, JSError, JSGlobalContext,
+    JSObject, JSResult, JSString, JSStringProctected, JSValue, OwnedJSContextGroup,
+    PrivateDataDropStatus, PrivateDataSetStatus, PrivateDataTakeResult,
+    PrivateDataWrapper, TypedJSContext,
 };
 use rust_jsc_sys::{
     InspectorMessageCallback, InspectorPauseEventCallback, JSAPIModuleLoader,
     JSCheckScriptSyntax, JSContextGetGlobalContext, JSContextGetGlobalObject,
     JSContextGetGroup, JSContextGetSharedData, JSContextGroupCreate, JSContextGroupRef,
-    JSContextGroupRelease, JSContextRef, JSContextSetSharedData, JSEvaluateScript,
-    JSGarbageCollect, JSGetMemoryUsageStatistics, JSGlobalContextCopyName,
-    JSGlobalContextCreate, JSGlobalContextCreateInGroup, JSGlobalContextIsInspectable,
-    JSGlobalContextRef, JSGlobalContextRelease, JSGlobalContextSetInspectable,
-    JSGlobalContextSetName, JSGlobalContextSetUncaughtExceptionAtEventLoopCallback,
+    JSContextGroupRelease, JSContextGroupRetain, JSContextRef, JSContextSetSharedData,
+    JSEvaluateScript, JSGarbageCollect, JSGetMemoryUsageStatistics,
+    JSGlobalContextCopyName, JSGlobalContextCreate, JSGlobalContextCreateInGroup,
+    JSGlobalContextIsInspectable, JSGlobalContextRef, JSGlobalContextRelease,
+    JSGlobalContextRetain, JSGlobalContextSetInspectable, JSGlobalContextSetName,
+    JSGlobalContextSetUncaughtExceptionAtEventLoopCallback,
     JSGlobalContextSetUncaughtExceptionHandler,
     JSGlobalContextSetUnhandledRejectionCallback, JSInspectorDisconnect,
     JSInspectorIsConnected, JSInspectorSendMessage, JSInspectorSetCallback,
@@ -22,45 +25,100 @@ use rust_jsc_sys::{
 use std::ffi::CString;
 
 impl JSContextGroup {
-    pub fn new_context(&self) -> JSContext {
+    /// Creates a borrowed JavaScriptCore context-group view from a raw group.
+    ///
+    /// The returned [`JSContextGroup`] does not retain or release the raw
+    /// `JSContextGroupRef`. Use [`JSContextGroup::retain`] when Rust must own a
+    /// group reference beyond the owner that provided this raw pointer.
+    ///
+    /// # Safety
+    /// `context_group` must be a valid `JSContextGroupRef` and must remain
+    /// alive while the returned borrowed view is used.
+    pub unsafe fn borrowed(context_group: JSContextGroupRef) -> Self {
+        Self::from_ref(context_group)
+    }
+
+    pub(crate) fn from_ref(context_group: JSContextGroupRef) -> Self {
+        Self {
+            context_group,
+            _not_send_or_sync: not_send_or_sync(),
+        }
+    }
+
+    pub fn new() -> OwnedJSContextGroup {
+        OwnedJSContextGroup::new()
+    }
+
+    pub fn retain(&self) -> OwnedJSContextGroup {
+        let context_group = unsafe { JSContextGroupRetain(self.context_group) };
+        OwnedJSContextGroup {
+            inner: Self::from_ref(context_group),
+        }
+    }
+
+    pub fn new_context(&self) -> JSGlobalContext {
         let ctx = unsafe {
             JSGlobalContextCreateInGroup(self.context_group, std::ptr::null_mut())
         };
-        JSContext::from(ctx)
+        JSGlobalContext::from_owned_ref(ctx)
     }
 
-    pub fn new_context_with_class(&self, class: &JSClass) -> JSContext {
+    pub fn new_context_with_class(&self, class: &JSClass) -> JSGlobalContext {
         let ctx =
             unsafe { JSGlobalContextCreateInGroup(self.context_group, class.inner) };
-        JSContext::from(ctx)
+        JSGlobalContext::from_owned_ref(ctx)
     }
+}
 
-    /// Creates a new `JSContextGroup` object.
+impl OwnedJSContextGroup {
+    /// Creates a new owned JavaScript context group.
+    ///
+    /// JavaScriptCore ties deferred group work to the run loop of the creating
+    /// thread. Use contexts and values from the group on one thread unless you
+    /// provide external synchronization.
     pub fn new() -> Self {
         let context_group = unsafe { JSContextGroupCreate() };
-        Self { context_group }
-    }
-}
-
-impl From<JSContextGroupRef> for JSContextGroup {
-    fn from(group: JSContextGroupRef) -> Self {
         Self {
-            context_group: group,
+            inner: JSContextGroup::from_ref(context_group),
         }
     }
+
+    pub fn as_context_group(&self) -> &JSContextGroup {
+        &self.inner
+    }
 }
 
-impl Drop for JSContextGroup {
+impl std::ops::Deref for OwnedJSContextGroup {
+    type Target = JSContextGroup;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl Drop for OwnedJSContextGroup {
     fn drop(&mut self) {
         unsafe {
-            JSContextGroupRelease(self.context_group);
+            JSContextGroupRelease(self.inner.context_group);
         }
+    }
+}
+
+impl Default for OwnedJSContextGroup {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl std::fmt::Debug for JSContextGroup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("JSContextGroup").finish()
+    }
+}
+
+impl std::fmt::Debug for OwnedJSContextGroup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OwnedJSContextGroup").finish()
     }
 }
 
@@ -77,9 +135,37 @@ pub enum InspectorPauseEvent {
 }
 
 impl JSContext {
-    /// Creates a new `JSContext` object.
+    /// Creates a borrowed JavaScriptCore context view from a raw context.
     ///
-    /// Gets a new global context of a JavaScript execution context.
+    /// The returned [`JSContext`] does not retain or release the underlying
+    /// global context. This is the correct wrapper for JavaScriptCore callback
+    /// arguments. Use [`JSContext::retain`] or [`JSGlobalContext::retain_from_raw`]
+    /// when Rust needs an owned context handle.
+    ///
+    /// # Safety
+    /// `context` must be a valid `JSContextRef` and its global context must
+    /// remain alive while the returned borrowed view is used.
+    pub unsafe fn borrowed(context: JSContextRef) -> Self {
+        Self::from_ref(context)
+    }
+
+    pub(crate) fn from_ref(context: JSContextRef) -> Self {
+        let global_context = unsafe { JSContextGetGlobalContext(context) };
+        Self::from_global_ref(global_context)
+    }
+
+    pub(crate) fn from_global_ref(inner: JSGlobalContextRef) -> Self {
+        Self {
+            inner,
+            _not_send_or_sync: not_send_or_sync(),
+        }
+    }
+
+    /// Creates a new owned JavaScript global context.
+    ///
+    /// The returned [`JSGlobalContext`] releases the underlying
+    /// `JSGlobalContextRef` in `Drop`. Borrowed callback contexts are represented
+    /// by [`JSContext`] and do not release the context.
     ///
     /// # Examples
     /// ```
@@ -87,14 +173,17 @@ impl JSContext {
     ///
     /// let ctx = JSContext::new();
     /// ```
-    pub fn new() -> Self {
-        let ctx = unsafe { JSGlobalContextCreate(std::ptr::null_mut()) };
-        Self { inner: ctx }
+    pub fn new() -> JSGlobalContext {
+        JSGlobalContext::new()
     }
 
-    pub fn new_with(class: &JSClass) -> Self {
-        let ctx = unsafe { JSGlobalContextCreate(class.inner) };
-        Self { inner: ctx }
+    pub fn new_with(class: &JSClass) -> JSGlobalContext {
+        JSGlobalContext::new_with(class)
+    }
+
+    pub fn retain(&self) -> JSGlobalContext {
+        let ctx = unsafe { JSGlobalContextRetain(self.inner) };
+        JSGlobalContext::from_owned_ref(ctx)
     }
 
     /// Garbage collects the JavaScript execution context.
@@ -294,7 +383,7 @@ impl JSContext {
 
     pub fn group(&self) -> JSContextGroup {
         let group = unsafe { JSContextGetGroup(self.inner) };
-        JSContextGroup::from(group)
+        JSContextGroup::from_ref(group)
     }
 
     /// Gets the global object of the JavaScript execution context.
@@ -596,6 +685,13 @@ impl JSContext {
             return Err(value.into());
         }
 
+        if result.is_null() {
+            return Err(JSError::from_message(
+                self,
+                "script evaluation returned a null JavaScriptCore value",
+            ));
+        }
+
         Ok(JSValue::new(result, self.inner))
     }
 
@@ -691,22 +787,6 @@ impl JSContext {
         }
     }
 
-    /// Releases the context.
-    ///
-    /// # Example
-    /// ```ignore
-    /// use rust_jsc::JSContext;
-    ///
-    /// let ctx = JSContext::new();
-    ///
-    /// ctx.release();
-    /// ```
-    pub fn release(self) {
-        unsafe {
-            JSGlobalContextRelease(self.inner);
-        }
-    }
-
     /// Checks if a context is inspectable.
     ///
     /// # Examples
@@ -790,11 +870,44 @@ impl JSContext {
     /// ```
     ///
     /// # Note
-    /// If shared data was previously set, call [`take_shared_data`] first to
-    /// reclaim it. Otherwise the old data will be leaked.
-    pub fn set_shared_data<T: 'static>(&self, data: T) {
+    /// This method only stores into an empty slot. If shared data already
+    /// exists, the context is left unchanged and
+    /// [`PrivateDataSetStatus::AlreadySet`] is returned. Use
+    /// [`replace_shared_data`] when you explicitly own the current data and want
+    /// to replace it.
+    pub fn set_shared_data<T: 'static>(&self, data: T) -> PrivateDataSetStatus {
+        let current = unsafe { JSContextGetSharedData(self.inner) };
+        if !current.is_null() {
+            return PrivateDataSetStatus::AlreadySet;
+        }
+
         let ptr = PrivateDataWrapper::into_raw(data);
-        unsafe { JSContextSetSharedData(self.inner, ptr) }
+        unsafe { JSContextSetSharedData(self.inner, ptr) };
+        PrivateDataSetStatus::Set
+    }
+
+    /// Replaces shared data, dropping the existing Rust-owned allocation first.
+    ///
+    /// # Safety
+    /// The caller must ensure that the existing shared-data pointer, if any, was
+    /// created by [`PrivateDataWrapper::into_raw`] and that no references into
+    /// the existing allocation are alive.
+    pub unsafe fn replace_shared_data<T: 'static>(
+        &self,
+        data: T,
+    ) -> PrivateDataSetStatus {
+        let current = unsafe { JSContextGetSharedData(self.inner) };
+        let status = if current.is_null() {
+            PrivateDataSetStatus::Set
+        } else {
+            unsafe { PrivateDataWrapper::drop_erased(current) };
+            unsafe { JSContextSetSharedData(self.inner, std::ptr::null_mut()) };
+            PrivateDataSetStatus::Replaced
+        };
+
+        let ptr = PrivateDataWrapper::into_raw(data);
+        unsafe { JSContextSetSharedData(self.inner, ptr) };
+        status
     }
 
     /// Gets shared data for a context as an immutable reference.
@@ -908,15 +1021,12 @@ impl JSContext {
     /// The caller must ensure that the type `T` matches the type of the data currently
     /// stored in the context. If the type does not match, this method will return `None`
     /// and leave the data in place.
-    pub unsafe fn take_shared_data<T: 'static>(&self) -> Option<T> {
+    pub unsafe fn take_shared_data<T: 'static>(&self) -> PrivateDataTakeResult<T> {
         let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
-        if data_ptr.is_null() {
-            return None;
-        }
         // Only take ownership (and clear the JSC pointer) if the type matches.
         // On type mismatch the data stays in place — nothing is freed or lost.
         let result = unsafe { PrivateDataWrapper::take(data_ptr) };
-        if result.is_some() {
+        if result.is_taken() {
             unsafe { JSContextSetSharedData(self.inner, std::ptr::null_mut()) };
         }
         result
@@ -924,7 +1034,8 @@ impl JSContext {
 
     /// Drops the shared data without reclaiming ownership.
     /// This is useful for cleaning up data when the context is being dropped, without needing to take ownership of it.
-    /// After this call, the context's shared data pointer is cleared.
+    /// After this call, the context's shared data pointer is cleared only when
+    /// the stored type matches `T`.
     ///
     /// # Examples
     /// ```no_run
@@ -935,16 +1046,17 @@ impl JSContext {
     /// unsafe { ctx.drop_shared_data::<String>() }; // Clean up without taking ownership
     /// assert!(ctx.get_shared_data::<String>().is_none()); // data has been removed
     /// ```
-    /// # Safety Note
-    /// The caller must ensure that the type `T` matches the type of the data currently
-    /// stored in the context. If the type does not match, this method will not drop the data,
-    /// and set the shared data pointer to null, which could lead to memory leaks. Use with caution.
-    pub unsafe fn drop_shared_data<T: 'static>(&self) {
+    /// # Safety
+    /// The caller must ensure that no references into the shared data are alive.
+    /// If the type does not match, this method returns
+    /// [`PrivateDataDropStatus::TypeMismatch`] and leaves the data pointer intact.
+    pub unsafe fn drop_shared_data<T: 'static>(&self) -> PrivateDataDropStatus {
         let data_ptr = unsafe { JSContextGetSharedData(self.inner) };
-        if !data_ptr.is_null() {
-            unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+        let status = unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+        if status.is_dropped() {
             unsafe { JSContextSetSharedData(self.inner, std::ptr::null_mut()) };
         }
+        status
     }
 }
 
@@ -954,49 +1066,80 @@ impl std::fmt::Debug for JSContext {
     }
 }
 
-impl Default for JSContext {
-    fn default() -> Self {
-        JSContext::new()
+impl JSGlobalContext {
+    pub(crate) fn from_owned_ref(inner: JSGlobalContextRef) -> Self {
+        Self {
+            inner: JSContext::from_global_ref(inner),
+        }
+    }
+
+    /// Creates a new owned JavaScript global context.
+    pub fn new() -> Self {
+        let ctx = unsafe { JSGlobalContextCreate(std::ptr::null_mut()) };
+        Self::from_owned_ref(ctx)
+    }
+
+    /// Creates a new owned JavaScript global context with a custom global class.
+    pub fn new_with(class: &JSClass) -> Self {
+        let ctx = unsafe { JSGlobalContextCreate(class.inner) };
+        Self::from_owned_ref(ctx)
+    }
+
+    /// Retains a borrowed raw global context and returns an owned RAII handle.
+    ///
+    /// # Safety
+    /// The raw pointer must be a valid `JSGlobalContextRef`.
+    pub unsafe fn retain_from_raw(ctx: JSGlobalContextRef) -> Self {
+        let ctx = unsafe { JSGlobalContextRetain(ctx) };
+        Self::from_owned_ref(ctx)
+    }
+
+    pub fn as_context(&self) -> &JSContext {
+        &self.inner
+    }
+
+    /// Explicitly releases this owned context before the end of its scope.
+    pub fn release(self) {}
+}
+
+impl std::ops::Deref for JSGlobalContext {
+    type Target = JSContext;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
-impl From<JSContextRef> for JSContext {
-    fn from(context: JSContextRef) -> Self {
-        let global_context = unsafe { JSContextGetGlobalContext(context) };
-        // Retaining the context here would lead to over-retention and potential memory leaks.
-        // unsafe { JSGlobalContextRetain(global_context); }
-
-        Self {
-            inner: global_context,
+impl Drop for JSGlobalContext {
+    fn drop(&mut self) {
+        unsafe {
+            let data_ptr = JSContextGetSharedData(self.inner.inner);
+            if PrivateDataWrapper::drop_erased(data_ptr).is_dropped() {
+                JSContextSetSharedData(self.inner.inner, std::ptr::null_mut());
+            }
+            JSInspectorDisconnect(self.inner.inner);
+            JSGlobalContextRelease(self.inner.inner);
         }
     }
 }
 
-// impl Drop for JSContext {
-//     fn drop(&mut self) {
-//         /*
-//         TODO: Set pointer to null
-//         unsafe {
-//              if JSInspectorIsConnected(self.inner) {
-//                  JSInspectorDisconnect(self.inner);
-//              }
-//             JSContextSetSharedData(self.inner, std::ptr::null_mut());
-//         }
-//         */
-//     }
-// }
+impl Default for JSGlobalContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-impl From<JSGlobalContextRef> for JSContext {
-    fn from(ctx: JSGlobalContextRef) -> Self {
-        Self { inner: ctx }
+impl std::fmt::Debug for JSGlobalContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JSGlobalContext").finish()
     }
 }
 
 impl<T: 'static> TypedJSContext<T> {
     /// Creates a new `TypedJSContext` with the given shared data.
     pub fn new(data: T) -> Self {
-        let inner = JSContext::new();
-        inner.set_shared_data(data);
+        let inner = JSGlobalContext::new();
+        inner.set_shared_data(data).unwrap();
         Self {
             inner,
             _marker: std::marker::PhantomData,
@@ -1005,8 +1148,8 @@ impl<T: 'static> TypedJSContext<T> {
 
     /// Creates a new `TypedJSContext` with the given class and shared data.
     pub fn new_with(class: &JSClass, data: T) -> Self {
-        let inner = JSContext::new_with(class);
-        inner.set_shared_data(data);
+        let inner = JSGlobalContext::new_with(class);
+        inner.set_shared_data(data).unwrap();
         Self {
             inner,
             _marker: std::marker::PhantomData,
@@ -1016,7 +1159,7 @@ impl<T: 'static> TypedJSContext<T> {
     /// Creates a new `TypedJSContext` from an existing `JSContextGroup` with shared data.
     pub fn new_in_group(group: &JSContextGroup, data: T) -> Self {
         let inner = group.new_context();
-        inner.set_shared_data(data);
+        inner.set_shared_data(data).unwrap();
         Self {
             inner,
             _marker: std::marker::PhantomData,
@@ -1030,7 +1173,7 @@ impl<T: 'static> TypedJSContext<T> {
         data: T,
     ) -> Self {
         let inner = group.new_context_with_class(class);
-        inner.set_shared_data(data);
+        inner.set_shared_data(data).unwrap();
         Self {
             inner,
             _marker: std::marker::PhantomData,
@@ -1055,8 +1198,16 @@ impl<T: 'static> TypedJSContext<T> {
     ///
     /// # Safety
     /// The caller must ensure that no other references to the shared data exist.
-    pub unsafe fn take_data(&self) -> Option<T> {
+    pub unsafe fn take_data(&self) -> PrivateDataTakeResult<T> {
         self.inner.take_shared_data::<T>()
+    }
+
+    /// Replaces the typed shared data.
+    ///
+    /// This requires `&mut self`, so safe callers cannot hold references
+    /// returned by [`get_data`] while replacing the value.
+    pub fn replace_data(&mut self, data: T) -> PrivateDataSetStatus {
+        unsafe { self.inner.replace_shared_data(data) }
     }
 }
 
@@ -1064,7 +1215,7 @@ impl<T: 'static> std::ops::Deref for TypedJSContext<T> {
     type Target = JSContext;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        self.inner.as_context()
     }
 }
 
@@ -1073,8 +1224,6 @@ impl<T: 'static> Drop for TypedJSContext<T> {
         unsafe {
             // Automatically drop the shared data
             self.inner.drop_shared_data::<T>();
-            // Release the underlying global context
-            JSGlobalContextRelease(self.inner.inner);
         }
     }
 }
@@ -1085,6 +1234,22 @@ mod tests {
     use crate::{self as rust_jsc};
 
     use rust_jsc_macros::*;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    static BORROWED_CONTEXT_CALLBACK_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    struct DropCounter {
+        drops: Arc<AtomicUsize>,
+    }
+
+    impl Drop for DropCounter {
+        fn drop(&mut self) {
+            self.drops.fetch_add(1, Ordering::SeqCst);
+        }
+    }
 
     #[module_resolve]
     fn module_loader_resolve_virtual(
@@ -1196,7 +1361,7 @@ mod tests {
     #[test]
     fn test_js_context() {
         let ctx = JSContext::new();
-        assert_eq!(format!("{:?}", ctx), "JSContext");
+        assert_eq!(format!("{:?}", ctx), "JSGlobalContext");
     }
 
     #[test]
@@ -1209,14 +1374,93 @@ mod tests {
     #[test]
     fn test_js_context_group() {
         let group = JSContextGroup::new();
-        assert_eq!(format!("{:?}", group), "JSContextGroup");
+        assert_eq!(format!("{:?}", group), "OwnedJSContextGroup");
     }
 
     #[test]
     fn test_js_context_with_group() {
         let group = JSContextGroup::new();
         let ctx = group.new_context();
-        assert_eq!(format!("{:?}", ctx), "JSContext");
+        assert_eq!(format!("{:?}", ctx), "JSGlobalContext");
+    }
+
+    #[test]
+    fn test_owned_global_context_retain_survives_original_handle_drop() {
+        let retained: JSGlobalContext = {
+            let ctx: JSGlobalContext = JSContext::new();
+            let retained = ctx.retain();
+            let result = ctx.evaluate_script("20 + 1", None).unwrap();
+            assert_eq!(result.as_number().unwrap(), 21.0);
+            retained
+        };
+
+        let result = retained.evaluate_script("40 + 2", None).unwrap();
+        assert_eq!(result.as_number().unwrap(), 42.0);
+    }
+
+    #[test]
+    fn test_borrowed_callback_context_does_not_release_owned_context() {
+        BORROWED_CONTEXT_CALLBACK_COUNT.store(0, Ordering::SeqCst);
+
+        #[callback]
+        fn borrowed_context_callback(
+            ctx: JSContext,
+            _function: JSObject,
+            _this: JSObject,
+        ) -> JSResult<JSValue> {
+            BORROWED_CONTEXT_CALLBACK_COUNT.fetch_add(1, Ordering::SeqCst);
+            ctx.evaluate_script("globalThis.borrowedContextTouched = true", None)?;
+            Ok(JSValue::undefined(&ctx))
+        }
+
+        let ctx = JSContext::new();
+        let function = rust_jsc::JSFunction::callback(
+            &ctx,
+            Some("borrowedContextCallback"),
+            Some(borrowed_context_callback),
+        );
+        ctx.global_object()
+            .set_property("borrowedContextCallback", &function, Default::default())
+            .unwrap();
+
+        ctx.evaluate_script("borrowedContextCallback()", None)
+            .unwrap();
+        assert_eq!(BORROWED_CONTEXT_CALLBACK_COUNT.load(Ordering::SeqCst), 1);
+
+        let result = ctx
+            .evaluate_script("globalThis.borrowedContextTouched", None)
+            .unwrap();
+        assert!(result.as_boolean());
+
+        let result = ctx.evaluate_script("6 * 7", None).unwrap();
+        assert_eq!(result.as_number().unwrap(), 42.0);
+    }
+
+    #[test]
+    fn test_context_group_retain_survives_original_group_drop() {
+        let retained: OwnedJSContextGroup = {
+            let group: OwnedJSContextGroup = JSContextGroup::new();
+            group.retain()
+        };
+
+        let ctx = retained.new_context();
+        let result = ctx.evaluate_script("7 * 6", None).unwrap();
+        assert_eq!(result.as_number().unwrap(), 42.0);
+    }
+
+    #[test]
+    fn test_context_group_from_context_is_borrowed() {
+        let ctx = JSContext::new();
+        let borrowed_group: JSContextGroup = ctx.group();
+        let retained_group: OwnedJSContextGroup = borrowed_group.retain();
+
+        let sibling = retained_group.new_context();
+        let result = sibling.evaluate_script("21 + 21", None).unwrap();
+        assert_eq!(result.as_number().unwrap(), 42.0);
+
+        let direct = borrowed_group.new_context();
+        let result = direct.evaluate_script("'borrowed-group'", None).unwrap();
+        assert_eq!(result.as_string().unwrap().to_string(), "borrowed-group");
     }
 
     #[test]
@@ -1263,6 +1507,17 @@ mod tests {
         let script = "console.log('Hello, world!'); 'kedojs'";
         let result = ctx.evaluate_script(script, None);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_js_context_evaluate_script_primitive_exception() {
+        let ctx = JSContext::new();
+        let error = ctx
+            .evaluate_script("throw 'plain failure'", None)
+            .unwrap_err();
+
+        assert_eq!(error.name().unwrap().to_string(), "Error");
+        assert_eq!(error.message().unwrap().to_string(), "plain failure");
     }
 
     #[test]
@@ -1584,7 +1839,7 @@ mod tests {
     #[test]
     fn test_shared_data_type_safe() {
         let ctx = JSContext::new();
-        ctx.set_shared_data(42i32);
+        assert_eq!(ctx.set_shared_data(42i32), PrivateDataSetStatus::Set);
         let data = ctx.get_shared_data::<i32>().unwrap();
         assert_eq!(*data, 42);
     }
@@ -1695,8 +1950,14 @@ mod tests {
         ctx.set_shared_data(String::from("preserve me"));
 
         // Taking with wrong type should return None and NOT destroy the data
-        assert!(unsafe { ctx.take_shared_data::<i32>() }.is_none());
-        assert!(unsafe { ctx.take_shared_data::<Vec<u8>>() }.is_none());
+        assert_eq!(
+            unsafe { ctx.take_shared_data::<i32>() },
+            PrivateDataTakeResult::TypeMismatch
+        );
+        assert_eq!(
+            unsafe { ctx.take_shared_data::<Vec<u8>>() },
+            PrivateDataTakeResult::TypeMismatch
+        );
 
         // Data should still be accessible with correct type
         assert_eq!(ctx.get_shared_data::<String>().unwrap(), "preserve me");
@@ -1713,8 +1974,109 @@ mod tests {
         ctx.set_shared_data(String::from("drop me"));
 
         assert!(ctx.get_shared_data::<String>().is_some());
-        unsafe { ctx.drop_shared_data::<String>() };
+        assert_eq!(
+            unsafe { ctx.drop_shared_data::<String>() },
+            PrivateDataDropStatus::Dropped
+        );
         assert!(ctx.get_shared_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_drop_shared_data_wrong_type_preserves_data() {
+        let ctx = JSContext::new();
+        ctx.set_shared_data(String::from("keep me"));
+
+        assert_eq!(
+            unsafe { ctx.drop_shared_data::<i32>() },
+            PrivateDataDropStatus::TypeMismatch
+        );
+        assert_eq!(ctx.get_shared_data::<String>().unwrap(), "keep me");
+
+        assert_eq!(
+            unsafe { ctx.drop_shared_data::<String>() },
+            PrivateDataDropStatus::Dropped
+        );
+        assert_eq!(
+            unsafe { ctx.drop_shared_data::<String>() },
+            PrivateDataDropStatus::Empty
+        );
+    }
+
+    #[test]
+    fn test_set_shared_data_does_not_replace_existing_data() {
+        let ctx = JSContext::new();
+        assert_eq!(ctx.set_shared_data(42i32), PrivateDataSetStatus::Set);
+        assert_eq!(
+            ctx.set_shared_data(String::from("new type")),
+            PrivateDataSetStatus::AlreadySet
+        );
+
+        assert_eq!(*ctx.get_shared_data::<i32>().unwrap(), 42);
+        assert!(ctx.get_shared_data::<String>().is_none());
+    }
+
+    #[test]
+    fn test_replace_shared_data_drops_existing_data() {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let ctx = JSContext::new();
+
+        assert_eq!(
+            ctx.set_shared_data(DropCounter {
+                drops: drops.clone()
+            }),
+            PrivateDataSetStatus::Set
+        );
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+
+        assert_eq!(
+            unsafe {
+                ctx.replace_shared_data(DropCounter {
+                    drops: drops.clone(),
+                })
+            },
+            PrivateDataSetStatus::Replaced
+        );
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_owned_global_context_drops_shared_data() {
+        let drops = Arc::new(AtomicUsize::new(0));
+
+        {
+            let ctx = JSContext::new();
+            assert_eq!(
+                ctx.set_shared_data(DropCounter {
+                    drops: drops.clone()
+                }),
+                PrivateDataSetStatus::Set
+            );
+            assert_eq!(drops.load(Ordering::SeqCst), 0);
+        }
+
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_typed_context_replace_data_drops_once() {
+        let drops = Arc::new(AtomicUsize::new(0));
+
+        {
+            let mut ctx = TypedJSContext::new(DropCounter {
+                drops: drops.clone(),
+            });
+            assert_eq!(drops.load(Ordering::SeqCst), 0);
+
+            assert_eq!(
+                ctx.replace_data(DropCounter {
+                    drops: drops.clone()
+                }),
+                PrivateDataSetStatus::Replaced
+            );
+            assert_eq!(drops.load(Ordering::SeqCst), 1);
+        }
+
+        assert_eq!(drops.load(Ordering::SeqCst), 2);
     }
 
     #[test]
@@ -1758,8 +2120,10 @@ mod tests {
         assert!(ctx.get_shared_data::<()>().is_some());
         assert!(ctx.get_shared_data::<i32>().is_none());
 
-        let taken = unsafe { ctx.take_shared_data::<()>() }.unwrap();
-        assert_eq!(taken, ());
+        assert!(matches!(
+            unsafe { ctx.take_shared_data::<()>() },
+            PrivateDataTakeResult::Taken(())
+        ));
     }
 
     #[test]
@@ -1782,9 +2146,8 @@ mod tests {
         let ctx = JSContext::new();
         ctx.set_shared_data(String::from("alive"));
 
-        // Create an alias manually since JSContext is not Clone
-        // We need to access inner which is pub(crate)
-        let ctx_alias = JSContext { inner: ctx.inner };
+        // Create a borrowed alias to simulate another callback/context view.
+        let ctx_alias = *ctx.as_context();
 
         // 1. Get reference from first context
         // The reference lifetime is tied to `ctx`
@@ -1804,8 +2167,8 @@ mod tests {
         // Verify the data is logically gone from the context
         assert!(ctx.get_shared_data::<String>().is_none());
 
-        // Avoid double-release issues if JSContext implements Drop (currently it doesn't seem to)
-        std::mem::forget(ctx_alias);
+        // Borrowed contexts are Copy views and never release the global context.
+        let _ = ctx_alias;
     }
 
     #[test]

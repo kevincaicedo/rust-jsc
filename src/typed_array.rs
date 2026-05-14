@@ -54,6 +54,10 @@ impl JSTypedArray {
             return Err(JSError::from(value));
         }
 
+        if result.is_null() {
+            return Err(JSError::from_message(ctx, "failed to create typed array"));
+        }
+
         let object = JSObject::from_ref(result, ctx.inner);
         Ok(Self { object })
     }
@@ -112,9 +116,10 @@ impl JSTypedArray {
         }
 
         if result.is_null() {
-            return Err(
-                JSError::with_message(ctx, "Failed to create typed array").unwrap()
-            );
+            return Err(JSError::from_message(
+                ctx,
+                "failed to create typed array from bytes",
+            ));
         }
 
         Ok(Self {
@@ -294,6 +299,14 @@ impl JSTypedArray {
             return Err(JSError::from(value));
         }
 
+        if result.is_null() {
+            let context = unsafe { JSContext::borrowed(self.object.ctx) };
+            return Err(JSError::from_message(
+                &context,
+                "failed to get typed array buffer",
+            ));
+        }
+
         Ok(JSArrayBuffer::from_object(JSObject::from_ref(
             result,
             self.object.ctx,
@@ -337,12 +350,13 @@ impl JSTypedArray {
             return Err(JSError::from(value));
         }
 
+        let byte_len = self.byte_len()?;
         if result.is_null() {
-            let context = JSContext::from(self.object.ctx);
-            return Err(JSError::with_message(
+            let context = unsafe { JSContext::borrowed(self.object.ctx) };
+            return Err(JSError::from_message(
                 &context,
-                "Typed array bytes pointer is null",
-            )?);
+                "typed array bytes pointer is null",
+            ));
         }
 
         let byte_offset = self.byte_offset()?;
@@ -350,7 +364,7 @@ impl JSTypedArray {
             std::slice::from_raw_parts_mut(
                 // result as *mut u8,
                 result.offset(byte_offset as isize).cast::<T>(),
-                self.byte_len()?,
+                byte_len,
             )
         };
 
@@ -378,11 +392,11 @@ impl JSTypedArray {
         }
 
         if result.is_null() {
-            let context = JSContext::from(value.ctx);
-            return Err(JSError::with_message(
+            let context = unsafe { JSContext::borrowed(value.ctx) };
+            return Err(JSError::from_message(
                 &context,
-                "Typed array bytes pointer is null",
-            )?);
+                "typed array bytes pointer is null",
+            ));
         }
 
         let bytes = unsafe {
@@ -461,6 +475,13 @@ impl JSTypedArray {
             return Err(JSError::from(value));
         }
 
+        if result.is_null() {
+            return Err(JSError::from_message(
+                ctx,
+                "failed to create typed array with buffer",
+            ));
+        }
+
         Ok(Self {
             object: JSObject::from_ref(result, ctx.inner),
         })
@@ -500,7 +521,14 @@ impl JSTypedArray {
         byte_offset: usize,
     ) -> JSResult<Self> {
         let mut exception: JSValueRef = std::ptr::null_mut();
-        let byte_length = array_buffer.len()? - byte_offset;
+        let buffer_len = array_buffer.len()?;
+        if byte_offset > buffer_len {
+            return Err(JSError::from_message(
+                ctx,
+                "typed array byte offset exceeds array buffer length",
+            ));
+        }
+        let byte_length = buffer_len - byte_offset;
         let result = unsafe {
             JSObjectMakeTypedArrayWithArrayBufferAndOffset(
                 ctx.inner,
@@ -515,6 +543,13 @@ impl JSTypedArray {
         if !exception.is_null() {
             let value = JSValue::new(exception, ctx.inner);
             return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            return Err(JSError::from_message(
+                ctx,
+                "failed to create typed array with buffer and offset",
+            ));
         }
 
         Ok(Self {
@@ -616,10 +651,16 @@ impl JSArrayBuffer {
             return Err(JSError::from(value));
         }
 
-        assert!(!result.is_null(), "ArrayBuffer pointer is null");
+        let len = self.len()?;
+        if result.is_null() {
+            let context = unsafe { JSContext::borrowed(self.object.ctx) };
+            return Err(JSError::from_message(
+                &context,
+                "array buffer bytes pointer is null",
+            ));
+        }
 
-        let bytes =
-            unsafe { std::slice::from_raw_parts_mut(result as *mut u8, self.len()?) };
+        let bytes = unsafe { std::slice::from_raw_parts_mut(result as *mut u8, len) };
 
         Ok(bytes)
     }
@@ -627,13 +668,16 @@ impl JSArrayBuffer {
     /// Checks if the ArrayBuffer is detached.
     /// Detached ArrayBuffers are ArrayBuffers that have been detached from their backing store.
     /// This can happen when the backing store is transferred to another object.
-    pub fn is_detached(&self) -> bool {
+    pub fn is_detached(&self) -> JSResult<bool> {
         let mut exception: JSValueRef = std::ptr::null_mut();
         let result = unsafe {
             JSObjectIsDetachedBuffer(self.object.ctx, self.object.inner, &mut exception)
         };
-        // TODO: Handle exception
-        result
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.object.ctx);
+            return Err(JSError::from(value));
+        }
+        Ok(result)
     }
 
     /// Gets the bytes of the ArrayBuffer as a Vec.
@@ -674,9 +718,7 @@ impl JSArrayBuffer {
         }
 
         if result.is_null() {
-            return Err(
-                JSError::with_message(ctx, "Failed to create array array").unwrap()
-            );
+            return Err(JSError::from_message(ctx, "failed to create array buffer"));
         }
 
         Ok(Self {
@@ -915,7 +957,7 @@ mod tests {
         let ctx = JSContext::new();
         let mut bytes = vec![6; 10];
         let array_buffer = JSArrayBuffer::new(&ctx, bytes.as_mut_slice()).unwrap();
-        assert_eq!(array_buffer.is_detached(), false);
+        assert_eq!(array_buffer.is_detached().unwrap(), false);
 
         let array_buffer = ctx
             .evaluate_script("const buffer = new ArrayBuffer(10); buffer", None)
@@ -927,6 +969,32 @@ mod tests {
                 None,
             )
             .unwrap();
-        assert_eq!(array_buffer.is_detached(), true);
+        assert_eq!(array_buffer.is_detached().unwrap(), true);
+    }
+
+    #[test]
+    fn test_array_buffer_bytes_returns_error_for_non_buffer() {
+        let ctx = JSContext::new();
+        let object = ctx
+            .evaluate_script("({})", None)
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let array_buffer = JSArrayBuffer::from_object(object);
+
+        assert!(array_buffer.bytes().is_err());
+    }
+
+    #[test]
+    fn test_typed_array_get_buffer_returns_error_for_non_typed_array() {
+        let ctx = JSContext::new();
+        let object = ctx
+            .evaluate_script("({})", None)
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let typed_array = JSTypedArray::from(object);
+
+        assert!(typed_array.get_buffer().is_err());
     }
 }

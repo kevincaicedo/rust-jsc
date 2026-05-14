@@ -74,11 +74,13 @@ jobs:
         run: |
           VERSION=$(grep '^version' sys/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}/libjsc-x86_64-unknown-linux-gnu.a.gz"
-          if curl --output /dev/null --silent --head --fail "$URL"; then
-            echo "Release for $VERSION exists. sys/build.rs will download it."
+          MANIFEST_URL="https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v${VERSION}/SHA256SUMS"
+          if curl --output /dev/null --silent --head --fail "$URL" && \
+             curl --output /dev/null --silent --head --fail "$MANIFEST_URL"; then
+            echo "Release for $VERSION exists with checksum manifest. sys/build.rs will download it."
             echo "BUILD_STATIC=false" >> $GITHUB_ENV
           else
-            echo "Release for $VERSION not found. Will build static lib via Docker."
+            echo "Release for $VERSION or SHA256SUMS not found. Will build static lib via Docker."
             echo "BUILD_STATIC=true" >> $GITHUB_ENV
           fi
 
@@ -99,7 +101,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-linux-x86_64
-          key: buildx-linux-x86_64-${{ github.sha }}
+          key: buildx-linux-x86_64-${{ hashFiles('Dockerfile', 'Makefile', 'sys/Cargo.toml') }}
           restore-keys: buildx-linux-x86_64-
 
       - name: Build JavaScriptCore static
@@ -124,8 +126,8 @@ jobs:
           else
             echo "No separate JavaScriptCoreJIT archive produced for this target"
           fi
-          echo "RUST_JSC_BUILD_MODE=static" >> $GITHUB_ENV
-          echo "RUST_JSC_CUSTOM_BUILD_PATH=${{ github.workspace }}/.libs" >> $GITHUB_ENV
+          echo "RUST_JSC_BUILD_MODE=download" >> $GITHUB_ENV
+          echo "RUST_JSC_LIB_DIR=${{ github.workspace }}/.libs" >> $GITHUB_ENV
 
       - name: Rotate cache
         if: always() && env.BUILD_STATIC == 'true'
@@ -135,6 +137,6 @@ jobs:
 
       - name: Run tests
         env:
-          RUST_JSC_BUILD_MODE: static
+          RUST_JSC_BUILD_MODE: download
           RUST_BACKTRACE: 1
         run: cargo test --lib -- --test-threads=1

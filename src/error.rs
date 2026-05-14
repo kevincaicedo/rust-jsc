@@ -1,10 +1,46 @@
 use std::ops::Deref;
 
-use rust_jsc_sys::{JSObjectMakeError, JSObjectMakeTypeError, JSValueRef};
+use rust_jsc_sys::{JSObjectMakeError, JSObjectMakeTypeError, JSObjectRef, JSValueRef};
 
 use crate::{JSContext, JSError, JSObject, JSResult, JSString, JSValue};
 
 impl JSError {
+    pub(crate) fn from_message(ctx: &JSContext, message: impl Into<JSString>) -> Self {
+        match Self::with_message(ctx, message) {
+            Ok(error) | Err(error) => error,
+        }
+    }
+
+    fn fallback(ctx: &JSContext, name: &str, message: &str) -> Self {
+        let object = JSObject::new(ctx);
+        let name = JSValue::string(ctx, name);
+        let message = JSValue::string(ctx, message);
+
+        let _ = object.set_property("name", &name, Default::default());
+        let _ = object.set_property("message", &message, Default::default());
+
+        Self { object }
+    }
+
+    fn from_exception(value: JSValue) -> Self {
+        if value.is_object() {
+            return Self {
+                object: JSObject {
+                    inner: value.inner as JSObjectRef,
+                    value,
+                },
+            };
+        }
+
+        let ctx = unsafe { JSContext::borrowed(value.ctx) };
+        let message = match value.as_string() {
+            Ok(message) => message.to_string(),
+            Err(error) => return error,
+        };
+
+        Self::from_message(&ctx, message)
+    }
+
     /// Creates a new `JSError` object.
     /// This is the same as `new Error()`.
     ///
@@ -37,6 +73,14 @@ impl JSError {
         if !exception.is_null() {
             let value = JSValue::new(exception, ctx.inner);
             return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            return Err(Self::fallback(
+                ctx,
+                "Error",
+                "failed to create JavaScript Error object",
+            ));
         }
 
         Ok(Self::from(JSObject::from_ref(result, ctx.inner)))
@@ -76,21 +120,21 @@ impl JSError {
             return Err(JSError::from(value));
         }
 
+        if result.is_null() {
+            return Err(Self::fallback(
+                ctx,
+                "TypeError",
+                "failed to create JavaScript TypeError object",
+            ));
+        }
+
         Ok(Self::from(JSObject::from_ref(result, ctx.inner)))
     }
 
     pub fn new_typ_raw(ctx: &JSContext, message: impl Into<JSString>) -> JSValueRef {
-        let mut exception: JSValueRef = std::ptr::null_mut();
-
-        let result = unsafe {
-            JSObjectMakeTypeError(ctx.inner, message.into().inner, &mut exception)
-        };
-
-        if !exception.is_null() {
-            return exception;
+        match Self::new_typ(ctx, message) {
+            Ok(error) | Err(error) => error.object.value.inner,
         }
-
-        result
     }
 
     pub fn with_message(ctx: &JSContext, message: impl Into<JSString>) -> JSResult<Self> {
@@ -125,7 +169,10 @@ impl JSError {
 
 impl std::fmt::Display for JSError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "JavaScript error: {:?}", self.message().unwrap())
+        match self.message() {
+            Ok(message) => write!(f, "JavaScript error: {:?}", message),
+            Err(_) => write!(f, "JavaScript error"),
+        }
     }
 }
 
@@ -133,9 +180,7 @@ impl std::error::Error for JSError {}
 
 impl From<JSValue> for JSError {
     fn from(value: JSValue) -> Self {
-        Self {
-            object: value.as_object().unwrap(),
-        }
+        Self::from_exception(value)
     }
 }
 
@@ -207,5 +252,14 @@ mod tests {
         let result = ctx.evaluate_script("myError instanceof Error", None);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_boolean(), true);
+    }
+
+    #[test]
+    fn test_error_from_primitive_exception() {
+        let ctx = JSContext::new();
+        let error = ctx.evaluate_script("throw 42", None).unwrap_err();
+
+        assert_eq!(error.name().unwrap().to_string(), "Error");
+        assert_eq!(error.message().unwrap().to_string(), "42");
     }
 }

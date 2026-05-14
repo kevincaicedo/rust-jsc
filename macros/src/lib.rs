@@ -82,7 +82,7 @@ pub fn callback(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> *const rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let function = rust_jsc::JSObject::from_ref(__function, __ctx_ref);
             let this_object = rust_jsc::JSObject::from_ref(__this_object, __ctx_ref);
             let arguments = if __arguments.is_null() || __argument_count == 0 {
@@ -173,7 +173,7 @@ fn generate_legacy_callback(
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> *const rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let function = rust_jsc::JSObject::from_ref(__function, __ctx_ref);
             let this_object = rust_jsc::JSObject::from_ref(__this_object, __ctx_ref);
             let arguments = if __arguments.is_null() || __argument_count == 0 {
@@ -232,7 +232,7 @@ pub fn constructor(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let constructor = rust_jsc::JSObject::from_ref(__constructor, __ctx_ref);
             let arguments = if __arguments.is_null() || __argument_count == 0 {
                 vec![]
@@ -286,7 +286,7 @@ pub fn initialize(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __object: rust_jsc::internal::JSObjectRef,
         )
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let object = rust_jsc::JSObject::from_ref(__object, __ctx_ref);
 
             let func: fn(
@@ -357,7 +357,7 @@ pub fn has_instance(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __exception: *mut rust_jsc::internal::JSValueRef,
         ) -> bool
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let constructor = rust_jsc::JSObject::from_ref(__constructor, __ctx_ref);
             let possible_instance = rust_jsc::JSValue::new(__possible_instance, __ctx_ref);
 
@@ -406,7 +406,7 @@ pub fn module_resolve(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __script_fetcher: rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSString
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
             let referrer = rust_jsc::JSValue::new(__referrer, __ctx_ref);
             let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
@@ -445,7 +445,7 @@ pub fn module_evaluate(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __key_value: rust_jsc::internal::JSValueRef,
         ) -> *const rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
 
             let func: fn(
@@ -482,7 +482,7 @@ pub fn module_fetch(_attr: TokenStream, item: TokenStream) -> TokenStream {
             __script_fetcher: rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSString
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
             let attributes_value = rust_jsc::JSValue::new(__attributes_value, __ctx_ref);
             let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
@@ -522,7 +522,7 @@ pub fn module_import_meta(_attr: TokenStream, item: TokenStream) -> TokenStream 
             __script_fetcher: rust_jsc::internal::JSValueRef,
         ) -> *mut rust_jsc::internal::OpaqueJSValue
         #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let key_value = rust_jsc::JSValue::new(__key_value, __ctx_ref);
             let script_fetcher = rust_jsc::JSValue::new(__script_fetcher, __ctx_ref);
 
@@ -559,7 +559,7 @@ pub fn uncaught_exception(_attr: TokenStream, item: TokenStream) -> TokenStream 
             __filename: rust_jsc::internal::JSStringRef,
             __exception: rust_jsc::internal::JSValueRef,
         ) #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let filename = rust_jsc::JSString::from(__filename);
             let exception = rust_jsc::JSValue::new(__exception, __ctx_ref);
 
@@ -597,7 +597,7 @@ pub fn uncaught_exception_event_loop(
             __ctx_ref: rust_jsc::internal::JSContextRef,
             __exception: rust_jsc::internal::JSValueRef,
         ) #where_clause {
-            let ctx = rust_jsc::JSContext::from(__ctx_ref);
+            let ctx = unsafe { rust_jsc::JSContext::borrowed(__ctx_ref) };
             let exception = rust_jsc::JSValue::new(__exception, __ctx_ref);
 
             let func: fn(
@@ -670,7 +670,7 @@ pub fn inspector_pause_event_callback(
             };
 
             // Convert raw context ref to safe wrapper without taking ownership.
-            let js_ctx = rust_jsc::JSContext::from(ctx);
+            let js_ctx = unsafe { rust_jsc::JSContext::borrowed(ctx) };
 
             let func: fn(rust_jsc::JSContext, rust_jsc::context::InspectorPauseEvent) = {
                 #input

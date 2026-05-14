@@ -94,7 +94,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: libjsc-x86_64-apple-darwin
-          path: libjsc-x86_64-apple-darwin.a.gz
+          path: |
+            libjsc-x86_64-apple-darwin.a.gz
+            libjsc-x86_64-apple-darwin.a.gz.sha256
+            libjsc-x86_64-apple-darwin.metadata.json
           retention-days: 7
 
   build-macos-aarch64:
@@ -127,7 +130,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: libjsc-aarch64-apple-darwin
-          path: libjsc-aarch64-apple-darwin.a.gz
+          path: |
+            libjsc-aarch64-apple-darwin.a.gz
+            libjsc-aarch64-apple-darwin.a.gz.sha256
+            libjsc-aarch64-apple-darwin.metadata.json
           retention-days: 7
 
   # ===========================================================================
@@ -155,32 +161,35 @@ jobs:
           driver: docker-container
 
       - name: Cache Docker layers
+        if: github.event.inputs.skip_cache != 'true'
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-linux-x86_64
-          key: buildx-linux-x86_64-${{ hashFiles('Dockerfile') }}
+          key: buildx-linux-x86_64-${{ hashFiles('Dockerfile', 'Makefile', 'sys/Cargo.toml') }}
           restore-keys: buildx-linux-x86_64-
 
       - name: Build JavaScriptCore
         run: |
           mkdir -p .libs
+          CACHE_ARGS=()
+          if [ "${{ github.event.inputs.skip_cache }}" != "true" ]; then
+            CACHE_ARGS+=(--cache-from type=local,src=/tmp/.buildx-cache-linux-x86_64)
+            CACHE_ARGS+=(--cache-to type=local,dest=/tmp/.buildx-cache-linux-x86_64-new,mode=max)
+          fi
           docker buildx build \
             --output type=local,dest=./.libs \
-            --cache-from type=local,src=/tmp/.buildx-cache-linux-x86_64 \
-            --cache-to type=local,dest=/tmp/.buildx-cache-linux-x86_64-new,mode=max \
+            "${CACHE_ARGS[@]}" \
             -f Dockerfile .
 
       - name: Rotate cache
-        if: always()
+        if: always() && github.event.inputs.skip_cache != 'true'
         run: |
           rm -rf /tmp/.buildx-cache-linux-x86_64
           mv /tmp/.buildx-cache-linux-x86_64-new /tmp/.buildx-cache-linux-x86_64 2>/dev/null || true
 
       - name: Archive static libraries
         run: |
-          cd .libs
-          tar -czf libjsc-x86_64-unknown-linux-gnu.a.gz *.a
-          mv libjsc-x86_64-unknown-linux-gnu.a.gz ../
+          python3 scripts/package_jsc_archive.py --lib-dir .libs --target-triple x86_64-unknown-linux-gnu --output-dir . --repo-root "$PWD" --webkit-dir WebKit
 
       - name: Verify archive contents
         run: |
@@ -203,7 +212,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: libjsc-x86_64-unknown-linux-gnu
-          path: libjsc-x86_64-unknown-linux-gnu.a.gz
+          path: |
+            libjsc-x86_64-unknown-linux-gnu.a.gz
+            libjsc-x86_64-unknown-linux-gnu.a.gz.sha256
+            libjsc-x86_64-unknown-linux-gnu.metadata.json
           retention-days: 7
 
   build-linux-x86_64-musl:
@@ -227,32 +239,35 @@ jobs:
           driver: docker-container
 
       - name: Cache Docker layers
+        if: github.event.inputs.skip_cache != 'true'
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-linux-musl-x86_64
-          key: buildx-linux-musl-x86_64-${{ hashFiles('Dockerfile.musl') }}
+          key: buildx-linux-musl-x86_64-${{ hashFiles('Dockerfile.musl', 'Makefile', 'sys/Cargo.toml') }}
           restore-keys: buildx-linux-musl-x86_64-
 
       - name: Build JavaScriptCore
         run: |
           mkdir -p .libs-musl
+          CACHE_ARGS=()
+          if [ "${{ github.event.inputs.skip_cache }}" != "true" ]; then
+            CACHE_ARGS+=(--cache-from type=local,src=/tmp/.buildx-cache-linux-musl-x86_64)
+            CACHE_ARGS+=(--cache-to type=local,dest=/tmp/.buildx-cache-linux-musl-x86_64-new,mode=max)
+          fi
           docker buildx build \
             --output type=local,dest=./.libs-musl \
-            --cache-from type=local,src=/tmp/.buildx-cache-linux-musl-x86_64 \
-            --cache-to type=local,dest=/tmp/.buildx-cache-linux-musl-x86_64-new,mode=max \
+            "${CACHE_ARGS[@]}" \
             -f Dockerfile.musl .
 
       - name: Rotate cache
-        if: always()
+        if: always() && github.event.inputs.skip_cache != 'true'
         run: |
           rm -rf /tmp/.buildx-cache-linux-musl-x86_64
           mv /tmp/.buildx-cache-linux-musl-x86_64-new /tmp/.buildx-cache-linux-musl-x86_64 2>/dev/null || true
 
       - name: Archive static libraries
         run: |
-          cd .libs-musl
-          tar -czf libjsc-x86_64-unknown-linux-musl.a.gz *.a
-          mv libjsc-x86_64-unknown-linux-musl.a.gz ../
+          python3 scripts/package_jsc_archive.py --lib-dir .libs-musl --target-triple x86_64-unknown-linux-musl --output-dir . --repo-root "$PWD" --webkit-dir WebKit
 
       - name: Verify archive contents
         run: |
@@ -275,7 +290,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: libjsc-x86_64-unknown-linux-musl
-          path: libjsc-x86_64-unknown-linux-musl.a.gz
+          path: |
+            libjsc-x86_64-unknown-linux-musl.a.gz
+            libjsc-x86_64-unknown-linux-musl.a.gz.sha256
+            libjsc-x86_64-unknown-linux-musl.metadata.json
           retention-days: 7
 
   # ===========================================================================
@@ -303,33 +321,36 @@ jobs:
           driver: docker-container
 
       - name: Cache Docker layers
+        if: github.event.inputs.skip_cache != 'true'
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-linux-aarch64
-          key: buildx-linux-aarch64-${{ hashFiles('Dockerfile') }}
+          key: buildx-linux-aarch64-${{ hashFiles('Dockerfile', 'Makefile', 'sys/Cargo.toml') }}
           restore-keys: buildx-linux-aarch64-
 
       # Native ARM64 runner: use the standard Dockerfile (same as x86_64 glibc)
       - name: Build JavaScriptCore
         run: |
           mkdir -p .libs-arm
+          CACHE_ARGS=()
+          if [ "${{ github.event.inputs.skip_cache }}" != "true" ]; then
+            CACHE_ARGS+=(--cache-from type=local,src=/tmp/.buildx-cache-linux-aarch64)
+            CACHE_ARGS+=(--cache-to type=local,dest=/tmp/.buildx-cache-linux-aarch64-new,mode=max)
+          fi
           docker buildx build \
             --output type=local,dest=./.libs-arm \
-            --cache-from type=local,src=/tmp/.buildx-cache-linux-aarch64 \
-            --cache-to type=local,dest=/tmp/.buildx-cache-linux-aarch64-new,mode=max \
+            "${CACHE_ARGS[@]}" \
             -f Dockerfile .
 
       - name: Rotate cache
-        if: always()
+        if: always() && github.event.inputs.skip_cache != 'true'
         run: |
           rm -rf /tmp/.buildx-cache-linux-aarch64
           mv /tmp/.buildx-cache-linux-aarch64-new /tmp/.buildx-cache-linux-aarch64 2>/dev/null || true
 
       - name: Archive static libraries
         run: |
-          cd .libs-arm
-          tar -czf libjsc-aarch64-unknown-linux-gnu.a.gz *.a
-          mv libjsc-aarch64-unknown-linux-gnu.a.gz ../
+          python3 scripts/package_jsc_archive.py --lib-dir .libs-arm --target-triple aarch64-unknown-linux-gnu --output-dir . --repo-root "$PWD" --webkit-dir WebKit
 
       - name: Verify archive contents
         run: |
@@ -352,7 +373,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: libjsc-aarch64-unknown-linux-gnu
-          path: libjsc-aarch64-unknown-linux-gnu.a.gz
+          path: |
+            libjsc-aarch64-unknown-linux-gnu.a.gz
+            libjsc-aarch64-unknown-linux-gnu.a.gz.sha256
+            libjsc-aarch64-unknown-linux-gnu.metadata.json
           retention-days: 7
 
   build-linux-aarch64-musl:
@@ -376,33 +400,36 @@ jobs:
           driver: docker-container
 
       - name: Cache Docker layers
+        if: github.event.inputs.skip_cache != 'true'
         uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache-linux-musl-aarch64
-          key: buildx-linux-musl-aarch64-${{ hashFiles('Dockerfile.musl') }}
+          key: buildx-linux-musl-aarch64-${{ hashFiles('Dockerfile.musl', 'Makefile', 'sys/Cargo.toml') }}
           restore-keys: buildx-linux-musl-aarch64-
 
       # Native ARM64 runner: use Dockerfile.musl directly (no QEMU)
       - name: Build JavaScriptCore
         run: |
           mkdir -p .libs-arm-musl
+          CACHE_ARGS=()
+          if [ "${{ github.event.inputs.skip_cache }}" != "true" ]; then
+            CACHE_ARGS+=(--cache-from type=local,src=/tmp/.buildx-cache-linux-musl-aarch64)
+            CACHE_ARGS+=(--cache-to type=local,dest=/tmp/.buildx-cache-linux-musl-aarch64-new,mode=max)
+          fi
           docker buildx build \
             --output type=local,dest=./.libs-arm-musl \
-            --cache-from type=local,src=/tmp/.buildx-cache-linux-musl-aarch64 \
-            --cache-to type=local,dest=/tmp/.buildx-cache-linux-musl-aarch64-new,mode=max \
+            "${CACHE_ARGS[@]}" \
             -f Dockerfile.musl .
 
       - name: Rotate cache
-        if: always()
+        if: always() && github.event.inputs.skip_cache != 'true'
         run: |
           rm -rf /tmp/.buildx-cache-linux-musl-aarch64
           mv /tmp/.buildx-cache-linux-musl-aarch64-new /tmp/.buildx-cache-linux-musl-aarch64 2>/dev/null || true
 
       - name: Archive static libraries
         run: |
-          cd .libs-arm-musl
-          tar -czf libjsc-aarch64-unknown-linux-musl.a.gz *.a
-          mv libjsc-aarch64-unknown-linux-musl.a.gz ../
+          python3 scripts/package_jsc_archive.py --lib-dir .libs-arm-musl --target-triple aarch64-unknown-linux-musl --output-dir . --repo-root "$PWD" --webkit-dir WebKit
 
       - name: Verify archive contents
         run: |
@@ -425,7 +452,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: libjsc-aarch64-unknown-linux-musl
-          path: libjsc-aarch64-unknown-linux-musl.a.gz
+          path: |
+            libjsc-aarch64-unknown-linux-musl.a.gz
+            libjsc-aarch64-unknown-linux-musl.a.gz.sha256
+            libjsc-aarch64-unknown-linux-musl.metadata.json
           retention-days: 7
 
   # ===========================================================================
@@ -448,6 +478,7 @@ jobs:
 
       - name: Extract static libraries
         run: |
+          shasum -a 256 -c libjsc-aarch64-apple-darwin.a.gz.sha256
           mkdir -p .jsc-libs
           tar -xzf libjsc-aarch64-apple-darwin.a.gz -C .jsc-libs
           ls -la .jsc-libs/
@@ -467,8 +498,8 @@ jobs:
 
       - name: Run tests
         env:
-          RUST_JSC_BUILD_MODE: static
-          RUST_JSC_CUSTOM_BUILD_PATH: ${{ github.workspace }}/.jsc-libs
+          RUST_JSC_BUILD_MODE: download
+          RUST_JSC_LIB_DIR: ${{ github.workspace }}/.jsc-libs
           RUST_BACKTRACE: 1
         run: cargo test --lib -- --test-threads=1
 
@@ -502,6 +533,9 @@ jobs:
         run: |
           mkdir -p release-files
           find artifacts -name '*.a.gz' -exec cp {} release-files/ \;
+          find artifacts -name '*.a.gz.sha256' -exec cp {} release-files/ \;
+          find artifacts -name '*.metadata.json' -exec cp {} release-files/ \;
+          (cd release-files && cat $(ls *.a.gz.sha256 | sort) > SHA256SUMS && sha256sum -c SHA256SUMS)
           echo "📦 Release files:"
           ls -lh release-files/
 
@@ -518,6 +552,6 @@ jobs:
           gh release create "$TAG" \
             --title "Rust-JSC-Sys $TAG" \
             --generate-notes \
-            release-files/*.a.gz
+            release-files/*
 
           echo "Release $TAG created successfully"

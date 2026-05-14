@@ -14,6 +14,7 @@ use rust_jsc_sys::{
 
 use crate::{
     JSContext, JSError, JSObject, JSResult, JSString, JSValue, PrivateData,
+    PrivateDataDropStatus, PrivateDataSetStatus, PrivateDataTakeResult,
     PrivateDataWrapper, PropertyDescriptor,
 };
 
@@ -231,6 +232,11 @@ impl JSObject {
             return Err(JSError::from(value));
         }
 
+        if value.is_null() {
+            let ctx = unsafe { JSContext::borrowed(self.value.ctx) };
+            return Err(JSError::from_message(&ctx, "failed to get object property"));
+        }
+
         Ok(JSValue::new(value, self.value.ctx))
     }
 
@@ -265,6 +271,14 @@ impl JSObject {
         if !exception.is_null() {
             let value = JSValue::new(exception, self.value.ctx);
             return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            let ctx = unsafe { JSContext::borrowed(self.value.ctx) };
+            return Err(JSError::from_message(
+                &ctx,
+                "failed to get indexed object property",
+            ));
         }
 
         Ok(JSValue::new(result, self.value.ctx))
@@ -351,6 +365,14 @@ impl JSObject {
         if !exception.is_null() {
             let value = JSValue::new(exception, self.value.ctx);
             return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            let ctx = unsafe { JSContext::borrowed(self.value.ctx) };
+            return Err(JSError::from_message(
+                &ctx,
+                "failed to get object property for key",
+            ));
         }
 
         Ok(JSValue::new(result, self.ctx))
@@ -472,6 +494,11 @@ impl JSObject {
                 descriptor.attributes,
                 &mut exception,
             );
+        }
+
+        if !exception.is_null() {
+            let value = JSValue::new(exception, self.value.ctx);
+            return Err(JSError::from(value));
         }
 
         Ok(())
@@ -662,17 +689,31 @@ impl JSObject {
     /// assert_eq!(*private_data, 42);
     /// ```
     ///
+    /// # Safety
+    /// The caller must ensure no references into the old private data are alive
+    /// if this call replaces an existing Rust-owned pointer. The object's class
+    /// finalizer must also agree with the stored Rust type.
+    ///
     /// # Returns
-    /// Returns true if object can store private data, otherwise false.
-    pub unsafe fn set_private_data<T: 'static>(&self, data: T) -> bool {
+    /// Returns [`PrivateDataSetStatus::Set`] or [`PrivateDataSetStatus::Replaced`]
+    /// if object can store private data, otherwise [`PrivateDataSetStatus::Unsupported`].
+    pub unsafe fn set_private_data<T: 'static>(&self, data: T) -> PrivateDataSetStatus {
+        let old_ptr = unsafe { JSObjectGetPrivate(self.inner) };
         let data_ptr = PrivateDataWrapper::into_raw(data);
         let success = unsafe { JSObjectSetPrivate(self.inner, data_ptr) };
         if !success {
             // If the object cannot store private data, we must free the allocation
             // to prevent a memory leak.
             unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+            return PrivateDataSetStatus::Unsupported;
         }
-        success
+
+        if !old_ptr.is_null() {
+            unsafe { PrivateDataWrapper::drop_erased(old_ptr) };
+            return PrivateDataSetStatus::Replaced;
+        }
+
+        PrivateDataSetStatus::Set
     }
 
     /// Gets the private data from an object as an immutable reference.
@@ -739,13 +780,10 @@ impl JSObject {
     /// # Type Safety
     /// Requesting the wrong type returns `None` instead of causing UB.
     /// On type mismatch, the data stays in place — nothing is freed or lost.
-    pub unsafe fn take_private_data<T: 'static>(&self) -> Option<T> {
+    pub unsafe fn take_private_data<T: 'static>(&self) -> PrivateDataTakeResult<T> {
         let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
-        if data_ptr.is_null() {
-            return None;
-        }
         let data = unsafe { PrivateDataWrapper::take(data_ptr) };
-        if data.is_some() {
+        if data.is_taken() {
             unsafe { JSObjectSetPrivate(self.inner, std::ptr::null_mut()) };
         }
         data
@@ -779,18 +817,20 @@ impl JSObject {
 
     /// Drops the private data without reclaiming ownership.
     /// This is useful for cleaning up data when the object is being dropped, without needing to take ownership of it.
-    /// After this call, the object's private data pointer is cleared.
+    /// After this call, the object's private data pointer is cleared only when
+    /// the stored type matches `T`.
     ///
-    /// # Safety Note
-    /// The caller must ensure that the type `T` matches the type of the data currently
-    /// stored in the object. If the type does not match, this method will not drop the data,
-    /// and set the private data pointer to null, which could lead to memory leaks. Use with caution.
-    pub unsafe fn drop_private_data<T: 'static>(&self) {
+    /// # Safety
+    /// The caller must ensure that no references into the private data are alive.
+    /// If the type does not match, this method returns
+    /// [`PrivateDataDropStatus::TypeMismatch`] and leaves the data pointer intact.
+    pub unsafe fn drop_private_data<T: 'static>(&self) -> PrivateDataDropStatus {
         let data_ptr = unsafe { JSObjectGetPrivate(self.inner) };
-        if !data_ptr.is_null() {
-            unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+        let status = unsafe { PrivateDataWrapper::drop_raw::<T>(data_ptr) };
+        if status.is_dropped() {
             unsafe { JSObjectSetPrivate(self.inner, std::ptr::null_mut()) };
         }
+        status
     }
 
     pub fn get_private_data_ptr(&self) -> Option<PrivateData> {
@@ -876,6 +916,14 @@ impl JSObject {
             return Err(JSError::from(value));
         }
 
+        if result.is_null() {
+            let ctx = unsafe { JSContext::borrowed(self.value.ctx) };
+            return Err(JSError::from_message(
+                &ctx,
+                "failed to call object as constructor",
+            ));
+        }
+
         Ok(JSObject::from_ref(result, self.value.ctx))
     }
 
@@ -917,6 +965,14 @@ impl JSObject {
         if !exception.is_null() {
             let value = JSValue::new(exception, self.value.ctx);
             return Err(JSError::from(value));
+        }
+
+        if result.is_null() {
+            let ctx = unsafe { JSContext::borrowed(self.value.ctx) };
+            return Err(JSError::from_message(
+                &ctx,
+                "failed to call object as function",
+            ));
         }
 
         Ok(JSValue::new(result, self.value.ctx))
@@ -1003,8 +1059,8 @@ mod tests {
     fn test_object_constructor() {
         let ctx = JSContext::new();
         let object = JSObject::new(&ctx);
-        let result = object.call_as_constructor(&[]).unwrap();
-        assert_eq!(result.is_contructor(), false);
+        let result = object.call_as_constructor(&[]);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1061,6 +1117,27 @@ mod tests {
             .set_property("name", &value, PropertyDescriptor::default())
             .unwrap();
         assert_eq!(object.get_property("name").unwrap(), value);
+    }
+
+    #[test]
+    fn test_object_set_property_propagates_exception() {
+        let ctx = JSContext::new();
+        let object = ctx
+            .evaluate_script(
+                "({ set name(_) { throw new TypeError('setter failed'); } })",
+                None,
+            )
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let value = JSValue::string(&ctx, "value");
+
+        let error = object
+            .set_property("name", &value, PropertyDescriptor::default())
+            .unwrap_err();
+
+        assert_eq!(error.name().unwrap().to_string(), "TypeError");
+        assert_eq!(error.message().unwrap().to_string(), "setter failed");
     }
 
     #[test]
@@ -1216,8 +1293,8 @@ mod tests {
     fn test_object_call_as_constructor() {
         let ctx = JSContext::new();
         let object = JSObject::new(&ctx);
-        let result = object.call_as_constructor(&[]).unwrap();
-        assert_eq!(result.is_contructor(), false);
+        let result = object.call_as_constructor(&[]);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1381,7 +1458,7 @@ mod tests {
     fn test_object_private_data_wrong_type_returns_none() {
         use crate::JSClass;
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("WrongTypeObj").build::<String>().unwrap();
 
         let object = class.object::<String>(&ctx, Some(String::from("data")));
@@ -1395,16 +1472,19 @@ mod tests {
 
     #[test]
     fn test_object_take_private_data_type_safe() {
-        use crate::JSClass;
+        use crate::{JSClass, PrivateDataTakeResult};
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("TakeObjTest").build::<i32>().unwrap();
 
         let object = class.object::<i32>(&ctx, Some(99));
         let object = object.as_object().unwrap();
 
         // Wrong type — data preserved
-        assert!(unsafe { object.take_private_data::<String>() }.is_none());
+        assert_eq!(
+            unsafe { object.take_private_data::<String>() },
+            PrivateDataTakeResult::TypeMismatch
+        );
         assert_eq!(*object.get_private_data::<i32>().unwrap(), 99);
 
         // Correct type — data taken
@@ -1414,10 +1494,59 @@ mod tests {
     }
 
     #[test]
+    fn test_object_drop_private_data_status_preserves_wrong_type() {
+        use crate::{JSClass, PrivateDataDropStatus};
+
+        let ctx = JSContext::new();
+        let class = JSClass::builder("DropStatusObj").build::<i32>().unwrap();
+
+        let object = class.object::<i32>(&ctx, Some(77));
+        let object = object.as_object().unwrap();
+
+        let wrong_type = unsafe { object.drop_private_data::<String>() };
+        assert_eq!(wrong_type, PrivateDataDropStatus::TypeMismatch);
+        assert_eq!(*object.get_private_data::<i32>().unwrap(), 77);
+
+        let dropped = unsafe { object.drop_private_data::<i32>() };
+        assert_eq!(dropped, PrivateDataDropStatus::Dropped);
+        assert!(object.get_private_data::<i32>().is_none());
+
+        let empty = unsafe { object.drop_private_data::<i32>() };
+        assert_eq!(empty, PrivateDataDropStatus::Empty);
+    }
+
+    #[test]
+    fn test_object_set_private_data_replaces_existing_data() {
+        use crate::{JSClass, PrivateDataSetStatus};
+
+        let ctx = JSContext::new();
+        let class = JSClass::builder("SetReplaceObj").build::<i32>().unwrap();
+
+        let object = class.object::<i32>(&ctx, Some(1));
+        let object = object.as_object().unwrap();
+
+        let status = unsafe { object.set_private_data(2) };
+        assert_eq!(status, PrivateDataSetStatus::Replaced);
+        assert_eq!(*object.get_private_data::<i32>().unwrap(), 2);
+    }
+
+    #[test]
+    fn test_object_set_private_data_reports_unsupported_plain_object() {
+        use crate::PrivateDataSetStatus;
+
+        let ctx = JSContext::new();
+        let object = JSObject::new(&ctx);
+
+        let status = unsafe { object.set_private_data(123i32) };
+        assert_eq!(status, PrivateDataSetStatus::Unsupported);
+        assert!(object.get_private_data::<i32>().is_none());
+    }
+
+    #[test]
     fn test_object_private_data_mut_type_safe() {
         use crate::JSClass;
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("MutObjTest").build::<i32>().unwrap();
 
         let object = class.object::<i32>(&ctx, Some(10));
@@ -1438,7 +1567,7 @@ mod tests {
     fn test_object_private_data_multiple_immutable_reads() {
         use crate::JSClass;
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("MultiRead").build::<String>().unwrap();
 
         let object = class.object::<String>(&ctx, Some(String::from("stable")));
@@ -1457,7 +1586,7 @@ mod tests {
         use crate::JSClass;
         use std::cell::RefCell;
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("RefCellObj")
             .build::<RefCell<i32>>()
             .unwrap();
@@ -1477,7 +1606,7 @@ mod tests {
     fn test_object_private_data_get_ptr() {
         use crate::JSClass;
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("PtrTest").build::<i32>().unwrap();
 
         let object = class.object::<i32>(&ctx, Some(42));
@@ -1496,7 +1625,7 @@ mod tests {
     fn test_object_private_data_uaf_scenario() {
         use crate::JSClass;
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("UAFTest").build::<String>().unwrap();
 
         let object = class.object::<String>(&ctx, Some(String::from("alive")));

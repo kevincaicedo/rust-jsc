@@ -16,7 +16,7 @@
 
 use rust_jsc::context::InspectorPauseEvent;
 use rust_jsc::{
-    callback, JSContext, JSFunction, JSObject, JSResult, JSValue,
+    callback, JSContext, JSFunction, JSObject, JSResult, JSValue, OwnedJSContext,
     PropertyDescriptorBuilder,
 };
 use rust_jsc_macros::{inspector_callback, inspector_pause_event_callback};
@@ -31,7 +31,7 @@ struct DebuggerState {
     // We store the context here so callbacks can use it to send messages.
     // Since everything runs on one thread, we don't need Arc/Mutex for the context itself,
     // but the callbacks receive `&mut DebuggerState`.
-    ctx: Arc<JSContext>,
+    ctx: Arc<OwnedJSContext>,
     paused: bool,
     // Synchronization to notify the main thread (for demonstration purposes)
     sync: Arc<(Mutex<bool>, Condvar)>,
@@ -141,7 +141,7 @@ fn main() {
 
         // Setup state
         let state = DebuggerState {
-            ctx: ctx.clone(), // JSContext is a wrapper around a pointer, clone is cheap (ref count)
+            ctx: ctx.clone(), // Clone the local Arc; the owned context stays on this JS thread.
             paused: false,
             sync: pair_clone,
         };

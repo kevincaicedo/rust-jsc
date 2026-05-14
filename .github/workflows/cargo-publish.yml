@@ -95,7 +95,7 @@ jobs:
 
       - name: Run tests
         env:
-          RUST_JSC_BUILD_MODE: static
+          RUST_JSC_BUILD_MODE: download
           RUST_BACKTRACE: 1
         run: |
           # Use --test-threads=1 to avoid SIGSEGV from parallel access to JSC global state.

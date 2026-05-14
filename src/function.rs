@@ -460,7 +460,7 @@ mod tests {
             _arguments: *const JSValueRef,
             _exception: *mut JSValueRef,
         ) -> JSValueRef {
-            let ctx = crate::JSContext::from(_ctx);
+            let ctx = unsafe { crate::JSContext::borrowed(_ctx) };
             let state = ctx.get_shared_data::<CallbackState>().unwrap();
 
             println!("Name: {}", state.name);

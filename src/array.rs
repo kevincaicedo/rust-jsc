@@ -50,6 +50,13 @@ impl JSArray {
             return Err(JSError::from(value));
         }
 
+        if result.is_null() {
+            return Err(JSError::from_message(
+                ctx,
+                "failed to create JavaScript array",
+            ));
+        }
+
         Ok(Self::new(JSObject::from_ref(result, ctx.inner)))
     }
 
@@ -276,6 +283,41 @@ mod tests {
         )
         .unwrap();
         assert_eq!(array.length().unwrap(), 3.0);
+    }
+
+    #[test]
+    fn test_array_length_propagates_exception() {
+        let ctx = JSContext::new();
+        let array = ctx
+            .evaluate_script(
+                "new Proxy([], { get(_target, property) { if (property === 'length') throw new Error('length failed'); return 0; } })",
+                None,
+            )
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let array = JSArray::new(array);
+
+        let error = array.length().unwrap_err();
+        assert_eq!(error.message().unwrap().to_string(), "length failed");
+    }
+
+    #[test]
+    fn test_array_set_propagates_exception() {
+        let ctx = JSContext::new();
+        let array = ctx
+            .evaluate_script(
+                "new Proxy([], { set() { throw new Error('set failed'); } })",
+                None,
+            )
+            .unwrap()
+            .as_object()
+            .unwrap();
+        let array = JSArray::new(array);
+        let value = JSValue::number(&ctx, 1.0);
+
+        let error = array.set(0, &value).unwrap_err();
+        assert_eq!(error.message().unwrap().to_string(), "set failed");
     }
 
     #[test]

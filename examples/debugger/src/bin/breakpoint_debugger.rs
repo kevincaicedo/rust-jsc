@@ -23,7 +23,7 @@
 //!   to reliably send step/resume commands while the VM is paused.
 
 use rust_jsc::context::InspectorPauseEvent;
-use rust_jsc::JSContext;
+use rust_jsc::{JSContext, OwnedJSContext};
 use rust_jsc_macros::{inspector_callback, inspector_pause_event_callback};
 use serde_json::Value;
 use std::path::PathBuf;
@@ -179,7 +179,7 @@ fn on_inspector_message(message: &str) {
 }
 
 struct HostState {
-    ctx: Arc<JSContext>,
+    ctx: Arc<OwnedJSContext>,
     sync: Sync,
     inspector_rx: Arc<Mutex<mpsc::Receiver<String>>>,
 }

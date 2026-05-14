@@ -20,7 +20,7 @@ use rust_jsc_sys::{
     JSTypedArrayType_kJSTypedArrayTypeUint8ClampedArray, JSValueRef,
 };
 
-use std::any::TypeId;
+use std::{any::TypeId, marker::PhantomData, rc::Rc};
 
 pub mod array;
 pub mod class;
@@ -43,14 +43,39 @@ pub use rust_jsc_sys as internal;
 // re export JSAPIModuleLoader from rust_jsc_sys as JSModuleLoader
 pub use rust_jsc_sys::JSAPIModuleLoader as JSModuleLoader;
 
-/// A JavaScript context.
+pub(crate) type NotSendOrSync = PhantomData<Rc<()>>;
+
+pub(crate) fn not_send_or_sync() -> NotSendOrSync {
+    PhantomData
+}
+
+/// A borrowed JavaScript execution context.
+///
+/// This handle does not own or release the underlying `JSGlobalContextRef`.
+/// Callback macros pass this type into Rust callbacks. Use [`JSGlobalContext`]
+/// or [`OwnedJSContext`] when Rust owns the global context lifetime.
+/// Context handles are intentionally not `Send` or `Sync`.
+#[derive(Clone, Copy)]
 pub struct JSContext {
     pub(crate) inner: JSGlobalContextRef,
+    pub(crate) _not_send_or_sync: NotSendOrSync,
 }
+
+/// An owned JavaScript global context.
+///
+/// This retains one `JSGlobalContextRef` ownership count and releases it in
+/// `Drop`. It dereferences to [`JSContext`] so existing context operations work
+/// on `&JSGlobalContext` without runtime overhead.
+/// Context handles are intentionally not `Send` or `Sync`.
+pub struct JSGlobalContext {
+    pub(crate) inner: JSContext,
+}
+
+pub type OwnedJSContext = JSGlobalContext;
 
 /// A strictly typed JavaScript context that automatically manages shared data state.
 pub struct TypedJSContext<T: 'static> {
-    pub(crate) inner: JSContext,
+    pub(crate) inner: JSGlobalContext,
     _marker: std::marker::PhantomData<T>,
 }
 
@@ -58,12 +83,13 @@ pub type PrivateData = *mut ::std::os::raw::c_void;
 
 /// Header-only view of a `TypedData<T>` allocation.
 ///
-/// Because `TypedData<T>` is `#[repr(C)]` with `type_id` as its first field,
+/// Because `TypedData<T>` is `#[repr(C)]` with `header` as its first field,
 /// casting any `*mut TypedData<T>` to `*const PrivateDataHeader` is valid and
 /// lets us inspect the `TypeId` without knowing `T`.
 #[repr(C)]
 struct PrivateDataHeader {
     type_id: TypeId,
+    drop_fn: unsafe fn(*mut std::ffi::c_void),
 }
 
 /// Single-allocation, cache-friendly, type-safe wrapper for `*mut c_void`.
@@ -79,8 +105,84 @@ struct PrivateDataHeader {
 /// - **No vtable dispatch**: type checking is a direct `TypeId` comparison.
 #[repr(C)]
 struct TypedData<T> {
-    type_id: TypeId,
+    header: PrivateDataHeader,
     data: T,
+}
+
+/// Result of installing private or shared data into a JavaScriptCore slot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrivateDataSetStatus {
+    /// Data was stored into an empty slot.
+    Set,
+    /// Existing Rust-owned data was dropped and replaced.
+    Replaced,
+    /// The slot already had data and the operation did not replace it.
+    AlreadySet,
+    /// JavaScriptCore rejected the data pointer for this object.
+    Unsupported,
+}
+
+impl PrivateDataSetStatus {
+    pub fn is_success(self) -> bool {
+        matches!(self, Self::Set | Self::Replaced)
+    }
+
+    pub fn unwrap(self) {
+        assert!(self.is_success(), "private data was not stored: {self:?}");
+    }
+}
+
+/// Result of dropping private or shared data with an expected Rust type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PrivateDataDropStatus {
+    /// The slot was empty.
+    Empty,
+    /// The slot contained data of a different Rust type and was left untouched.
+    TypeMismatch,
+    /// The data matched the requested type and was dropped.
+    Dropped,
+}
+
+impl PrivateDataDropStatus {
+    pub fn is_dropped(self) -> bool {
+        matches!(self, Self::Dropped)
+    }
+}
+
+/// Result of taking private or shared data with an expected Rust type.
+#[derive(Debug, PartialEq, Eq)]
+pub enum PrivateDataTakeResult<T> {
+    /// The slot was empty.
+    Empty,
+    /// The slot contained data of a different Rust type and was left untouched.
+    TypeMismatch,
+    /// The data matched the requested type and ownership was transferred.
+    Taken(T),
+}
+
+impl<T> PrivateDataTakeResult<T> {
+    pub fn is_taken(&self) -> bool {
+        matches!(self, Self::Taken(_))
+    }
+
+    pub fn is_none(&self) -> bool {
+        !self.is_taken()
+    }
+
+    pub fn into_option(self) -> Option<T> {
+        match self {
+            Self::Taken(data) => Some(data),
+            Self::Empty | Self::TypeMismatch => None,
+        }
+    }
+
+    pub fn unwrap(self) -> T {
+        match self {
+            Self::Taken(data) => data,
+            Self::Empty => panic!("private data slot is empty"),
+            Self::TypeMismatch => panic!("private data type mismatch"),
+        }
+    }
 }
 
 /// Zero-sized namespace for type-safe `*mut c_void` operations.
@@ -93,10 +195,17 @@ impl PrivateDataWrapper {
     #[inline]
     pub fn into_raw<T: 'static>(data: T) -> *mut std::ffi::c_void {
         let typed = Box::new(TypedData {
-            type_id: TypeId::of::<T>(),
+            header: PrivateDataHeader {
+                type_id: TypeId::of::<T>(),
+                drop_fn: Self::drop_typed::<T>,
+            },
             data,
         });
         Box::into_raw(typed) as *mut std::ffi::c_void
+    }
+
+    unsafe fn drop_typed<T>(ptr: *mut std::ffi::c_void) {
+        let _ = unsafe { Box::from_raw(ptr as *mut TypedData<T>) };
     }
 
     /// Recover a shared reference to the stored data, checking the type at runtime.
@@ -151,16 +260,18 @@ impl PrivateDataWrapper {
     /// The pointer must have been created by `PrivateDataWrapper::into_raw` and must
     /// not have been previously freed. On success the pointer becomes invalid.
     #[inline]
-    pub unsafe fn take<T: 'static>(ptr: *mut std::ffi::c_void) -> Option<T> {
+    pub unsafe fn take<T: 'static>(
+        ptr: *mut std::ffi::c_void,
+    ) -> PrivateDataTakeResult<T> {
         if ptr.is_null() {
-            return None;
+            return PrivateDataTakeResult::Empty;
         }
         let header = &*(ptr as *const PrivateDataHeader);
         if header.type_id != TypeId::of::<T>() {
-            return None;
+            return PrivateDataTakeResult::TypeMismatch;
         }
         let typed = Box::from_raw(ptr as *mut TypedData<T>);
-        Some(typed.data)
+        PrivateDataTakeResult::Taken(typed.data)
     }
 
     /// Drop the allocation, freeing both the header and the contained `T`.
@@ -172,19 +283,58 @@ impl PrivateDataWrapper {
     /// The pointer must have been created by `PrivateDataWrapper::into_raw` and must
     /// not have been previously freed.
     #[allow(dead_code)]
-    pub unsafe fn drop_raw<T: 'static>(ptr: *mut std::ffi::c_void) {
-        if !ptr.is_null() {
-            let header = &*(ptr as *const PrivateDataHeader);
-            if header.type_id == TypeId::of::<T>() {
-                let _ = Box::from_raw(ptr as *mut TypedData<T>);
-            }
+    pub unsafe fn drop_raw<T: 'static>(
+        ptr: *mut std::ffi::c_void,
+    ) -> PrivateDataDropStatus {
+        if ptr.is_null() {
+            return PrivateDataDropStatus::Empty;
         }
+
+        let header = &*(ptr as *const PrivateDataHeader);
+        if header.type_id != TypeId::of::<T>() {
+            return PrivateDataDropStatus::TypeMismatch;
+        }
+
+        unsafe { (header.drop_fn)(ptr) };
+        PrivateDataDropStatus::Dropped
+    }
+
+    /// Drop a Rust-owned private-data allocation without statically knowing `T`.
+    ///
+    /// # Safety
+    /// The pointer must have been created by `PrivateDataWrapper::into_raw`, must
+    /// not have been previously freed, and no references into the allocation may
+    /// be alive.
+    pub unsafe fn drop_erased(ptr: *mut std::ffi::c_void) -> PrivateDataDropStatus {
+        if ptr.is_null() {
+            return PrivateDataDropStatus::Empty;
+        }
+
+        let header = unsafe { &*(ptr as *const PrivateDataHeader) };
+        unsafe { (header.drop_fn)(ptr) };
+        PrivateDataDropStatus::Dropped
     }
 }
 
-/// A JavaScript execution context group.
+/// A borrowed JavaScript execution context group.
+///
+/// This handle does not own or release the underlying `JSContextGroupRef`.
+/// Use [`OwnedJSContextGroup`] when Rust owns a retained group.
+/// Context group handles are intentionally not `Send` or `Sync`.
+#[derive(Clone, Copy)]
 pub struct JSContextGroup {
     context_group: JSContextGroupRef,
+    pub(crate) _not_send_or_sync: NotSendOrSync,
+}
+
+/// An owned JavaScript execution context group.
+///
+/// JavaScriptCore contexts in the same group can share JavaScript values. A
+/// group is tied to the run loop of the thread that created it, and using values
+/// from the same group across threads requires explicit synchronization.
+/// Context group handles are intentionally not `Send` or `Sync`.
+pub struct OwnedJSContextGroup {
+    pub(crate) inner: JSContextGroup,
 }
 
 /// A JavaScript class.

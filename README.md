@@ -24,6 +24,16 @@ rust_jsc = { version = "1.0.0" }
 
 ## Usage
 
+### Context And Group Ownership
+
+`JSContext::new()` returns an owned `JSGlobalContext` (`OwnedJSContext` is an alias). Owned global contexts release their `JSGlobalContextRef` in `Drop`, so manual `release()` is only needed when you want to consume the handle early.
+
+`JSContext` is a borrowed view. JavaScriptCore callbacks receive `JSContext` because the callback does not own the context and must not release it. If you need to keep a callback context beyond the callback owner, call `ctx.retain()` and store the returned `JSGlobalContext`.
+
+`JSContextGroup` is also borrowed. `JSContextGroup::new()` returns an `OwnedJSContextGroup`, and `ctx.group()` returns a borrowed group view. Call `group.retain()` when Rust needs a retained group handle.
+
+Context and group handles are intentionally not `Send` or `Sync`. Use a context and its values on the thread that owns the JavaScriptCore VM/group unless you build a higher-level synchronization layer around raw JavaScriptCore usage.
+
 ### Evaluate Script
 
 ```rust
@@ -234,24 +244,40 @@ Table below shows the supported platforms:
 `rust_jsc` uses the `rust_jsc_sys` build script to locate and link the Kedo
 WebKit JavaScriptCore build. The default path is static: with no configuration,
 the build script downloads a prebuilt `libjsc-<target>.a.gz` archive from the
-rust-jsc GitHub release mirror and links `libJavaScriptCore.a`, `libWTF.a`, and
-`libbmalloc.a`; it also links `libJavaScriptCoreJIT.a` when a target produces a
-separate JIT archive.
+rust-jsc GitHub release mirror, verifies `SHA256SUMS`, rejects unsafe archive
+paths, and links `libJavaScriptCore.a`, `libWTF.a`, and `libbmalloc.a`; it also
+links `libJavaScriptCoreJIT.a` when a target produces a separate JIT archive.
 
 For local development against the bundled WebKit checkout:
 
 ```bash
 make build-jsc-static
-RUST_JSC_BUILD_MODE=static \
-  RUST_JSC_CUSTOM_BUILD_PATH="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/lib" \
+RUST_JSC_BUILD_MODE=download \
+  RUST_JSC_LIB_DIR="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/lib" \
   cargo test --lib -- --test-threads=1
 ```
 
-Linux release archives are built in Docker and include bundled static
-`libstdc++`, ICU, and `libatomic` archives. Local Linux source builds may link
-those system dependencies dynamically when the static `.a` files are not present
-beside the local JSC archives; that is intended for development and does not
-change the default release archive path.
+Sanitizer validation is separate from the release archive path:
+
+```bash
+make test-webkit-api-asan
+make test-webkit-api-ubsan
+make test-rust-asan
+make test-rust-ubsan
+```
+
+These targets build local ASAN/UBSAN JSCOnly trees and run WebKit
+`TestWTF`/`TestJavaScriptCore` plus Rust tests where practical. Rust ASAN uses
+nightly `-Zsanitizer=address`; Rust UBSAN links against UBSAN-instrumented
+WebKit and enables Rust UB checks because Rust does not expose
+`-Zsanitizer=undefined`.
+
+Linux release archives are built in Docker with deterministic packaging,
+per-archive `.sha256` sidecars, metadata JSON, and a combined `SHA256SUMS`.
+They include bundled static `libstdc++`, ICU, and `libatomic` archives. Local
+Linux source builds may link those system dependencies dynamically when the
+static `.a` files are not present beside the local JSC archives; that is
+intended for development and does not change the default release archive path.
 
 For every build mode and environment variable, see
 [rust-jsc/sys/README.md](sys/README.md).
@@ -266,15 +292,6 @@ Use the direct CMake/JSCOnly Makefile target. The default local build is static.
 make build-jsc-static
 make jsc-smoke
 make test-local-jsc
-```
-
-To build and link the macOS framework layout instead:
-
-```bash
-make build-jsc-framework
-RUST_JSC_BUILD_MODE=framework \
-  RUST_JSC_CUSTOM_BUILD_PATH="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release/lib" \
-  cargo test
 ```
 
 Linux release archives are produced with Docker:
@@ -293,9 +310,10 @@ The complete build configuration reference lives in
 
 ### How do I troubleshoot linking problems?
 
-For static local builds, first confirm `RUST_JSC_CUSTOM_BUILD_PATH` points at
+For static local builds, first confirm `RUST_JSC_LIB_DIR` points at
 the directory containing `libJavaScriptCore.a`, `libWTF.a`, and `libbmalloc.a`.
-For framework or dynamic builds, set the platform loader path if needed:
+For `system` mode experiments with dynamic libraries, set the platform loader
+path if needed:
 
 ```bash
 # macOS

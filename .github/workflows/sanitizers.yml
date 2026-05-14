@@ -1,0 +1,85 @@
+name: Sanitizers
+
+on:
+  workflow_dispatch:
+    inputs:
+      sanitizer:
+        description: "Sanitizer suite to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - asan
+          - ubsan
+  schedule:
+    - cron: "0 8 * * 1"
+
+concurrency:
+  group: sanitizers-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  webkit-api-and-rust:
+    name: ${{ matrix.sanitizer }} WebKit API and Rust tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    if: github.event_name != 'workflow_dispatch' || inputs.sanitizer == 'all' || inputs.sanitizer == matrix.sanitizer
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [asan, ubsan]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Install WebKit build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bison \
+            clang \
+            cmake \
+            file \
+            flex \
+            libatomic1 \
+            libicu-dev \
+            ninja-build \
+            perl \
+            python3 \
+            ruby
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: sanitizer-cargo-${{ runner.os }}-${{ matrix.sanitizer }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: sanitizer-cargo-${{ runner.os }}-${{ matrix.sanitizer }}-
+
+      - name: Run sanitizer suite
+        env:
+          CC: clang
+          CXX: clang++
+          JSC_GENERATOR: Ninja
+          JSC_JOBS: 4
+          JSC_SANITIZER_PROFILE: Release
+          RUST_BACKTRACE: 1
+        run: |
+          bash scripts/run-sanitizers.sh webkit-${{ matrix.sanitizer }}
+          bash scripts/run-sanitizers.sh rust-${{ matrix.sanitizer }}

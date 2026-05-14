@@ -43,7 +43,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc"
-version = "0.5.0"
+version = "1.0.0"
 dependencies = [
  "rust_jsc_macros",
  "rust_jsc_sys",
@@ -60,7 +60,7 @@ dependencies = [
 
 [[package]]
 name = "rust_jsc_sys"
-version = "0.4.2"
+version = "0.5.0"
 
 [[package]]
 name = "ryu"

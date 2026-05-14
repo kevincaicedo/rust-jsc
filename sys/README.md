@@ -1,36 +1,34 @@
-# rust-jsc-sys
+# rust-jsc-sys Build Configuration
 
-`rust_jsc_sys` provides the raw FFI bindings and build script used by
-`rust_jsc`. It links against the JavaScriptCore artifacts produced from the
-Kedo WebKit fork, not a stock system JavaScriptCore, because rust-jsc depends on
-fork-only APIs for modules, synthetic modules, inspector integration, shared
-data, typed arrays, and error helpers.
+`rust_jsc_sys` provides the raw JavaScriptCore FFI bindings and the Cargo build
+script used by `rust_jsc`. It links against artifacts produced from the Kedo
+WebKit fork, not stock JavaScriptCore, because rust-jsc depends on fork-only
+APIs for modules, synthetic modules, inspector integration, shared data, typed
+arrays, and error helpers.
 
-For normal users, no configuration is required. The default build downloads a
-prebuilt static JavaScriptCore archive from the rust-jsc GitHub release mirror
-and links it into the Rust crate.
+## Default Contract
 
-## Default Behavior
-
-With no environment variables set, `sys/build.rs` uses:
+The default is intentionally simple:
 
 ```text
-RUST_JSC_BUILD_MODE=auto
+RUST_JSC_BUILD_MODE=download
 ```
 
-`auto` behaves as follows:
+With no environment variables, `sys/build.rs` downloads the prebuilt static
+archive for the current target from the rust-jsc GitHub release mirror, verifies
+its SHA-256 manifest, rejects unsafe archive paths, extracts it into Cargo's
+build output directory, and links it statically.
 
-1. If `RUST_JSC_CUSTOM_BUILD_PATH` is set, inspect that path and link the first
-   supported artifact layout found there: framework, static archive set, or
-   dynamic libraries.
-2. Otherwise, download the prebuilt static archive for the current target from:
+There are three supported modes:
 
-```text
-https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v<rust_jsc_sys version>/libjsc-<target>.a.gz
-```
+| Mode | Use when | Behavior |
+| --- | --- | --- |
+| `download` | Normal user, CI, release, or local prebuilt-static use. | Links an exact `RUST_JSC_ARCHIVE` override when set, then `RUST_JSC_LIB_DIR` when set, otherwise downloads `libjsc-<target>.a.gz` from the mirror. |
+| `source` | You want Cargo to build JavaScriptCore from the bundled WebKit checkout. | Runs direct CMake/JSCOnly with Ninja and static JSC enabled. |
+| `system` | You are experimenting with a system or dynamic JavaScriptCore. | Links a system library/framework. This is not the normal rust-jsc path and may miss fork-only APIs. |
 
-The downloaded archive is extracted into Cargo's build output directory and is
-reused on later builds for the same version.
+Legacy mode strings `auto`, `custom`, `static`, and `archive` still map to
+`download` during the 1.0 migration window. Legacy `framework` maps to `system`.
 
 ## Release Archive Contract
 
@@ -51,7 +49,7 @@ Supported archive targets:
 | Linux musl x86_64 | `libjsc-x86_64-unknown-linux-musl.a.gz` |
 | Linux musl aarch64 | `libjsc-aarch64-unknown-linux-musl.a.gz` |
 
-All archives include the JavaScriptCore static libraries:
+Every archive must include:
 
 ```text
 libJavaScriptCore.a
@@ -59,18 +57,17 @@ libWTF.a
 libbmalloc.a
 ```
 
-Some WebKit/JSCOnly builds also produce a separate JIT archive:
+Some JSCOnly builds also produce:
 
 ```text
 libJavaScriptCoreJIT.a
 ```
 
 When present, `rust_jsc_sys` links it after `libJavaScriptCore.a`. When it is
-not present, `libJavaScriptCore.a` is expected to be self-contained for that
-target.
+absent, `libJavaScriptCore.a` is expected to be self-contained for that target.
 
 Linux release archives also include the static system dependency archives used
-by the release Docker builds:
+by the Docker release builds:
 
 ```text
 libstdc++.a
@@ -80,73 +77,164 @@ libicudata.a
 libatomic.a
 ```
 
-The CI release workflow verifies these files for Linux archives before
-publishing. This is separate from local Linux development builds, which may link
-system C++/ICU/atomic libraries dynamically when those static dependency
-archives are not present beside the local JSC archives.
+Local Linux source builds may not have those system archives beside JSC. In that
+case the build script links JSC/WTF statically and falls back to dynamic host
+`stdc++`, ICU, and `atomic` libraries. Release Docker archives remain fully
+bundled for the default download path.
 
-## Build Modes
+Every release also publishes:
 
-Select a mode with `RUST_JSC_BUILD_MODE`.
+```text
+SHA256SUMS
+libjsc-<target>.a.gz.sha256
+libjsc-<target>.metadata.json
+```
 
-| Mode | Use When | Behavior |
+`sys/build.rs` downloads `SHA256SUMS` for default mirror downloads and verifies
+the selected archive before extraction. Exact `RUST_JSC_ARCHIVE` overrides use a
+sidecar named `<archive>.sha256` or a `SHA256SUMS` file beside the local archive.
+The metadata JSON records the archive hash, included library hashes and sizes,
+WebKit commit, rust-jsc sys version, target triple, repository commit, and
+compiler/tool versions. Metadata is release evidence; it is not extracted or
+linked by Cargo.
+
+## Variables By Category
+
+### Mode Selection
+
+| Variable | Default | Description |
 | --- | --- | --- |
-| `auto` | Default for users and CI that should use released archives. | Uses `RUST_JSC_CUSTOM_BUILD_PATH` if set, otherwise downloads the target static archive from the GitHub mirror. |
-| `download` | You want to force archive download and ignore local builds. | Downloads and links the prebuilt static archive. Alias: `archive`. |
-| `static` | You have local static JSC archives, or you want static archive download fallback. | Uses `RUST_JSC_CUSTOM_BUILD_PATH` when set; otherwise downloads the prebuilt static archive. |
-| `framework` | You have a macOS `JavaScriptCore.framework` build. | Links the framework from `RUST_JSC_FRAMEWORK_PATH` or `RUST_JSC_CUSTOM_BUILD_PATH`. |
-| `source` | You want Cargo to configure/build JavaScriptCore from the bundled WebKit checkout. | Runs CMake/JSCOnly, then auto-detects artifacts in the build directory. |
-| `system` | You are experimenting with a system-provided JavaScriptCore. | Links a system dylib/framework. This may not provide rust-jsc fork-only APIs. |
+| `RUST_JSC_BUILD_MODE` | `download` | Selects `download`, `source`, or `system`. |
+| `RUST_JSC_FROM_SOURCE` | unset | Truthy values (`1`, `true`, `yes`, `on`) force `source` mode. This is a stable alias. |
 
-`RUST_JSC_FROM_SOURCE=1` takes precedence over `RUST_JSC_BUILD_MODE` and selects
-`source`.
+### Download And Static Archive Inputs
 
-`RUST_JSC_FRAMEWORK_PATH` takes precedence over the mode string and selects
-`framework`.
-
-## Configuration Variables
-
-| Variable | Applies To | Description |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `RUST_JSC_BUILD_MODE` | All builds | Selects `auto`, `download`, `static`, `framework`, `source`, or `system`. Defaults to `auto`. |
-| `RUST_JSC_CUSTOM_BUILD_PATH` | `auto`, `static`, `framework` | Directory containing JSC artifacts. May point directly at a `lib` directory, a CMake build directory with `lib`, `JavaScriptCore.framework`, or the framework parent directory. |
-| `RUST_JSC_CUSTOM_ARCHIVE` | `download`, `static` fallback, `auto` fallback | Overrides the archive URL/path used for download mode. |
-| `RUST_JSC_MIRROR` | `download`, `static` fallback, `auto` fallback | Overrides the default release mirror base URL. The build script appends `/sys-v<version>/libjsc-<target>.a.gz`. |
-| `RUST_JSC_FRAMEWORK_PATH` | `framework` | Path to `JavaScriptCore.framework` or its parent directory. |
-| `RUST_JSC_FROM_SOURCE` | All builds | Truthy values (`1`, `true`, `yes`, `on`) force `source` mode. |
-| `RUST_JSC_WEBKIT_DIR` | `source` | WebKit checkout to build. Defaults to `../WebKit` relative to the `sys` crate. |
-| `RUST_JSC_BUILD_DIR` | `source` | CMake build directory. Defaults to `WebKit/WebKitBuild/RustJSC/JSCOnly/<profile>`. |
-| `RUST_JSC_BUILD_PROFILE` | `source` | CMake build type. Defaults to `Release`. |
-| `RUST_JSC_CMAKE_GENERATOR` | `source` | CMake generator, for example `Ninja`. If unset, the build script uses Ninja when available. |
-| `RUST_JSC_JOBS` | `source` | Parallel build job count. Defaults to the host parallelism or `4`. |
-| `RUST_JSC_STATIC` | `source` | Truthy values add `-DENABLE_STATIC_JSC=ON -DUSE_THIN_ARCHIVES=OFF` to the CMake configure. |
-| `RUST_JSC_FORCE_CMAKE_CONFIGURE` | `source` | Truthy values rerun CMake configure even if `CMakeCache.txt` exists. |
-| `RUST_JSC_FORCE_SOURCE_BUILD` | `source` | Truthy values rebuild JSC even when artifacts already exist. |
-| `RUST_JSC_SYSTEM_LIBS_PATH` | `system` | Extra native library search directory for system JavaScriptCore. |
-| `RUST_JSC_SYSTEM_LIB_NAME` | `system` | Dynamic library name to link in system mode. Defaults to `JavaScriptCore`. |
-| `SYSTEM_LIBS_PATH` | macOS static | Extra search path for macOS system libraries. Defaults to `/usr/lib`. |
+| `RUST_JSC_ARCHIVE` | unset | Specific archive file, `file://` URL, or `http(s)` URL to use instead of the default target archive URL. This takes precedence over `RUST_JSC_LIB_DIR`. |
+| `RUST_JSC_LIB_DIR` | unset | Directory containing already-extracted static JSC archives. Use this for local Docker output or `make build-jsc-static` output. |
+| `RUST_JSC_MIRROR` | GitHub release mirror | Mirror base URL. The build script appends `/sys-v<version>/libjsc-<target>.a.gz`. |
 
-Cargo rebuilds `rust_jsc_sys` when any of these variables changes.
+### Source Build Inputs
+
+Source mode always uses direct CMake/JSCOnly, Ninja, and static JSC archives.
+There is no public generator setting and no dynamic/framework source mode.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `RUST_JSC_WEBKIT_DIR` | `../WebKit` from the `sys` crate | WebKit checkout to build. |
+| `RUST_JSC_BUILD_DIR` | `WebKit/WebKitBuild/RustJSC/JSCOnly/<profile>-Static` | CMake build directory. |
+| `RUST_JSC_BUILD_PROFILE` | `Release` | CMake build type. Supported values: `Release`, `Debug`. |
+| `RUST_JSC_JOBS` | host parallelism or `4` | Parallel CMake build jobs. |
+| `RUST_JSC_ARCHIVE_OUT` | unset | Optional `.tar.gz` output path. When set, source mode archives the built static `.a` files after the build. |
+| `RUST_JSC_CMAKE_ARGS` | unset | Advanced escape hatch for extra CMake `-D...` arguments. Keep this empty unless a build investigation needs it. |
+| `RUST_JSC_CMAKE_GENERATOR` | `Ninja` | Compatibility input only. `Ninja` is accepted, any other value warns, and source mode still uses Ninja. |
+
+### System Mode Inputs
+
+System mode is for experiments only. Distribution JavaScriptCore builds usually
+do not export rust-jsc's fork-only APIs.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `RUST_JSC_SYSTEM_LIBS_PATH` | unset | Extra native library search directory. |
+| `RUST_JSC_SYSTEM_LIB_NAME` | `JavaScriptCore` | Dynamic library name to link. On macOS, `JavaScriptCore` links as a framework. |
+| `SYSTEM_LIBS_PATH` | `/usr/lib` on macOS static links | Extra search path for macOS system libraries used by static archive links. |
+
+### Legacy Aliases
+
+These still work during the 1.0 migration window, but new scripts and docs
+should use the variables above.
+
+| Legacy | Replacement |
+| --- | --- |
+| `RUST_JSC_BUILD_MODE=auto` | `RUST_JSC_BUILD_MODE=download` |
+| `RUST_JSC_BUILD_MODE=custom` | `RUST_JSC_BUILD_MODE=download` with `RUST_JSC_LIB_DIR` |
+| `RUST_JSC_BUILD_MODE=static` | `RUST_JSC_BUILD_MODE=download` |
+| `RUST_JSC_BUILD_MODE=archive` | `RUST_JSC_BUILD_MODE=download` |
+| `RUST_JSC_BUILD_MODE=framework` | `RUST_JSC_BUILD_MODE=system` for dynamic/framework experiments |
+| `RUST_JSC_FRAMEWORK_PATH` | system-mode macOS framework path; ignored by explicit `download` or `source` mode |
+| `RUST_JSC_CUSTOM_BUILD_PATH` | `RUST_JSC_LIB_DIR` |
+| `RUST_JSC_CUSTOM_ARCHIVE` | `RUST_JSC_ARCHIVE` |
+| `RUST_JSC_CMAKE_GENERATOR` | compatibility-only source input; source mode always uses Ninja |
+| `RUST_JSC_STATIC` | ignored; source mode is static by default |
+
+Cargo rebuilds `rust_jsc_sys` when any supported or legacy variable changes.
 
 ## Common Workflows
 
 ### Use The Default Released Static Archive
 
-This is the normal user path:
-
 ```bash
 cargo build
 ```
 
-The build script downloads the archive matching the target triple and links it.
+This downloads and links the target archive from:
 
-To make the static download explicit:
-
-```bash
-RUST_JSC_BUILD_MODE=static cargo build
+```text
+https://github.com/kevincaicedo/rust-jsc/releases/download/sys-v<version>/libjsc-<target>.a.gz
 ```
 
-### Use A Different Archive Mirror
+To make the mode explicit:
+
+```bash
+RUST_JSC_BUILD_MODE=download cargo build
+```
+
+### Use A Local Static JSC Build
+
+From the repository root:
+
+```bash
+make build-jsc-static
+RUST_JSC_BUILD_MODE=download \
+RUST_JSC_LIB_DIR="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/lib" \
+cargo test --lib -- --test-threads=1
+```
+
+`make test-local-jsc` runs this local static path for the library tests.
+
+### Build JSC From Source During Cargo Build
+
+Use source mode when Cargo should configure and build JSC directly:
+
+```bash
+RUST_JSC_BUILD_MODE=source \
+RUST_JSC_JOBS=8 \
+cargo build
+```
+
+Equivalent stable alias:
+
+```bash
+RUST_JSC_FROM_SOURCE=1 \
+RUST_JSC_JOBS=8 \
+cargo build
+```
+
+To use a custom checkout or build directory:
+
+```bash
+RUST_JSC_BUILD_MODE=source \
+RUST_JSC_WEBKIT_DIR="$PWD/WebKit" \
+RUST_JSC_BUILD_DIR="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static" \
+cargo build
+```
+
+To create a local archive from a source build:
+
+```bash
+RUST_JSC_BUILD_MODE=source \
+RUST_JSC_ARCHIVE_OUT="$PWD/libjsc-local.a.gz" \
+cargo build
+```
+
+`RUST_JSC_ARCHIVE_OUT` packages the `.a` files found in the source build's
+`lib` directory and writes `<archive>.sha256` plus `<archive>.metadata.json`.
+It is useful for local validation, not a replacement for the release Docker
+archive workflow.
+
+### Use A Different Archive Source
 
 Use `RUST_JSC_MIRROR` when release assets are mirrored internally:
 
@@ -154,104 +242,92 @@ Use `RUST_JSC_MIRROR` when release assets are mirrored internally:
 RUST_JSC_MIRROR=https://example.com/rust-jsc-releases cargo build
 ```
 
-The build script will request:
+The build script requests:
 
 ```text
 https://example.com/rust-jsc-releases/sys-v<version>/libjsc-<target>.a.gz
 ```
 
-Use `RUST_JSC_CUSTOM_ARCHIVE` when you want a specific archive file or URL:
+Use `RUST_JSC_ARCHIVE` for one exact archive:
 
 ```bash
 RUST_JSC_BUILD_MODE=download \
-RUST_JSC_CUSTOM_ARCHIVE=/path/to/libjsc-x86_64-unknown-linux-gnu.a.gz \
+RUST_JSC_ARCHIVE=/path/to/libjsc-x86_64-unknown-linux-gnu.a.gz \
 cargo build
 ```
 
-### Build Static JSC Locally For Development
+`RUST_JSC_ARCHIVE` also accepts `file://`, `http://`, and `https://` URLs.
+Local exact archives need `<archive>.sha256` or a `SHA256SUMS` file in the same
+directory. HTTP exact archives use `<archive-url>.sha256`.
+
+### Run ASAN And UBSAN Validation
+
+Sanitizer builds are validation-only builds. They do not replace the default
+static GitHub mirror archives and they are not published by the release archive
+workflow.
 
 From the repository root:
 
 ```bash
-make build-jsc-static
-RUST_JSC_BUILD_MODE=static \
-RUST_JSC_CUSTOM_BUILD_PATH="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/lib" \
-cargo test --lib -- --test-threads=1
+make test-webkit-api-asan
+make test-webkit-api-ubsan
+make test-rust-asan
+make test-rust-ubsan
 ```
 
-`make build-jsc` is also static by default because `JSC_STATIC=ON` in the
-Makefile. Use `make build-jsc-framework` when you explicitly want a macOS
-framework/dynamic build.
+The WebKit API targets configure local JSCOnly trees with
+`-DENABLE_SANITIZERS=address` or `-DENABLE_SANITIZERS=undefined`, build `jsc`,
+`TestWTF`, and `TestJavaScriptCore`, then run the API test binaries directly.
 
-On local Linux glibc builds, the static JSC archives normally sit beside no
-static `libstdc++` or ICU archives. In that case `rust_jsc_sys` links JSC/WTF
-statically but links `stdc++`, ICU, and `atomic` dynamically from the host. This
-is intended for local development. Release Docker archives still bundle those
-static dependency archives.
-
-### Build Static JSC During Cargo Build
-
-Use this when the Cargo build itself should drive CMake:
-
-```bash
-RUST_JSC_FROM_SOURCE=1 \
-RUST_JSC_STATIC=1 \
-RUST_JSC_JOBS=8 \
-cargo build
-```
-
-Set `RUST_JSC_WEBKIT_DIR` and `RUST_JSC_BUILD_DIR` to control source and build
-locations:
-
-```bash
-RUST_JSC_BUILD_MODE=source \
-RUST_JSC_STATIC=1 \
-RUST_JSC_WEBKIT_DIR="$PWD/WebKit" \
-RUST_JSC_BUILD_DIR="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static" \
-cargo build
-```
+Rust ASAN uses nightly Rust with `-Zsanitizer=address`, `-Zbuild-std`, and the
+ASAN-instrumented static JSC build. Rust UBSAN links tests against the
+UBSAN-instrumented JSC build with `-C link-arg=-fsanitize=undefined` and enables
+Rust `-Zub-checks=yes` where nightly supports it.
 
 ### Build Release Linux Archives With Docker
 
-The Dockerfiles produce archive contents for release and CI. They copy `.a`
-files into the Docker output directory.
+The Dockerfiles produce release archive contents and copy `.a` files into the
+Docker output directory.
 
 ```bash
 make build-docker-jsc
-cd .libs
-tar -czf ../libjsc-x86_64-unknown-linux-gnu.a.gz *.a
+python3 scripts/package_jsc_archive.py \
+  --lib-dir .libs \
+  --target-triple x86_64-unknown-linux-gnu \
+  --output-dir "$PWD" \
+  --repo-root "$PWD" \
+  --webkit-dir WebKit
 ```
 
 For musl:
 
 ```bash
 make build-docker-jsc-musl
-cd .libs-musl
-tar -czf ../libjsc-x86_64-unknown-linux-musl.a.gz *.a
+python3 scripts/package_jsc_archive.py \
+  --lib-dir .libs-musl \
+  --target-triple x86_64-unknown-linux-musl \
+  --output-dir "$PWD" \
+  --repo-root "$PWD" \
+  --webkit-dir WebKit
 ```
 
 For aarch64 cross builds:
 
 ```bash
 make build-docker-jsc-arm
-cd .libs-arm
-tar -czf ../libjsc-aarch64-unknown-linux-gnu.a.gz *.a
+python3 scripts/package_jsc_archive.py \
+  --lib-dir .libs-arm \
+  --target-triple aarch64-unknown-linux-gnu \
+  --output-dir "$PWD" \
+  --repo-root "$PWD" \
+  --webkit-dir WebKit
 ```
 
-The GitHub `build-release.yml` workflow builds the complete platform matrix and
-publishes those archives under a `sys-v<rust_jsc_sys version>` release tag.
-
-### Use A macOS Framework Build
-
-```bash
-make build-jsc-framework
-RUST_JSC_BUILD_MODE=framework \
-RUST_JSC_CUSTOM_BUILD_PATH="$PWD/WebKit/WebKitBuild/RustJSC/JSCOnly/Release/lib" \
-cargo test
-```
-
-Use framework mode for local macOS debugging or symbol inspection. It is not the
-default release path.
+The GitHub `build-release.yml` workflow builds the platform matrix and publishes
+the archives, checksum sidecars, metadata JSON, and combined `SHA256SUMS` under
+a `sys-v<rust_jsc_sys version>` release tag. Docker layer caches are keyed by
+the Dockerfile, Makefile, and sys crate manifest, with broad restore keys so
+incremental release rebuilds can reuse stable layers.
 
 ### Use A System JavaScriptCore
 
@@ -262,44 +338,61 @@ RUST_JSC_SYSTEM_LIB_NAME=JavaScriptCore \
 cargo build
 ```
 
-System mode is for experiments only. Distribution-provided JavaScriptCore builds
-usually do not export rust-jsc's custom APIs, so normal rust-jsc features may
-fail to link.
+This is for experiments only. Stock system JavaScriptCore usually cannot link
+all rust-jsc APIs.
 
 ## CI And Release Behavior
 
 - Pull-request CI checks whether the current `rust_jsc_sys` version already has
-  a released Linux glibc x86_64 static archive.
-- If the release exists, CI lets `sys/build.rs` download it from the GitHub
-  mirror.
+  a released Linux glibc x86_64 static archive and `SHA256SUMS` manifest.
+- If the release exists, CI uses default `download` mode and lets
+  `sys/build.rs` download and verify it from the GitHub mirror.
 - If the release does not exist, CI builds the static JSC archive with Docker
-  and sets `RUST_JSC_BUILD_MODE=static` plus `RUST_JSC_CUSTOM_BUILD_PATH=.libs`.
-- The release workflow always builds static archives for macOS, Linux glibc, and
-  Linux musl targets, then publishes them to a `sys-v<version>` GitHub release.
-- The crate publish workflow tests with `RUST_JSC_BUILD_MODE=static`, which
-  downloads the published static archive when no custom path is set.
+  and sets `RUST_JSC_BUILD_MODE=download` plus `RUST_JSC_LIB_DIR=.libs`.
+- The release workflow builds static archives for macOS, Linux glibc, and Linux
+  musl targets, packages deterministic archives, verifies checksums, then
+  publishes them to a `sys-v<version>` GitHub release.
+- The crate publish workflow tests with `RUST_JSC_BUILD_MODE=download`, which
+  downloads the published static archive when no local library directory is set.
+- The sanitizer workflow is manual and scheduled. It builds local ASAN/UBSAN
+  JSCOnly trees and runs WebKit API tests plus Rust integration tests, but it
+  does not publish or alter release archives.
 
 ## Troubleshooting
 
 ### The Build Tries To Download An Archive That Does Not Exist
 
-Confirm that `sys/Cargo.toml` version has a matching GitHub release tag:
+Confirm that `sys/Cargo.toml` version has a matching GitHub release tag and
+`SHA256SUMS` file:
 
 ```text
 sys-v<version>
+SHA256SUMS
 ```
 
 For local work before publishing a new sys archive, build JSC locally and set:
 
 ```bash
-RUST_JSC_BUILD_MODE=static \
-RUST_JSC_CUSTOM_BUILD_PATH=/path/to/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/lib \
+RUST_JSC_BUILD_MODE=download \
+RUST_JSC_LIB_DIR=/path/to/WebKit/WebKitBuild/RustJSC/JSCOnly/Release-Static/lib \
 cargo build
 ```
 
+### Source Mode Cannot Configure CMake
+
+Source mode requires CMake and Ninja:
+
+```bash
+cmake --version
+ninja --version
+```
+
+Install `ninja-build` on Debian/Ubuntu or the equivalent package on your
+distribution.
+
 ### A Local Static Linux Build Cannot Find `libstdc++.a` Or ICU `.a` Files
 
-This is expected for many source-built local glibc builds. The build script now
+This is expected for many source-built local glibc builds. The build script
 falls back to dynamic Linux system libraries when the static dependency archives
 are not bundled beside the local JSC archives. Install the development packages
 for your distro, for example:
@@ -311,10 +404,10 @@ sudo apt-get install libicu-dev libstdc++-dev libatomic1
 Release Docker archives still bundle the static dependency archives and keep the
 default downloaded archive path static.
 
-### Runtime Loader Cannot Find A Dynamic Local JSC Build
+### Runtime Loader Cannot Find A Dynamic System Build
 
-When using `framework`, `system`, or dynamic library layouts, set the platform
-loader path if needed:
+When using `system` mode with dynamic libraries, set the platform loader path if
+needed:
 
 ```bash
 # macOS
@@ -329,8 +422,10 @@ Static archive builds do not need these variables for JavaScriptCore itself.
 ### CMake Reuses The Wrong Build Directory
 
 If a CMake cache was created from a different checkout path, use a fresh build
-directory instead of deleting unrelated user artifacts:
+directory:
 
 ```bash
-make build-jsc JSC_STATIC=ON JSC_BUILD_ROOT=WebKit/WebKitBuild/RustJSC-local JSC_JOBS=8
+RUST_JSC_BUILD_MODE=source \
+RUST_JSC_BUILD_DIR="$PWD/WebKit/WebKitBuild/RustJSC-local/JSCOnly/Release-Static" \
+cargo build
 ```

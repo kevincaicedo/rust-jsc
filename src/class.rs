@@ -23,6 +23,7 @@ pub enum ClassError {
 
 pub struct JSClassBuilder {
     definition: JSClassDefinition,
+    class_name: CString,
     name: String,
 }
 
@@ -34,6 +35,7 @@ impl JSClassBuilder {
         definition.className = class_name.as_ptr();
         Self {
             definition,
+            class_name,
             name: name.to_string(),
         }
     }
@@ -145,6 +147,7 @@ impl JSClassBuilder {
         if self.definition.finalize.is_none() && TypeId::of::<T>() != TypeId::of::<()>() {
             self.definition.finalize = Some(Self::finalize_callback::<T>);
         }
+        self.definition.className = self.class_name.as_ptr();
 
         let class = unsafe { JSClassCreate(&self.definition) };
         if class.is_null() {
@@ -246,7 +249,7 @@ impl JSClass {
     /// ```
     /// use rust_jsc::{JSClass, JSContext};
     ///
-    /// let ctx = JSContext::default();
+    /// let ctx = JSContext::new();
     /// let class = JSClass::builder("Test")
     ///    .set_version(1)
     ///    .build::<i32>()
@@ -290,7 +293,7 @@ impl JSClass {
     /// ```
     /// use rust_jsc::{JSClass, JSContext, JSClassAttribute};
     ///
-    /// let ctx = JSContext::default();
+    /// let ctx = JSContext::new();
     /// let class = JSClass::builder("Test")
     ///     .set_version(1)
     ///     .set_attributes(JSClassAttribute::None.into())
@@ -330,6 +333,7 @@ impl Drop for JSClass {
 
 #[cfg(test)]
 mod tests {
+    use super::JSClassBuilder;
     use crate::{self as rust_jsc, PrivateData};
     use rust_jsc_macros::{constructor, finalize, has_instance, initialize};
 
@@ -349,7 +353,7 @@ mod tests {
             Ok(this.into())
         }
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
@@ -400,7 +404,7 @@ mod tests {
             Ok(this.into())
         }
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
@@ -428,7 +432,7 @@ mod tests {
 
     #[test]
     fn test_class_without_constructor() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
@@ -501,7 +505,7 @@ mod tests {
             }
         }
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("Test")
             .set_version(1)
             .set_attributes(JSClassAttribute::None.into())
@@ -532,13 +536,13 @@ mod tests {
 
         let object = object.as_object().unwrap();
         let result = unsafe { object.set_private_data(42) };
-        assert!(result);
+        assert!(result.is_success());
         assert_eq!(*object.get_private_data::<i32>().unwrap(), 42);
     }
 
     #[test]
     fn test_class_object_private_data_type_safe() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("TypeSafeTest").build::<String>().unwrap();
 
         let object = class.object::<String>(&ctx, Some(String::from("hello")));
@@ -554,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_class_object_no_data() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("NoDataTest").build::<()>().unwrap();
 
         let object = class.object::<()>(&ctx, None);
@@ -567,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_class_object_take_private_data() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("TakeDataTest").build::<String>().unwrap();
 
         let object = class.object::<String>(&ctx, Some(String::from("take me")));
@@ -583,7 +587,7 @@ mod tests {
 
     #[test]
     fn test_class_object_take_wrong_type_preserves_data() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("TakeWrongTest").build::<i32>().unwrap();
 
         let object = class.object::<i32>(&ctx, Some(42));
@@ -598,7 +602,7 @@ mod tests {
 
     #[test]
     fn test_class_object_mut_data() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("MutDataTest").build::<i32>().unwrap();
 
         let object = class.object::<i32>(&ctx, Some(10));
@@ -613,7 +617,7 @@ mod tests {
 
     #[test]
     fn test_class_object_multiple_reads() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("MultiReadTest").build::<String>().unwrap();
 
         let object = class.object::<String>(&ctx, Some(String::from("persistent")));
@@ -628,7 +632,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Data type does not match class type")]
     fn test_class_object_type_mismatch_panics() {
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("MismatchTest").build::<i32>().unwrap();
 
         // Attempting to create an object with a different type should panic
@@ -644,7 +648,7 @@ mod tests {
             title: String,
         }
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("ConfigClass").build::<Config>().unwrap();
 
         let object = class.object::<Config>(
@@ -667,7 +671,7 @@ mod tests {
     fn test_class_refcell_safe_mutation() {
         use std::cell::RefCell;
 
-        let ctx = JSContext::default();
+        let ctx = JSContext::new();
         let class = JSClass::builder("RefCellTest")
             .build::<RefCell<Vec<String>>>()
             .unwrap();
@@ -687,5 +691,114 @@ mod tests {
             &*cell.borrow(),
             &["first".to_string(), "second".to_string()]
         );
+    }
+
+    #[test]
+    fn test_class_builder_name_lifetime_repeated_creation() {
+        let ctx = JSContext::new();
+
+        for index in 0..128 {
+            let name = format!("LifetimeClass{index}");
+            let class = JSClass::builder(&name).build::<()>().unwrap();
+            let object = class.object::<()>(&ctx, None);
+            ctx.global_object()
+                .set_property("__rust_jsc_lifetime_probe", &object, Default::default())
+                .unwrap();
+
+            let tag = ctx
+                .evaluate_script(
+                    "Object.prototype.toString.call(__rust_jsc_lifetime_probe)",
+                    None,
+                )
+                .unwrap()
+                .as_string()
+                .unwrap()
+                .to_string();
+
+            assert_eq!(tag, format!("[object {name}]"));
+        }
+    }
+
+    #[test]
+    fn test_class_registration_and_inheritance() {
+        #[constructor]
+        fn constructor(
+            ctx: JSContext,
+            this: JSObject,
+            _arguments: &[JSValue],
+        ) -> JSResult<JSValue> {
+            this.set_property(
+                "created",
+                &JSValue::boolean(&ctx, true),
+                Default::default(),
+            )?;
+            Ok(this.into())
+        }
+
+        let ctx = JSContext::new();
+        let parent = JSClass::builder("PhaseOneParent")
+            .call_as_constructor(Some(constructor))
+            .build::<()>()
+            .unwrap();
+        let child = JSClass::builder("PhaseOneChild")
+            .parent_class(&parent)
+            .call_as_constructor(Some(constructor))
+            .build::<()>()
+            .unwrap();
+
+        parent.register(&ctx).unwrap();
+        child.register(&ctx).unwrap();
+
+        let value = ctx
+            .evaluate_script("const child = new PhaseOneChild(); child", None)
+            .unwrap();
+
+        assert!(value.is_object_of_class(&child).unwrap());
+        assert!(value.is_object_of_class(&parent).unwrap());
+        assert_eq!(
+            value
+                .as_object()
+                .unwrap()
+                .get_property("created")
+                .unwrap()
+                .as_boolean(),
+            true
+        );
+        assert_eq!(
+            ctx.evaluate_script("child.created", None)
+                .unwrap()
+                .as_boolean(),
+            true
+        );
+    }
+
+    #[test]
+    fn test_class_default_finalize_callback_drops_private_data() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        static DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+        struct FinalizeProbe;
+
+        impl Drop for FinalizeProbe {
+            fn drop(&mut self) {
+                DROP_COUNT.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        DROP_COUNT.store(0, Ordering::SeqCst);
+
+        let ctx = JSContext::new();
+        let class = JSClass::builder("FinalizeProbe")
+            .build::<FinalizeProbe>()
+            .unwrap();
+        let object = class.object::<FinalizeProbe>(&ctx, Some(FinalizeProbe));
+
+        unsafe {
+            JSClassBuilder::finalize_callback::<FinalizeProbe>(object.inner);
+            rust_jsc::internal::JSObjectSetPrivate(object.inner, std::ptr::null_mut());
+        }
+
+        assert_eq!(DROP_COUNT.load(Ordering::SeqCst), 1);
     }
 }
